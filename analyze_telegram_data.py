@@ -426,6 +426,143 @@ class TelegramDataAnalyzer:
         
         return fig
 
+    def create_user_media_analysis(self):
+        """Create a chart showing users and their media contribution."""
+        if 'creator_username' not in self.df.columns or 'media_type' not in self.df.columns:
+            return None
+        
+        # Filter messages with media and valid creator usernames
+        media_data = self.df[
+            (self.df['media_type'].notna()) & 
+            (self.df['creator_username'].notna()) & 
+            (self.df['creator_username'] != '')
+        ].copy()
+        
+        if len(media_data) == 0:
+            return None
+        
+        # Count media contributions by user
+        user_media_counts = media_data.groupby('creator_username').agg({
+            'media_type': 'count',
+            'file_size': ['sum', 'mean'],
+            'views': 'sum',
+            'forwards': 'sum',
+            'replies': 'sum'
+        }).round(2)
+        
+        # Flatten column names
+        user_media_counts.columns = ['media_count', 'total_size', 'avg_size', 'total_views', 'total_forwards', 'total_replies']
+        user_media_counts = user_media_counts.reset_index()
+        
+        # Convert file sizes to MB
+        user_media_counts['total_size_mb'] = user_media_counts['total_size'] / (1024 * 1024)
+        user_media_counts['avg_size_mb'] = user_media_counts['avg_size'] / (1024 * 1024)
+        
+        # Sort by media count (descending)
+        user_media_counts = user_media_counts.sort_values('media_count', ascending=False)
+        
+        # Limit to top 20 users for readability
+        top_users = user_media_counts.head(20)
+        
+        # Create bar chart showing top users by media count
+        fig = go.Figure(data=[go.Bar(
+            x=top_users['creator_username'],
+            y=top_users['media_count'],
+            text=top_users['media_count'],
+            textposition='auto',
+            marker_color='#17a2b8',
+            hovertemplate='<b>%{x}</b><br>' +
+                          'Media Count: %{y}<br>' +
+                          'Total Size: %{customdata[0]:.1f} MB<br>' +
+                          'Avg Size: %{customdata[1]:.2f} MB<br>' +
+                          'Total Views: %{customdata[2]:,}<br>' +
+                          'Total Forwards: %{customdata[3]:,}<br>' +
+                          'Total Replies: %{customdata[4]:,}<extra></extra>',
+            customdata=list(zip(
+                top_users['total_size_mb'],
+                top_users['avg_size_mb'],
+                top_users['total_views'],
+                top_users['total_forwards'],
+                top_users['total_replies']
+            ))
+        )])
+        
+        fig.update_layout(
+            title='Top Users by Media Contribution',
+            xaxis_title='Username',
+            yaxis_title='Number of Media Attachments',
+            height=500,
+            template='plotly_white',
+            xaxis={'tickangle': -45}
+        )
+        
+        return fig
+
+    def create_user_media_table(self):
+        """Create a detailed table of users and their media statistics."""
+        if 'creator_username' not in self.df.columns or 'media_type' not in self.df.columns:
+            return None
+        
+        # Filter messages with media and valid creator usernames
+        media_data = self.df[
+            (self.df['media_type'].notna()) & 
+            (self.df['creator_username'].notna()) & 
+            (self.df['creator_username'] != '')
+        ].copy()
+        
+        if len(media_data) == 0:
+            return None
+        
+        # Count media contributions by user
+        user_media_counts = media_data.groupby('creator_username').agg({
+            'media_type': 'count',
+            'file_size': ['sum', 'mean'],
+            'views': 'sum',
+            'forwards': 'sum',
+            'replies': 'sum'
+        }).round(2)
+        
+        # Flatten column names
+        user_media_counts.columns = ['Media Count', 'Total Size (bytes)', 'Avg Size (bytes)', 'Total Views', 'Total Forwards', 'Total Replies']
+        user_media_counts = user_media_counts.reset_index()
+        
+        # Convert file sizes to MB
+        user_media_counts['Total Size (MB)'] = (user_media_counts['Total Size (bytes)'] / (1024 * 1024)).round(2)
+        user_media_counts['Avg Size (MB)'] = (user_media_counts['Avg Size (bytes)'] / (1024 * 1024)).round(2)
+        
+        # Sort by media count (descending)
+        user_media_counts = user_media_counts.sort_values('Media Count', ascending=False)
+        
+        # Select columns for display
+        display_columns = ['creator_username', 'Media Count', 'Total Size (MB)', 'Avg Size (MB)', 'Total Views', 'Total Forwards', 'Total Replies']
+        display_data = user_media_counts[display_columns].copy()
+        display_data.columns = ['Username', 'Media Count', 'Total Size (MB)', 'Avg Size (MB)', 'Total Views', 'Total Forwards', 'Total Replies']
+        
+        # Create table
+        fig = go.Figure(data=[go.Table(
+            header=dict(
+                values=list(display_data.columns),
+                fill_color='#17a2b8',
+                font=dict(color='white', size=12),
+                align='left'
+            ),
+            cells=dict(
+                values=[display_data[col] for col in display_data.columns],
+                fill_color='lavender',
+                align='left',
+                font=dict(size=11),
+                height=30
+            )
+        )])
+        
+        fig.update_layout(
+            title='User Media Contribution Table',
+            height=600,
+            template='plotly_white'
+        )
+        
+        return fig
+
     def create_summary_statistics(self):
         """Create a summary statistics table."""
         if self.df is None:
@@ -454,6 +591,21 @@ class TelegramDataAnalyzer:
                     'Average File Size': f"{avg_size_mb:.2f} MB",
                     'Largest File': f"{file_size_stats.max() / (1024 * 1024):.1f} MB",
                     'Smallest File': f"{file_size_stats.min() / (1024 * 1024):.2f} MB"
+                })
+        
+        # Add user statistics if available
+        if 'creator_username' in self.df.columns:
+            user_stats = self.df['creator_username'].dropna()
+            if len(user_stats) > 0:
+                unique_users = user_stats.nunique()
+                # Count users with media
+                users_with_media = self.df[
+                    (self.df['creator_username'].notna()) & 
+                    (self.df['media_type'].notna())
+                ]['creator_username'].nunique()
+                stats.update({
+                    'Unique Users': unique_users,
+                    'Users with Media': users_with_media
                 })
         
         # Create table
@@ -494,6 +646,8 @@ class TelegramDataAnalyzer:
             'Forwarding Analysis': self.create_forwarding_analysis(),
             'File Size by Media Type': self.create_file_size_by_media_type(),
             'File Size Analysis': self.create_file_size_analysis(),
+            'Top Users by Media': self.create_user_media_analysis(),
+            'User Media Table': self.create_user_media_table(),
             'Engagement Metrics': self.create_engagement_metrics(),
             'Summary Statistics': self.create_summary_statistics()
         }

@@ -294,6 +294,138 @@ class TelegramDataAnalyzer:
         
         return fig
     
+    def create_file_size_analysis(self):
+        """Create comprehensive file size analysis charts."""
+        if 'file_size' not in self.df.columns:
+            return None
+        
+        # Filter out null file sizes
+        file_data = self.df[self.df['file_size'].notna()].copy()
+        if len(file_data) == 0:
+            return None
+        
+        # Convert to MB for better readability
+        file_data['file_size_mb'] = file_data['file_size'] / (1024 * 1024)
+        
+        # Create subplots for different file size analyses
+        fig = make_subplots(
+            rows=2, cols=2,
+            subplot_titles=('File Size Distribution', 'File Size by Media Type', 'File Size Over Time', 'File Size vs Engagement'),
+            specs=[[{"type": "histogram"}, {"type": "box"}],
+                   [{"type": "scatter"}, {"type": "scatter"}]]
+        )
+        
+        # 1. File Size Distribution (histogram)
+        fig.add_trace(
+            go.Histogram(
+                x=file_data['file_size_mb'],
+                nbinsx=50,
+                name='File Size Distribution',
+                marker_color='#1f77b4'
+            ),
+            row=1, col=1
+        )
+        
+        # 2. File Size by Media Type (box plot)
+        if 'media_type' in file_data.columns:
+            for media_type in file_data['media_type'].unique():
+                if pd.notna(media_type):
+                    media_data = file_data[file_data['media_type'] == media_type]['file_size_mb']
+                    if len(media_data) > 0:
+                        fig.add_trace(
+                            go.Box(
+                                y=media_data,
+                                name=media_type,
+                                boxpoints='outliers'
+                            ),
+                            row=1, col=2
+                        )
+        
+        # 3. File Size Over Time (scatter)
+        if 'date' in file_data.columns:
+            fig.add_trace(
+                go.Scatter(
+                    x=file_data['date'],
+                    y=file_data['file_size_mb'],
+                    mode='markers',
+                    name='File Size Over Time',
+                    marker=dict(size=3, color='#2ca02c', opacity=0.6)
+                ),
+                row=2, col=1
+            )
+        
+        # 4. File Size vs Views (scatter)
+        if 'views' in file_data.columns:
+            fig.add_trace(
+                go.Scatter(
+                    x=file_data['file_size_mb'],
+                    y=file_data['views'],
+                    mode='markers',
+                    name='File Size vs Views',
+                    marker=dict(size=3, color='#d62728', opacity=0.6)
+                ),
+                row=2, col=2
+            )
+        
+        # Update layout
+        fig.update_layout(
+            title='File Size Analysis',
+            height=600,
+            template='plotly_white'
+        )
+        
+        # Update axes labels
+        fig.update_xaxes(title_text="File Size (MB)", row=1, col=1)
+        fig.update_yaxes(title_text="Count", row=1, col=1)
+        fig.update_yaxes(title_text="File Size (MB)", row=1, col=2)
+        fig.update_xaxes(title_text="Date", row=2, col=1)
+        fig.update_yaxes(title_text="File Size (MB)", row=2, col=1)
+        fig.update_xaxes(title_text="File Size (MB)", row=2, col=2)
+        fig.update_yaxes(title_text="Views", row=2, col=2)
+        
+        return fig
+
+    def create_file_size_by_media_type(self):
+        """Create a chart showing file size statistics by media type."""
+        if 'file_size' not in self.df.columns or 'media_type' not in self.df.columns:
+            return None
+        
+        # Filter out null values
+        file_data = self.df[self.df['file_size'].notna() & self.df['media_type'].notna()].copy()
+        if len(file_data) == 0:
+            return None
+        
+        # Convert to MB
+        file_data['file_size_mb'] = file_data['file_size'] / (1024 * 1024)
+        
+        # Group by media type and calculate statistics
+        media_stats = file_data.groupby('media_type').agg({
+            'file_size_mb': ['count', 'mean', 'median', 'std', 'min', 'max']
+        }).round(2)
+        
+        # Flatten column names
+        media_stats.columns = ['count', 'mean', 'median', 'std', 'min', 'max']
+        media_stats = media_stats.reset_index()
+        
+        # Create bar chart showing average file size by media type
+        fig = go.Figure(data=[go.Bar(
+            x=media_stats['media_type'],
+            y=media_stats['mean'],
+            text=media_stats['mean'].round(2),
+            textposition='auto',
+            marker_color='#9467bd'
+        )])
+        
+        fig.update_layout(
+            title='Average File Size by Media Type',
+            xaxis_title='Media Type',
+            yaxis_title='Average File Size (MB)',
+            height=400,
+            template='plotly_white'
+        )
+        
+        return fig
+
     def create_summary_statistics(self):
         """Create a summary statistics table."""
         if self.df is None:
@@ -310,6 +442,19 @@ class TelegramDataAnalyzer:
             'Total Views': f"{self.df['views'].sum():,}" if 'views' in self.df.columns else 'N/A',
             'Total Forwards': f"{self.df['forwards'].sum():,}" if 'forwards' in self.df.columns else 'N/A'
         }
+        
+        # Add file size statistics if available
+        if 'file_size' in self.df.columns:
+            file_size_stats = self.df['file_size'].dropna()
+            if len(file_size_stats) > 0:
+                total_size_mb = file_size_stats.sum() / (1024 * 1024)
+                avg_size_mb = file_size_stats.mean() / (1024 * 1024)
+                stats.update({
+                    'Total File Size': f"{total_size_mb:,.1f} MB",
+                    'Average File Size': f"{avg_size_mb:.2f} MB",
+                    'Largest File': f"{file_size_stats.max() / (1024 * 1024):.1f} MB",
+                    'Smallest File': f"{file_size_stats.min() / (1024 * 1024):.2f} MB"
+                })
         
         # Create table
         fig = go.Figure(data=[go.Table(
@@ -347,6 +492,8 @@ class TelegramDataAnalyzer:
             'Text Length Distribution': self.create_text_length_distribution(),
             'Channel Comparison': self.create_channel_comparison(),
             'Forwarding Analysis': self.create_forwarding_analysis(),
+            'File Size by Media Type': self.create_file_size_by_media_type(),
+            'File Size Analysis': self.create_file_size_analysis(),
             'Engagement Metrics': self.create_engagement_metrics(),
             'Summary Statistics': self.create_summary_statistics()
         }

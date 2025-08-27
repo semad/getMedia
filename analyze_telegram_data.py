@@ -107,6 +107,7 @@ class TelegramDataAnalyzer:
             xaxis_title='Date',
             yaxis_title='Number of Messages',
             hovermode='x unified',
+            height=400,
             template='plotly_white'
         )
         
@@ -287,7 +288,7 @@ class TelegramDataAnalyzer:
         
         fig.update_layout(
             title='Engagement Metrics Analysis',
-            height=800,
+            height=600,
             template='plotly_white'
         )
         
@@ -390,8 +391,9 @@ class TelegramDataAnalyzer:
                     background: white;
                     border-radius: 10px;
                     padding: 20px;
-                    margin-bottom: 30px;
+                    margin-bottom: 0;
                     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    box-sizing: border-box;
                 }}
                 .chart-title {{
                     color: #333;
@@ -400,14 +402,22 @@ class TelegramDataAnalyzer:
                     padding-bottom: 10px;
                     border-bottom: 2px solid #667eea;
                 }}
-                .grid {{
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+                .grid-row {{
+                    display: flex;
                     gap: 30px;
                     margin-bottom: 30px;
+                    flex-wrap: wrap;
+                }}
+                .chart-container {{
+                    flex: 1;
+                    min-width: 500px;
+                    max-width: calc(50% - 15px);
+                    display: flex;
+                    flex-direction: column;
                 }}
                 .full-width {{
-                    grid-column: 1 / -1;
+                    max-width: 100%;
+                    margin-bottom: 30px;
                 }}
                 .footer {{
                     text-align: center;
@@ -415,6 +425,27 @@ class TelegramDataAnalyzer:
                     margin-top: 40px;
                     padding: 20px;
                     border-top: 1px solid #ddd;
+                }}
+                
+                /* Responsive design for mobile devices */
+                @media (max-width: 768px) {{
+                    body {{
+                        padding: 10px;
+                    }}
+                    .header h1 {{
+                        font-size: 2em;
+                    }}
+                    .grid-row {{
+                        flex-direction: column;
+                        gap: 20px;
+                    }}
+                    .chart-container {{
+                        min-width: 100%;
+                        max-width: 100%;
+                    }}
+                    .full-width {{
+                        margin-bottom: 20px;
+                    }}
                 }}
             </style>
         </head>
@@ -426,19 +457,27 @@ class TelegramDataAnalyzer:
             </div>
         """
         
-        # Add charts in a grid layout
+        # Add charts in a clean grid layout
         chart_count = 0
+        current_row = []
+        
         for title, chart in charts.items():
             if chart is None:
                 continue
-                
+            
             # Determine if chart should be full width
             is_full_width = title in ['Time Series', 'Engagement Metrics']
             
-            if chart_count == 0 or is_full_width:
-                html_content += '<div class="grid">'
-            
             if is_full_width:
+                # Close current row if it has charts
+                if current_row:
+                    html_content += '<div class="grid-row">'
+                    for chart_html in current_row:
+                        html_content += chart_html
+                    html_content += '</div>'
+                    current_row = []
+                
+                # Add full-width chart
                 html_content += f'''
                 <div class="chart-container full-width">
                     <div class="chart-title">{title}</div>
@@ -446,22 +485,28 @@ class TelegramDataAnalyzer:
                 </div>
                 '''
             else:
-                html_content += f'''
+                # Add chart to current row
+                chart_html = f'''
                 <div class="chart-container">
                     <div class="chart-title">{title}</div>
                     {chart.to_html(full_html=False, include_plotlyjs='cdn')}
                 </div>
                 '''
-            
-            chart_count += 1
-            
-            # Close grid if needed
-            if is_full_width or chart_count % 2 == 0:
-                html_content += '</div>'
-                chart_count = 0
+                current_row.append(chart_html)
+                
+                # If we have 2 charts in the row, close it
+                if len(current_row) == 2:
+                    html_content += '<div class="grid-row">'
+                    for chart_html in current_row:
+                        html_content += chart_html
+                    html_content += '</div>'
+                    current_row = []
         
-        # Close any remaining grid
-        if chart_count > 0:
+        # Close any remaining charts in the last row
+        if current_row:
+            html_content += '<div class="grid-row">'
+            for chart_html in current_row:
+                html_content += chart_html
             html_content += '</div>'
         
         # Add footer

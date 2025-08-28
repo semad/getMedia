@@ -43,6 +43,7 @@ telegram_collector.log
 # Data Files
 *.json
 *.csv
+!duplicate_documents.csv
 *.db
 *.sqlite
 *.sqlite3

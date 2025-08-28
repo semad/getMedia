@@ -40,6 +40,13 @@ venv.bak/
 logs/
 telegram_collector.log
 
+# Reports Directory (Generated Output Files)
+reports/
+reports/*.html
+reports/*.csv
+reports/*.xlsx
+reports/*.json
+
 # Data Files
 *.json
 *.csv

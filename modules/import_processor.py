@@ -75,12 +75,16 @@ async def process_import_batch(
     retry_handler: RetryHandler,
     skip_duplicates: bool = False
 ) -> tuple[int, int, int]:
-    """Process a batch of messages for import."""
+    """Process a batch of messages for import using individual endpoints."""
+    logger.debug(f"Processing import batch of {len(batch)} messages...")
+    logger.debug(f"Skip duplicates setting: {skip_duplicates}")
+    
     success_count = 0
     error_count = 0
     skipped_count = 0
     
-    for msg in batch:
+    for i, msg in enumerate(batch):
+        logger.debug(f"Processing message {i+1}/{len(batch)}: ID {msg.get('message_id', 'unknown')}")
         try:
             # Validate message format
             if not validate_message_format(msg):
@@ -88,34 +92,38 @@ async def process_import_batch(
                 error_count += 1
                 continue
             
-            # Convert dict to TelegramMessage object
-            message = TelegramMessage(
-                message_id=msg['message_id'],
-                channel_username=msg['channel_username'],
-                date=datetime.fromisoformat(msg['date']) if isinstance(msg['date'], str) else msg['date'],
-                text=msg['text'],
-                media_type=msg.get('media_type'),
-                file_name=msg.get('file_name'),
-                file_size=msg.get('file_size'),
-                mime_type=msg.get('mime_type'),
-                duration=msg.get('duration'),
-                width=msg.get('width'),
-                height=msg.get('height'),
-                caption=msg.get('caption'),
-                views=msg.get('views'),
-                forwards=msg.get('forwards'),
-                replies=msg.get('replies'),
-                edit_date=datetime.fromisoformat(msg['edit_date']) if msg.get('edit_date') else None,
-                is_forwarded=msg.get('is_forwarded', False),
-                forwarded_from=msg.get('forwarded_from'),
-                forwarded_message_id=msg.get('forwarded_message_id'),
-                created_at=datetime.now(),
-                updated_at=datetime.now()
-            )
+            # Clean and prepare message data for API
+            cleaned_msg = {
+                'message_id': msg['message_id'],
+                'channel_username': msg['channel_username'],
+                'date': msg['date'],
+                'text': msg['text'],
+                'media_type': msg.get('media_type'),
+                'file_name': msg.get('file_name'),
+                'file_size': msg.get('file_size'),
+                'mime_type': msg.get('mime_type'),
+                'caption': msg.get('caption')
+            }
+            
+            # Remove fields that conflict with database schema
+            fields_to_remove = ['id', 'created_at', 'updated_at', 'deleted_at', 'is_deleted', 'text_length', 'has_media']
+            for field in fields_to_remove:
+                cleaned_msg.pop(field, None)
+            
+            # Clean NaN and inf values
+            for key, value in cleaned_msg.items():
+                if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+                    cleaned_msg[key] = None
+                elif isinstance(value, str) and value in ['NaN', 'NaT', 'nan', 'nat']:
+                    cleaned_msg[key] = None
+            
+            # Convert float values to int for integer fields
+            if 'file_size' in cleaned_msg and isinstance(cleaned_msg['file_size'], float):
+                cleaned_msg['file_size'] = int(cleaned_msg['file_size'])
             
             # Store message with retry logic
             success = await retry_handler.execute_with_retry(
-                db_service.store_message, message
+                db_service.store_message, cleaned_msg
             )
             
             if success:
@@ -200,28 +208,34 @@ async def run_import(
             return stats
         
         # Initialize database service
+        logger.debug(f"Initializing database service with URL: {db_url}")
         async with TelegramDBService(db_url) as db_service:
             # Check connection
             logger.info("Checking database connection...")
+            logger.debug("Sending connection test request...")
             if not await db_service.check_connection():
                 logger.error("Cannot connect to database. Please check if the service is running.")
                 return stats
             
             logger.info("Database connection successful")
+            logger.debug("Database service initialized and connection verified")
             
             # Initialize retry handler
             retry_handler = RetryHandler(max_retries, retry_delay, max_delay)
             
             # Process messages in batches
             total_batches = (len(messages) + batch_size - 1) // batch_size
+            logger.debug(f"Will process {len(messages)} messages in {total_batches} batches of size {batch_size}")
             
             for i in range(0, len(messages), batch_size):
                 batch = messages[i:i + batch_size]
                 batch_num = (i // batch_size) + 1
                 
                 logger.info(f"Processing batch {batch_num}/{total_batches} ({len(batch)} messages)")
+                logger.debug(f"Batch {batch_num} message IDs: {[msg.get('message_id', 'unknown') for msg in batch[:5]]}{'...' if len(batch) > 5 else ''}")
                 
                 if not dry_run:
+                    logger.debug(f"Starting batch {batch_num} processing...")
                     success, errors, skipped = await process_import_batch(
                         batch, db_service, retry_handler, skip_duplicates
                     )
@@ -230,7 +244,8 @@ async def run_import(
                     stats.error_count += errors
                     stats.skipped_count += skipped
                     
-                    logger.info(f"Batch {batch_num} complete. Success: {success}, Errors: {errors}")
+                    logger.info(f"Batch {batch_num} complete. Success: {success}, Errors: {errors}, Skipped: {skipped}")
+                    logger.debug(f"Batch {batch_num} statistics - Total: {len(batch)}, Success: {success}, Errors: {errors}, Skipped: {skipped}")
                     
                     # Progress update
                     progress = min(i + batch_size, len(messages))
@@ -242,6 +257,7 @@ async def run_import(
                         await asyncio.sleep(batch_delay)
                 else:
                     logger.info(f"DRY RUN - Would process batch {batch_num} ({len(batch)} messages)")
+                    logger.debug(f"DRY RUN - Batch {batch_num} would contain: {[msg.get('message_id', 'unknown') for msg in batch[:5]]}{'...' if len(batch) > 5 else ''}")
                     stats.imported_count += len(batch)
             
             # Update retry statistics

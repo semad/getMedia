@@ -7,6 +7,7 @@ import os
 import click
 import asyncio
 import logging
+import json
 from datetime import datetime
 
 # Add the current directory to the Python path
@@ -17,6 +18,7 @@ from modules.telegram_collector import TelegramCollector, DatabaseChecker
 from modules.telegram_exporter import TelegramMessageExporter
 from modules.telegram_analyzer import TelegramDataAnalyzer
 from modules.models import ChannelConfig, RateLimitConfig
+from modules.diff_utility import DatabaseDiffChecker
 
 
 def setup_logging(verbose: bool):
@@ -35,6 +37,85 @@ def setup_logging(verbose: bool):
 def cli():
     """Unified Telegram Media Messages Tool"""
     pass
+
+
+@cli.command(name='diff')
+@click.argument('json_file', type=click.Path(exists=True))
+@click.option('--output', '-o', default='diff_output.json', help='Output file path for diff JSON (default: diff_output.json)')
+@click.option('--db-url', default='http://localhost:80', help='Database API URL (default: http://localhost:80)')
+@click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging output')
+@click.option('--convert', '-c', is_flag=True, help='Also create an import-ready file with just the missing messages')
+@click.help_option('-h', '--help')
+def diff_cmd(json_file, output, db_url, verbose, convert):
+    """Generate a diff between JSON export file and database.
+    
+    This command compares a JSON export file with the current database state
+    and generates a diff JSON containing only the messages that are missing
+    from the database. This is useful for:
+    
+    - Identifying missing messages after a failed import
+    - Creating a clean import file with only missing data
+    - Verifying database completeness
+    
+    The output file can then be used with the import command to add only
+    the missing messages.
+    """
+    setup_logging(verbose)
+    
+    if verbose:
+        logger = logging.getLogger(__name__)
+        logger.info("Verbose logging enabled")
+    
+    logger = logging.getLogger(__name__)
+    logger.info(f"DIFF MODE - Comparing {json_file} with database")
+    logger.info(f"Database URL: {db_url}")
+    logger.info(f"Output file: {output}")
+    
+    async def run_diff():
+        async with DatabaseDiffChecker(db_url) as checker:
+            return await checker.generate_diff(json_file, output)
+    
+    try:
+        diff_summary = asyncio.run(run_diff())
+        
+        if diff_summary:
+            logger.info("=== DIFF SUMMARY ===")
+            logger.info(f"Total messages in JSON: {diff_summary['summary']['total_in_json']}")
+            logger.info(f"Total messages in database: {diff_summary['summary']['total_in_database']}")
+            logger.info(f"Missing messages: {diff_summary['summary']['missing_messages']}")
+            logger.info(f"Channels in JSON: {diff_summary['summary']['channels_in_json']}")
+            logger.info(f"Channels in database: {diff_summary['summary']['channels_in_database']}")
+            
+            if diff_summary['summary']['missing_messages'] > 0:
+                logger.info(f"✅ Diff file generated successfully: {output}")
+                
+                # Create import-ready file if requested
+                if convert:
+                    import_file = output.replace('.json', '_import.json')
+                    try:
+                        with open(import_file, 'w', encoding='utf-8') as f:
+                            json.dump(diff_summary['missing_messages'], f, ensure_ascii=False, indent=2)
+                        logger.info(f"✅ Import-ready file created: {import_file}")
+                        logger.info(f"📝 You can now import the missing messages using:")
+                        logger.info(f"   python main.py import {import_file} --verbose")
+                    except Exception as e:
+                        logger.error(f"Failed to create import file: {e}")
+                else:
+                    logger.info(f"📝 You can now import the missing messages using:")
+                    logger.info(f"   python main.py import {output} --verbose")
+                    logger.info(f"   Or use --convert flag to create an import-ready file")
+            else:
+                logger.info("✅ No missing messages found - database is up to date!")
+        else:
+            logger.error("Failed to generate diff")
+            sys.exit(1)
+            
+    except KeyboardInterrupt:
+        logger.info("Operation cancelled by user")
+        sys.exit(1)
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        sys.exit(1)
 
 
 @cli.command(name='import')
@@ -80,7 +161,7 @@ def import_cmd(data_file, verbose, batch_size, dry_run, skip_duplicates, validat
         logger.info(f"IMPORT MODE - Importing data from: {data_file}")
     
     # Database URL - you can make this configurable
-    db_url = "http://localhost:8000"
+    db_url = "http://localhost:80"
     
     if not validate_only:
         logger.info(f"Connecting to database at: {db_url}")
@@ -157,7 +238,7 @@ def collect(channels, max_messages, offset_id, rate_limit, session_name, dry_run
     # Load configuration
     api_id = os.getenv('TG_API_ID')
     api_hash = os.getenv('TG_API_HASH')
-    db_url = os.getenv('TELEGRAM_DB_URL', 'http://localhost:8000')
+    db_url = os.getenv('TELEGRAM_DB_URL', 'http://localhost:80')
     
     if not api_id or not api_hash:
         logger.error("Missing TG_API_ID or TG_API_HASH environment variables")
@@ -243,7 +324,7 @@ def export(output, format, batch_size, verbose, summary):
         logger.info("Verbose logging enabled")
     
     # Get database URL from environment
-    db_url = os.getenv('TELEGRAM_DB_URL', 'http://localhost:8000')
+    db_url = os.getenv('TELEGRAM_DB_URL', 'http://localhost:80')
     logger.info(f"Connecting to database at: {db_url}")
     
     async def run_export():

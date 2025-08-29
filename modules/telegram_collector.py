@@ -28,6 +28,8 @@ class TelegramCollector:
             'channels_processed': 0,
             'errors': 0
         }
+        self.collected_messages = []  # Store messages as they're collected
+
     
     async def initialize(self, api_id: str, api_hash: str, session_name: str) -> bool:
         """Initialize the Telegram client."""
@@ -62,6 +64,8 @@ class TelegramCollector:
             collection_params = {}
             if max_messages is not None:
                 collection_params['limit'] = max_messages
+            if offset_id > 0:
+                collection_params['max_id'] = offset_id
             
             async for message in self.client.iter_messages(channel_config.username, **collection_params):
                 # Rate limiting
@@ -71,12 +75,20 @@ class TelegramCollector:
                 telegram_message = await self.process_message(message, channel_config.username)
                 if telegram_message:
                     messages.append(telegram_message)
+                    self.collected_messages.append(telegram_message)  # Store in instance variable
                     message_count += 1
                     self.stats['total_messages'] += 1
                 
-                # Update database
-                if self.db_service:
-                    await self.db_service.store_message(telegram_message)
+                # Update database immediately to ensure it's saved
+                if self.db_service and telegram_message:
+                    try:
+                        success = await self.db_service.store_message(telegram_message)
+                        if success:
+                            logger.debug(f"Successfully stored message {telegram_message.message_id} in database")
+                        else:
+                            logger.warning(f"Failed to store message {telegram_message.message_id} in database")
+                    except Exception as e:
+                        logger.error(f"Error storing message {telegram_message.message_id} in database: {e}")
                 
                 # Progress update
                 if message_count % 10 == 0:
@@ -93,6 +105,16 @@ class TelegramCollector:
             self.stats['errors'] += 1
         
         return messages
+    
+    def get_collected_messages(self) -> List[TelegramMessage]:
+        """Get all messages collected so far."""
+        return self.collected_messages.copy()
+    
+    def clear_collected_messages(self):
+        """Clear the collected messages list."""
+        self.collected_messages.clear()
+    
+
     
     async def process_message(self, message: Message, channel_username: str) -> Optional[TelegramMessage]:
         """Process a Telegram message and extract metadata."""

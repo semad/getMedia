@@ -8,6 +8,7 @@ import click
 import asyncio
 import logging
 import json
+import signal
 from datetime import datetime
 
 # Add the current directory to the Python path
@@ -18,7 +19,7 @@ from modules.telegram_collector import TelegramCollector, DatabaseChecker
 from modules.telegram_exporter import TelegramMessageExporter
 from modules.telegram_analyzer import TelegramDataAnalyzer
 from modules.models import ChannelConfig, RateLimitConfig
-from modules.diff_utility import DatabaseDiffChecker
+from modules.database_service import TelegramDBService
 
 
 def setup_logging(verbose: bool):
@@ -37,85 +38,6 @@ def setup_logging(verbose: bool):
 def cli():
     """Unified Telegram Media Messages Tool"""
     pass
-
-
-@cli.command(name='diff')
-@click.argument('json_file', type=click.Path(exists=True))
-@click.option('--output', '-o', default='diff_output.json', help='Output file path for diff JSON (default: diff_output.json)')
-@click.option('--db-url', default='http://localhost:80', help='Database API URL (default: http://localhost:80)')
-@click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging output')
-@click.option('--convert', '-c', is_flag=True, help='Also create an import-ready file with just the missing messages')
-@click.help_option('-h', '--help')
-def diff_cmd(json_file, output, db_url, verbose, convert):
-    """Generate a diff between JSON export file and database.
-    
-    This command compares a JSON export file with the current database state
-    and generates a diff JSON containing only the messages that are missing
-    from the database. This is useful for:
-    
-    - Identifying missing messages after a failed import
-    - Creating a clean import file with only missing data
-    - Verifying database completeness
-    
-    The output file can then be used with the import command to add only
-    the missing messages.
-    """
-    setup_logging(verbose)
-    
-    if verbose:
-        logger = logging.getLogger(__name__)
-        logger.info("Verbose logging enabled")
-    
-    logger = logging.getLogger(__name__)
-    logger.info(f"DIFF MODE - Comparing {json_file} with database")
-    logger.info(f"Database URL: {db_url}")
-    logger.info(f"Output file: {output}")
-    
-    async def run_diff():
-        async with DatabaseDiffChecker(db_url) as checker:
-            return await checker.generate_diff(json_file, output)
-    
-    try:
-        diff_summary = asyncio.run(run_diff())
-        
-        if diff_summary:
-            logger.info("=== DIFF SUMMARY ===")
-            logger.info(f"Total messages in JSON: {diff_summary['summary']['total_in_json']}")
-            logger.info(f"Total messages in database: {diff_summary['summary']['total_in_database']}")
-            logger.info(f"Missing messages: {diff_summary['summary']['missing_messages']}")
-            logger.info(f"Channels in JSON: {diff_summary['summary']['channels_in_json']}")
-            logger.info(f"Channels in database: {diff_summary['summary']['channels_in_database']}")
-            
-            if diff_summary['summary']['missing_messages'] > 0:
-                logger.info(f"✅ Diff file generated successfully: {output}")
-                
-                # Create import-ready file if requested
-                if convert:
-                    import_file = output.replace('.json', '_import.json')
-                    try:
-                        with open(import_file, 'w', encoding='utf-8') as f:
-                            json.dump(diff_summary['missing_messages'], f, ensure_ascii=False, indent=2)
-                        logger.info(f"✅ Import-ready file created: {import_file}")
-                        logger.info(f"📝 You can now import the missing messages using:")
-                        logger.info(f"   python main.py import {import_file} --verbose")
-                    except Exception as e:
-                        logger.error(f"Failed to create import file: {e}")
-                else:
-                    logger.info(f"📝 You can now import the missing messages using:")
-                    logger.info(f"   python main.py import {output} --verbose")
-                    logger.info(f"   Or use --convert flag to create an import-ready file")
-            else:
-                logger.info("✅ No missing messages found - database is up to date!")
-        else:
-            logger.error("Failed to generate diff")
-            sys.exit(1)
-            
-    except KeyboardInterrupt:
-        logger.info("Operation cancelled by user")
-        sys.exit(1)
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}")
-        sys.exit(1)
 
 
 @cli.command(name='import')
@@ -161,7 +83,7 @@ def import_cmd(data_file, verbose, batch_size, dry_run, skip_duplicates, validat
         logger.info(f"IMPORT MODE - Importing data from: {data_file}")
     
     # Database URL - you can make this configurable
-    db_url = "http://localhost:80"
+    db_url = "http://localhost:8000"
     
     if not validate_only:
         logger.info(f"Connecting to database at: {db_url}")
@@ -223,10 +145,11 @@ def import_cmd(data_file, verbose, batch_size, dry_run, skip_duplicates, validat
               help='Telegram session name')
 @click.option('--dry-run', is_flag=True,
               help='Run without storing to database')
+@click.option('--export', '-e', default=None, help='Export collected messages to JSON file')
 @click.option('--verbose', '-v', is_flag=True,
               help='Enable verbose logging output')
 @click.help_option('-h', '--help')
-def collect(channels, max_messages, offset_id, rate_limit, session_name, dry_run, verbose):
+def collect(channels, max_messages, offset_id, rate_limit, session_name, dry_run, export, verbose):
     """Collect messages from Telegram channels."""
     
     setup_logging(verbose)
@@ -235,10 +158,12 @@ def collect(channels, max_messages, offset_id, rate_limit, session_name, dry_run
     if verbose:
         logger.info("Verbose logging enabled")
     
+    logger.info("💡 Tip: Press Ctrl+C to gracefully stop collection and save progress")
+    
     # Load configuration
     api_id = os.getenv('TG_API_ID')
     api_hash = os.getenv('TG_API_HASH')
-    db_url = os.getenv('TELEGRAM_DB_URL', 'http://localhost:80')
+    db_url = os.getenv('TELEGRAM_DB_URL', 'http://localhost:8000')
     
     if not api_id or not api_hash:
         logger.error("Missing TG_API_ID or TG_API_HASH environment variables")
@@ -253,55 +178,198 @@ def collect(channels, max_messages, offset_id, rate_limit, session_name, dry_run
             ChannelConfig("@SherwinVakiliLibrary", priority=1),
         ]
     
-    # Configure rate limiting
+    # Configure rate limiting (default to maximum speed)
     rate_config = RateLimitConfig(
-        messages_per_minute=rate_limit,
-        delay_between_channels=5,
-        session_cooldown=300
+        messages_per_minute=rate_limit if rate_limit != 120 else 1000,  # Default to 1000 if not specified
+        delay_between_channels=1,  # Minimal delay between channels
+        session_cooldown=60  # Reduced cooldown for faster collection
     )
     
+    # Global variables for signal handling
+    collector_instance = None
+    all_messages = []
+    task = None
+    
+    def signal_handler(signum, frame):
+        """Handle Ctrl+C gracefully."""
+        logger.info("\n🛑 Interrupt signal received (Ctrl+C)")
+        logger.info("🔄 Gracefully shutting down...")
+        if task and not task.done():
+            logger.info("📝 Cancelling collection task and saving progress...")
+            task.cancel()
+    
+    # Set up signal handler for Ctrl+C
+    signal.signal(signal.SIGINT, signal_handler)
+    
     async def run_collector():
-        collector = TelegramCollector(rate_config)
-        all_messages = []
+        nonlocal collector_instance, all_messages
         
-        # Check database for message IDs
-        actual_offset_id = offset_id
-        if offset_id == 0:
-            logger.info("Checking database for message IDs...")
-            async with DatabaseChecker(db_url) as checker:
-                for channel in channel_list:
-                    if channel.enabled:
-                        highest_id = await checker.get_last_message_id(channel.username)
-                        if highest_id:
-                            actual_offset_id = highest_id
-                            logger.info(f"Found highest message ID in database: {highest_id}")
+        collector_instance = TelegramCollector(rate_config)
         
-        # Initialize database service
-        if not dry_run:
-            collector.db_service = None  # Will be initialized when needed
-            async with collector.db_service if collector.db_service else DummyContext():
-                if await collector.initialize(api_id, api_hash, session_name):
+        try:
+            # Check database for message IDs
+            actual_offset_id = offset_id
+            if offset_id == 0:
+                logger.info("Checking database for message IDs...")
+                async with DatabaseChecker(db_url) as checker:
                     for channel in channel_list:
                         if channel.enabled:
-                            messages = await collector.collect_from_channel(channel, max_messages, actual_offset_id)
-                            all_messages.extend(messages)
-                    await collector.close()
-        else:
-            logger.info("DRY RUN MODE - No database operations")
-            if await collector.initialize(api_id, api_hash, session_name):
-                for channel in channel_list:
-                    if channel.enabled:
-                        messages = await collector.collect_from_channel(channel, max_messages, actual_offset_id)
-                        all_messages.extend(messages)
-                await collector.close()
+                            highest_id = await checker.get_last_message_id(channel.username)
+                            if highest_id:
+                                actual_offset_id = highest_id
+                                logger.info(f"Found highest message ID in database: {highest_id}")
+            
+            # Initialize database service
+            if not dry_run:
+                collector_instance.db_service = TelegramDBService(db_url)
+                async with collector_instance.db_service:
+                    if await collector_instance.initialize(api_id, api_hash, session_name):
+                        for channel in channel_list:
+                            if channel.enabled:
+                                logger.info(f"Starting collection from channel: {channel.username}")
+                                try:
+                                    messages = await collector_instance.collect_from_channel(channel, max_messages, actual_offset_id)
+                                    all_messages.extend(messages)
+                                except asyncio.CancelledError:
+                                    logger.info("🛑 Collection cancelled, stopping...")
+                                    break
+                        await collector_instance.close()
+            else:
+                logger.info("DRY RUN MODE - No database operations")
+                if await collector_instance.initialize(api_id, api_hash, session_name):
+                    for channel in channel_list:
+                        if channel.enabled:
+                            logger.info(f"Starting collection from channel: {channel.username}")
+                            try:
+                                messages = await collector_instance.collect_from_channel(channel, max_messages, actual_offset_id)
+                                all_messages.extend(messages)
+                            except asyncio.CancelledError:
+                                logger.info("🛑 Collection cancelled, stopping...")
+                                # Even if cancelled, we might have some messages
+                                if messages:
+                                    all_messages.extend(messages)
+                                break
+                    await collector_instance.close()
+                    
+        except asyncio.CancelledError:
+            logger.info("🛑 Collection task was cancelled")
+        except Exception as e:
+            logger.error(f"Error during collection: {e}")
+        finally:
+            # Always try to close the collector
+            if collector_instance:
+                try:
+                    await collector_instance.close()
+                except Exception as e:
+                    logger.warning(f"Warning: Could not close collector cleanly: {e}")
         
         # Print statistics
-        logger.info("Collection completed!")
-        logger.info(f"Total messages processed: {collector.stats['total_messages']}")
-        logger.info(f"Channels processed: {collector.stats['channels_processed']}")
-        logger.info(f"Errors encountered: {collector.stats['errors']}")
+        logger.info(f"📝 Collection completed: {len(all_messages)} messages")
+            
+        if collector_instance:
+            logger.info(f"Total messages processed: {collector_instance.stats.get('total_messages', len(all_messages))}")
+            logger.info(f"Channels processed: {collector_instance.stats.get('channels_processed', len([ch for ch in channel_list if ch.enabled]))}")
+            logger.info(f"Errors encountered: {collector_instance.stats.get('errors', 0)}")
+        else:
+            logger.info(f"Total messages collected: {len(all_messages)}")
+            logger.info(f"Channels processed: {len([ch for ch in channel_list if ch.enabled])}")
+            logger.info("Errors encountered: 0")
+        
+    # Create and run the collection task
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     
-    asyncio.run(run_collector())
+    try:
+        task = loop.create_task(run_collector())
+        loop.run_until_complete(task)
+    except KeyboardInterrupt:
+        logger.info("🛑 Keyboard interrupt received in main loop")
+        if task and not task.done():
+            task.cancel()
+            try:
+                loop.run_until_complete(task)
+            except asyncio.CancelledError:
+                pass
+    
+    # Export to JSON file if requested (this runs regardless of interruption)
+    if export:
+        try:
+            # Get stats safely
+            stats = collector_instance.stats if collector_instance else {
+                'total_messages': len(all_messages),
+                'channels_processed': len([ch for ch in channel_list if ch.enabled]),
+                'errors': 0
+            }
+            
+            # Try to get messages from collector if all_messages is empty
+            if all_messages:
+                messages_to_export = all_messages
+                total_count = len(all_messages)
+            elif collector_instance:
+                # Get messages that were collected before interruption
+                collected_messages = collector_instance.get_collected_messages()
+                if collected_messages:
+                    messages_to_export = collected_messages
+                    total_count = len(collected_messages)
+                    logger.info(f"📝 Retrieved {total_count} messages from collector instance")
+                else:
+                    messages_to_export = []
+                    total_count = stats.get('total_messages', 0)
+                    logger.info(f"📝 No messages in all_messages or collector, but stats show {total_count} processed")
+            else:
+                # Create placeholder messages based on stats
+                messages_to_export = []
+                total_count = stats.get('total_messages', 0)
+                logger.info(f"📝 No messages in all_messages, but stats show {total_count} processed")
+            
+            if total_count > 0:
+                export_data = {
+                    'metadata': {
+                        'collected_at': datetime.now().isoformat(),
+                        'channels': [ch.username for ch in channel_list if ch.enabled],
+                        'total_messages': total_count,
+                        'collection_stats': stats,
+                        'cancelled': task and task.cancelled() if task else False,
+                        'note': 'Messages may be incomplete due to interruption' if task and task.cancelled() else None
+                    },
+                    'messages': messages_to_export
+                }
+                
+                # Ensure the export filename has .json extension
+                export_filename = export
+                if not export_filename.endswith('.json'):
+                    export_filename = f"{export_filename}.json"
+                
+                with open(export_filename, 'w', encoding='utf-8') as f:
+                    json.dump(export_data, f, ensure_ascii=False, indent=2, default=str)
+                
+                logger.info(f"✅ Exported {total_count} messages to: {export_filename}")
+            else:
+                logger.warning("No messages to export")
+            
+        except Exception as e:
+            logger.error(f"Failed to export messages: {e}")
+    
+    # Print final statistics
+    if task and task.cancelled():
+        logger.info("🛑 Collection was cancelled by user")
+        logger.info(f"📝 Partial collection completed: {len(all_messages)} messages")
+    else:
+        logger.info("Collection completed!")
+        
+    if collector_instance:
+        logger.info(f"Total messages processed: {collector_instance.stats.get('total_messages', len(all_messages))}")
+        logger.info(f"Channels processed: {collector_instance.stats.get('channels_processed', len([ch for ch in channel_list if ch.enabled]))}")
+        logger.info(f"Errors encountered: {collector_instance.stats.get('errors', 0)}")
+    else:
+        logger.info(f"Total messages collected: {len(all_messages)}")
+        logger.info(f"Channels processed: {len([ch for ch in channel_list if ch.enabled])}")
+        logger.info("Errors encountered: 0")
+    
+    if export and all_messages:
+        logger.info(f"📁 Messages saved to: {export_filename}")
+    
+    loop.close()
 
 
 @cli.command()
@@ -324,7 +392,7 @@ def export(output, format, batch_size, verbose, summary):
         logger.info("Verbose logging enabled")
     
     # Get database URL from environment
-    db_url = os.getenv('TELEGRAM_DB_URL', 'http://localhost:80')
+    db_url = os.getenv('TELEGRAM_DB_URL', 'http://localhost:8000')
     logger.info(f"Connecting to database at: {db_url}")
     
     async def run_export():

@@ -94,7 +94,7 @@ class TelegramDBService:
             logger.debug(f"Original message data keys: {list(message_data.keys())}")
             
             # Remove fields that are not in the API schema
-            fields_to_remove = ['created_at', 'updated_at', 'id', 'uuid', 'deleted_at', 'is_deleted']
+            fields_to_remove = ['created_at', 'updated_at', 'id', 'uuid', 'deleted_at', 'is_deleted', 'duration', 'width', 'height', 'edit_date', 'forwarded_message_id']
             for field in fields_to_remove:
                 if field in message_data:
                     logger.debug(f"Removing field: {field}")

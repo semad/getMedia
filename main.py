@@ -9,7 +9,9 @@ import asyncio
 import logging
 import json
 import signal
-from datetime import datetime
+import re
+from datetime import datetime, timezone
+from pathlib import Path
 
 # Add the current directory to the Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -146,10 +148,11 @@ def import_cmd(data_file, verbose, batch_size, dry_run, skip_duplicates, validat
 @click.option('--dry-run', is_flag=True,
               help='Run without storing to database')
 @click.option('--export', '-e', default=None, help='Export collected messages to JSON file')
+@click.option('--import-file', type=click.Path(exists=True), help='Import messages from existing JSON file to database')
 @click.option('--verbose', '-v', is_flag=True,
               help='Enable verbose logging output')
 @click.help_option('-h', '--help')
-def collect(channels, max_messages, offset_id, rate_limit, session_name, dry_run, export, verbose):
+def collect(channels, max_messages, offset_id, rate_limit, session_name, dry_run, export, import_file, verbose):
     """Collect messages from Telegram channels."""
     
     setup_logging(verbose)
@@ -275,21 +278,29 @@ def collect(channels, max_messages, offset_id, rate_limit, session_name, dry_run
             logger.info(f"Channels processed: {len([ch for ch in channel_list if ch.enabled])}")
             logger.info("Errors encountered: 0")
         
-    # Create and run the collection task
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    
-    try:
-        task = loop.create_task(run_collector())
-        loop.run_until_complete(task)
-    except KeyboardInterrupt:
-        logger.info("🛑 Keyboard interrupt received in main loop")
-        if task and not task.done():
-            task.cancel()
-            try:
-                loop.run_until_complete(task)
-            except asyncio.CancelledError:
-                pass
+    # Only run Telegram collection if not just importing a file
+    if not import_file:
+        # Create and run the collection task
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            task = loop.create_task(run_collector())
+            loop.run_until_complete(task)
+        except KeyboardInterrupt:
+            logger.info("🛑 Keyboard interrupt received in main loop")
+            if task and not task.done():
+                task.cancel()
+                try:
+                    loop.run_until_complete(task)
+                except asyncio.CancelledError:
+                    pass
+    else:
+        logger.info("📁 File import mode - skipping Telegram collection")
+        # Set up minimal variables for the rest of the function
+        collector_instance = None
+        all_messages = []
+        task = None
     
     # Export to JSON file if requested (this runs regardless of interruption)
     if export:
@@ -350,8 +361,60 @@ def collect(channels, max_messages, offset_id, rate_limit, session_name, dry_run
         except Exception as e:
             logger.error(f"Failed to export messages: {e}")
     
+    # Import existing file to database if requested
+    if import_file:
+        try:
+            logger.info(f"🔄 Importing messages from existing file: {import_file}")
+            
+            # Check if the file needs JSON fixing (contains string representations of TelegramMessage objects)
+            logger.info("🔍 Checking if JSON file needs fixing...")
+            try:
+                with open(import_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                
+                # Apply JSON fixing if needed
+                fixed_data, was_fixed = fix_json_data(data)
+                
+                if was_fixed:
+                    logger.info("🔧 JSON file was malformed and has been fixed")
+                    # Create a temporary fixed file for import with .json extension
+                    temp_fixed_file = f"{import_file}.temp_fixed.json"
+                    with open(temp_fixed_file, 'w', encoding='utf-8') as f:
+                        json.dump(fixed_data, f, ensure_ascii=False, indent=2)
+                    logger.info(f"📝 Created temporary fixed file: {temp_fixed_file}")
+                    import_file_to_use = temp_fixed_file
+                else:
+                    logger.info("✅ JSON file is properly formatted")
+                    import_file_to_use = import_file
+                    
+            except Exception as e:
+                logger.error(f"Failed to read or fix JSON file: {e}")
+                return
+            
+            # Run the import synchronously since we're not in an async context here
+            from modules.import_processor import run_import
+            import_result = asyncio.run(run_import(import_file_to_use, db_url))
+            
+            if import_result:
+                logger.info(f"✅ Successfully imported messages from {import_file} to database")
+            else:
+                logger.error(f"❌ Failed to import messages from {import_file} to database")
+            
+            # Clean up temporary file if it was created
+            if was_fixed and os.path.exists(temp_fixed_file):
+                try:
+                    os.remove(temp_fixed_file)
+                    logger.info(f"🧹 Cleaned up temporary file: {temp_fixed_file}")
+                except Exception as e:
+                    logger.warning(f"Could not remove temporary file {temp_fixed_file}: {e}")
+                    
+        except Exception as e:
+            logger.error(f"Failed to import messages from {import_file} to database: {e}")
+    
     # Print final statistics
-    if task and task.cancelled():
+    if import_file:
+        logger.info("📁 File import mode completed!")
+    elif task and task.cancelled():
         logger.info("🛑 Collection was cancelled by user")
         logger.info(f"📝 Partial collection completed: {len(all_messages)} messages")
     else:
@@ -369,7 +432,9 @@ def collect(channels, max_messages, offset_id, rate_limit, session_name, dry_run
     if export and all_messages:
         logger.info(f"📁 Messages saved to: {export_filename}")
     
-    loop.close()
+    # Only close loop if it was created
+    if not import_file:
+        loop.close()
 
 
 @cli.command()
@@ -543,6 +608,180 @@ def analyze_file(data_file, logger, dashboard, output, summary):
             logger.info("Use the console reports above for data analysis")
     else:
         logger.error("Failed to load data for analysis")
+
+
+def safe_eval_datetime(dt_str):
+    """Safely evaluate datetime string using eval."""
+    try:
+        # Replace datetime.timezone.utc with a string representation
+        dt_str = dt_str.replace('datetime.timezone.utc', '"UTC"')
+        
+        # Use eval to parse the datetime
+        result = eval(dt_str)
+        
+        # Convert to ISO format if it's a datetime object
+        if isinstance(result, datetime):
+            return result.isoformat()
+        else:
+            return str(result)
+    except Exception as e:
+        # If eval fails, try to parse manually
+        try:
+            # Extract datetime components using regex
+            import re
+            # Try pattern with seconds first
+            pattern_with_seconds = r'datetime\.datetime\((\d+),\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+)'
+            match = re.search(pattern_with_seconds, dt_str)
+            if match:
+                year, month, day, hour, minute, second = map(int, match.groups())
+                dt = datetime(year, month, day, hour, minute, second, tzinfo=timezone.utc)
+                return dt.isoformat()
+            
+            # Try pattern without seconds
+            pattern_without_seconds = r'datetime\.datetime\((\d+),\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+)'
+            match = re.search(pattern_without_seconds, dt_str)
+            if match:
+                year, month, day, hour, minute = map(int, match.groups())
+                dt = datetime(year, month, day, hour, minute, tzinfo=timezone.utc)
+                return dt.isoformat()
+            
+        except Exception as regex_error:
+            pass
+        return None
+
+def parse_telegram_message_string(msg_str):
+    """Parse a string representation of a TelegramMessage object."""
+    try:
+        # Remove the TelegramMessage( wrapper
+        content = msg_str.strip()
+        if content.startswith('TelegramMessage(') and content.endswith(')'):
+            content = content[16:-1]  # Remove 'TelegramMessage(' and ')'
+        
+        # Parse the key-value pairs - need to handle nested parentheses properly
+        parsed = {}
+        current_key = None
+        current_value = ""
+        paren_count = 0
+        in_quotes = False
+        quote_char = None
+        
+        i = 0
+        while i < len(content):
+            char = content[i]
+            
+            if char in ['"', "'"] and (i == 0 or content[i-1] != '\\'):
+                if not in_quotes:
+                    in_quotes = True
+                    quote_char = char
+                elif char == quote_char:
+                    in_quotes = False
+                    quote_char = None
+                current_value += char
+            elif char == '(' and not in_quotes:
+                paren_count += 1
+                current_value += char
+            elif char == ')' and not in_quotes:
+                paren_count -= 1
+                current_value += char
+            elif char == ',' and paren_count == 0 and not in_quotes:
+                # End of current key-value pair
+                if current_key is not None:
+                    current_value = current_value.strip()
+                    # Handle datetime objects
+                    if 'datetime.datetime(' in current_value:
+                        parsed[current_key] = safe_eval_datetime(current_value)
+                    else:
+                        # Handle different value types
+                        if current_value == 'None':
+                            parsed[current_key] = None
+                        elif current_value == 'True':
+                            parsed[current_key] = True
+                        elif current_value == 'False':
+                            parsed[current_key] = False
+                        elif current_value.startswith('"') and current_value.endswith('"'):
+                            parsed[current_key] = current_value[1:-1]
+                        elif current_value.startswith("'") and current_value.endswith("'"):
+                            parsed[current_key] = current_value[1:-1]
+                        else:
+                            # Try to convert to number
+                            try:
+                                if '.' in current_value:
+                                    parsed[current_key] = float(current_value)
+                                else:
+                                    parsed[current_key] = int(current_value)
+                            except ValueError:
+                                parsed[current_key] = current_value
+                
+                # Reset for next pair
+                current_key = None
+                current_value = ""
+            elif char == '=' and current_key is None and paren_count == 0 and not in_quotes:
+                # Found the equals sign, current_value contains the key
+                current_key = current_value.strip()
+                current_value = ""
+            else:
+                current_value += char
+            
+            i += 1
+        
+        # Handle the last key-value pair
+        if current_key is not None:
+            current_value = current_value.strip()
+            # Handle datetime objects
+            if 'datetime.datetime(' in current_value:
+                parsed[current_key] = safe_eval_datetime(current_value)
+            else:
+                # Handle different value types
+                if current_value == 'None':
+                    parsed[current_key] = None
+                elif current_value == 'True':
+                    parsed[current_key] = True
+                elif current_value == 'False':
+                    parsed[current_key] = False
+                elif current_value.startswith('"') and current_value.endswith('"'):
+                    parsed[current_key] = current_value[1:-1]
+                elif current_value.startswith("'") and current_value.endswith("'"):
+                    parsed[current_key] = current_value[1:-1]
+                else:
+                    # Try to convert to number
+                    try:
+                        if '.' in current_value:
+                            parsed[current_key] = float(current_value)
+                        else:
+                            parsed[current_key] = int(current_value)
+                    except ValueError:
+                        parsed[current_key] = current_value
+        
+        return parsed
+    except Exception as e:
+        print(f"Error parsing message: {e}")
+        return None
+
+def fix_json_data(data):
+    """Fix JSON data by converting string representations to proper JSON objects."""
+    if 'messages' not in data:
+        return data, False
+    
+    messages = data['messages']
+    fixed_messages = []
+    needs_fixing = False
+    
+    for i, msg in enumerate(messages):
+        if isinstance(msg, str):
+            needs_fixing = True
+            parsed = parse_telegram_message_string(msg)
+            if parsed:
+                fixed_messages.append(parsed)
+            else:
+                raise ValueError(f"Failed to parse message {i+1}")
+        else:
+            # Already a proper object
+            fixed_messages.append(msg)
+    
+    if needs_fixing:
+        data['messages'] = fixed_messages
+    
+    return data, needs_fixing
 
 
 class DummyContext:

@@ -206,12 +206,90 @@ class TelegramDBService:
     async def get_stats(self) -> Optional[Dict[str, Any]]:
         """Get database statistics."""
         try:
-            url = f"{self.db_url}/api/v1/telegram/stats"
+            # Try enhanced stats first, fall back to basic stats if not available
+            url = f"{self.db_url}/api/v1/telegram/stats/enhanced"
             if self.session:
                 async with self.session.get(url) as response:
                     if response.status == 200:
                         return await response.json()
+            
+            # Fall back to basic stats
+            url = f"{self.db_url}/api/v1/telegram/stats"
+            if self.session:
+                async with self.session.get(url) as response:
+                    if response.status == 200:
+                        basic_stats = await response.json()
+                        # Convert basic stats to enhanced format for compatibility
+                        return {
+                            "total_messages": basic_stats.get("total_messages", 0),
+                            "total_channels": basic_stats.get("channels_count", 0),
+                            "total_storage_gb": 0,  # Not available in basic stats
+                            "media_breakdown": {},  # Not available in basic stats
+                            "channel_breakdown": {},  # Not available in basic stats
+                            "date_range": {"start": "N/A", "end": "N/A"},  # Not available in basic stats
+                            "media_messages": basic_stats.get("media_messages", 0),
+                            "text_only_messages": basic_stats.get("text_only_messages", 0)
+                        }
             return None
         except Exception as e:
             logger.error(f"Error getting stats: {e}")
+            return None
+    
+    async def get_messages_for_analysis(self, limit: Optional[int] = 10000) -> Optional[List[Dict[str, Any]]]:
+        """Get messages from database for comprehensive analysis."""
+        try:
+            # First get basic stats to know total count
+            stats = await self.get_stats()
+            if not stats:
+                return None
+            
+            # If no limit specified, use the new bulk export endpoint
+            if limit is None:
+                total_messages = stats.get('total_messages', 0)
+                if total_messages > 0:
+                    logger.info(f"📊 Fetching ALL {total_messages:,} messages for comprehensive analysis...")
+                    
+                    # Use the bulk export endpoint for all messages
+                    url = f"{self.db_url}/api/v1/telegram/messages/export/all"
+                    params = {
+                        'fields': 'message_id,channel_username,date,text,media_type,file_name,file_size,mime_type,caption,views,forwards,replies,created_at,updated_at'
+                    }
+                    
+                    if self.session:
+                        async with self.session.get(url, params=params) as response:
+                            if response.status == 200:
+                                result = await response.json()
+                                logger.info(f"✅ Successfully downloaded {len(result):,} messages")
+                                return result
+                            else:
+                                logger.warning(f"Bulk export failed with status {response.status}, falling back to paginated approach")
+                                # Fall back to paginated approach
+                                limit = total_messages
+                else:
+                    logger.warning("No messages found in database")
+                    return None
+            
+            # Fall back to paginated approach for specific limits
+            if limit:
+                logger.info(f"📊 Fetching {limit:,} messages using paginated approach...")
+                url = f"{self.db_url}/api/v1/telegram/messages"
+                params = {
+                    'limit': min(limit, 1000),  # Respect the API limit
+                    'fields': 'message_id,channel_username,date,text,media_type,file_name,file_size,mime_type,caption,views,forwards,replies,created_at,updated_at'
+                }
+                
+                if self.session:
+                    async with self.session.get(url, params=params) as response:
+                        if response.status == 200:
+                            result = await response.json()
+                            if 'messages' in result:
+                                return result['messages']
+                            elif 'data' in result:
+                                return result['data']
+                            else:
+                                return result
+            
+            return None
+        except Exception as e:
+            logger.error(f"Error getting messages for analysis: {e}")
             return None

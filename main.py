@@ -242,44 +242,46 @@ def import_file(import_file, verbose):
 @cli.command(name='analyze')
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging output')
 @click.option('--dashboard', '-d', is_flag=True, help='Generate interactive HTML dashboard')
-@click.option('--output', '-o', default=DEFAULT_ANALYSIS_OUTPUT,
-              help='Output HTML file path for dashboard (default: ./reports/analysis/telegram_analysis_dashboard.html)')
-@click.option('--file', '-f', type=click.Path(exists=True), help='Analyze data from file instead of database')
 @click.option('--summary', '-s', is_flag=True, help='Generate summary report')
 @click.help_option('-h', '--help')
-def analyze(verbose, dashboard, output, file, summary):
-    """Analyze Telegram message data from database or files with comprehensive reports.
+def analyze(verbose: bool, dashboard: bool, summary: bool) -> None:
+    """Analyze Telegram message data from database with comprehensive reports.
     
-    This unified command handles:
-    - Database analysis (default): Show database statistics and summary information
-    - File analysis: Analyze data from JSON/CSV files with detailed reports
-    - Interactive dashboard generation (planned feature)
+    This command provides:
+    - Database statistics and summary information
+    - Interactive HTML dashboards saved to ./reports/html/
+    - Comprehensive field-by-field analysis with detailed insights
     
-    Use --file to analyze data from files instead of database.
-    Use --summary to generate concise summary reports.
+    Examples:
+        python main.py analyze                    # Basic analysis
+        python main.py analyze --summary         # Summary mode only
+        python main.py analyze --dashboard       # Generate HTML dashboard
+        python main.py analyze -s -d             # Both summary and dashboard
     """
+    # Setup logging
     setup_logging(verbose)
     logger = logging.getLogger(__name__)
     
     if verbose:
         logger.info("Verbose logging enabled")
     
-    # Ensure analysis directory exists
-    analysis_dir = os.path.dirname(output)
-    if analysis_dir and not os.path.exists(analysis_dir):
-        os.makedirs(analysis_dir, exist_ok=True)
-        logger.info(f"Created analysis directory: {analysis_dir}")
-    
-    if file:
-        # File analysis mode
-        logger.info(f"FILE ANALYSIS MODE - Analyzing data from: {file}")
-        from modules.analyze_processor import analyze_file
-        analyze_file(file, logger, dashboard, output, summary)
-    else:
-        # Default: Database analysis mode
-        logger.info("DATABASE ANALYSIS MODE - Analyzing database statistics")
+    try:
+        # Run database analysis
+        logger.info("🔍 DATABASE ANALYSIS MODE - Analyzing database statistics")
         from modules.analyze_processor import analyze_database
-        analyze_database(logger, summary)
+        analyze_database(logger, summary, dashboard)
+        
+        if dashboard:
+            logger.info("📊 HTML dashboard saved to ./reports/html/ directory")
+        
+        logger.info("✅ Analysis completed successfully")
+        
+    except Exception as e:
+        logger.error(f"❌ Analysis failed: {e}")
+        if verbose:
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+        raise
 
 
 if __name__ == '__main__':

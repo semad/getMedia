@@ -5,6 +5,7 @@ Telegram message collector for gathering messages from channels.
 import os
 import logging
 import asyncio
+import json
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from telethon import TelegramClient
@@ -13,7 +14,111 @@ from telethon.tl.types import Message, MessageMediaDocument, MessageMediaPhoto
 from .models import TelegramMessage, ChannelConfig, RateLimitConfig
 from .database_service import TelegramDBService
 
+# Import config constants
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import COLLECTIONS_DIR, DEFAULT_EXPORT_PATH, F_PREFIX, F_SEPARATOR, F_EXTENSION
+
 logger = logging.getLogger(__name__)
+
+
+def convert_messages_to_dataframe_format(messages: List[Any], logger: logging.Logger) -> List[Dict[str, Any]]:
+    """Convert TelegramMessage objects to a DataFrame-compatible structured format."""
+    if not messages:
+        return []
+    
+    structured_messages = []
+    for i, msg in enumerate(messages):
+        try:
+            if hasattr(msg, '__dict__'):
+                # Handle TelegramMessage objects
+                msg_dict = {}
+                for attr_name, attr_value in msg.__dict__.items():
+                    if hasattr(attr_value, 'isoformat'):
+                        msg_dict[attr_name] = attr_value.isoformat()
+                    else:
+                        msg_dict[attr_name] = attr_value
+                structured_messages.append(msg_dict)
+            elif isinstance(msg, dict):
+                # Handle already-dict messages
+                msg_dict = {}
+                for key, value in msg.items():
+                    if hasattr(value, 'isoformat'):
+                        msg_dict[key] = value.isoformat()
+                    else:
+                        msg_dict[key] = value
+                structured_messages.append(msg_dict)
+            else:
+                logger.warning(f"Message {i+1} has unexpected format: {type(msg)}")
+                continue
+        except Exception as e:
+            logger.error(f"Error processing message {i+1}: {e}")
+            continue
+    
+    if structured_messages:
+        logger.info(f"🔧 Converted {len(structured_messages)} messages to structured format")
+        sample_fields = list(structured_messages[0].keys())
+        logger.info(f"📋 Available fields: {', '.join(sample_fields[:10])}{'...' if len(sample_fields) > 10 else ''}")
+    
+    return structured_messages
+
+
+def export_messages_to_file(messages: List[Any], export_path: str, channel_list: List[Any], logger: logging.Logger) -> Optional[str]:
+    """Export messages to structured file (JSON with DataFrame-like structure)."""
+    try:
+        # Ensure export directory exists
+        os.makedirs(COLLECTIONS_DIR, exist_ok=True)
+        
+        # Generate filename
+        if export_path == DEFAULT_EXPORT_PATH:
+            # Create descriptive filename with channel name and message ID range
+            # Get channel names (remove @ symbol for filename)
+            channel_names = [ch.username.replace('@', '') for ch in channel_list if ch.enabled]
+            channel_str = F_SEPARATOR.join(channel_names) if channel_names else 'unknown'
+            
+            # Get message ID range
+            if messages:
+                message_ids = [msg.message_id if hasattr(msg, 'message_id') else 
+                             (msg.get('message_id') if isinstance(msg, dict) else None) 
+                             for msg in messages]
+                message_ids = [mid for mid in message_ids if mid is not None]
+                if message_ids:
+                    min_id = min(message_ids)
+                    max_id = max(message_ids)
+                    filename = f"{COLLECTIONS_DIR}/{F_PREFIX}{F_SEPARATOR}{channel_str}{F_SEPARATOR}{min_id}{F_SEPARATOR}{max_id}{F_EXTENSION}"
+                else:
+                    filename = f"{COLLECTIONS_DIR}/{F_PREFIX}{F_SEPARATOR}{channel_str}{F_SEPARATOR}unknown{F_SEPARATOR}unknown{F_EXTENSION}"
+            else:
+                filename = f"{COLLECTIONS_DIR}/{F_PREFIX}{F_SEPARATOR}{channel_str}{F_SEPARATOR}none{F_SEPARATOR}none{F_EXTENSION}"
+        else:
+            filename = export_path if export_path.endswith(F_EXTENSION) else f"{export_path}{F_EXTENSION}"
+        
+        # Convert messages to structured DataFrame-like format
+        structured_messages = convert_messages_to_dataframe_format(messages, logger)
+        
+        # Prepare export data with structured format
+        export_data = {
+            'metadata': {
+                'collected_at': datetime.now().isoformat(),
+                'channels': [ch.username for ch in channel_list if ch.enabled],
+                'total_messages': len(messages),
+                'data_format': 'structured_dataframe',
+                'fields': list(structured_messages[0].keys()) if structured_messages else []
+            },
+            'messages': structured_messages
+        }
+        
+        # Write file
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(export_data, f, ensure_ascii=False, indent=2, default=str)
+        
+        logger.info(f"✅ Exported {len(messages)} messages to structured format: {filename}")
+        logger.info(f"📊 Data converted to DataFrame-compatible structure with {len(structured_messages[0]) if structured_messages else 0} fields")
+        return filename
+        
+    except Exception as e:
+        logger.error(f"Failed to export messages: {e}")
+        return None
 
 
 class TelegramCollector:

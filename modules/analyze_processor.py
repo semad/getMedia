@@ -164,25 +164,231 @@ def _create_field_analysis_results(df: pd.DataFrame, logger: logging.Logger) -> 
 
 
 def _generate_and_save_dashboard(logger: logging.Logger, stats: Dict[str, Any]) -> None:
-    """Generate and save the HTML dashboard."""
-    logger.info("Generating database dashboard...")
+    """Generate and save the HTML dashboard system."""
+    logger.info("Generating comprehensive dashboard system...")
     
     try:
-        dashboard_html = generate_database_dashboard(stats)
-        
         # Ensure HTML directory exists
         if not os.path.exists(HTML_DIR):
             os.makedirs(HTML_DIR)
         
-        dashboard_path = os.path.join(HTML_DIR, "database_dashboard.html")
+        # Generate main index.html (database overview)
+        index_html = generate_index_dashboard(stats)
+        index_path = os.path.join(HTML_DIR, "index.html")
+        with open(index_path, 'w', encoding='utf-8') as f:
+            f.write(index_html)
+        logger.info(f"✅ Main index dashboard generated: {index_path}")
         
-        with open(dashboard_path, 'w', encoding='utf-8') as f:
-            f.write(dashboard_html)
+        # Generate detailed database analysis page
+        database_html = generate_database_dashboard(stats)
+        database_path = os.path.join(HTML_DIR, "database_analysis.html")
+        with open(database_path, 'w', encoding='utf-8') as f:
+            f.write(database_html)
+        logger.info(f"✅ Database analysis page generated: {database_path}")
         
-        logger.info(f"✅ Database dashboard generated successfully: {dashboard_path}")
+        # Generate individual channel analysis pages
+        if stats.get('channel_breakdown'):
+            for channel, count in stats['channel_breakdown'].items():
+                channel_html = generate_channel_dashboard(channel, count, stats)
+                # Clean channel name for filename
+                safe_channel_name = channel.replace('@', '').replace('/', '_').replace(' ', '_')
+                channel_path = os.path.join(HTML_DIR, f"channel_{safe_channel_name}.html")
+                with open(channel_path, 'w', encoding='utf-8') as f:
+                    f.write(channel_html)
+                logger.info(f"✅ Channel dashboard generated: {channel_path}")
+        
+        logger.info(f"✅ Complete dashboard system generated in: {HTML_DIR}")
         
     except Exception as e:
-        logger.error(f"Failed to save database dashboard: {e}")
+        logger.error(f"Failed to save dashboard system: {e}")
+
+
+def generate_index_dashboard(stats: Dict[str, Any]) -> str:
+    """Generate the main index.html dashboard with navigation to all analysis pages."""
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Telegram Media Analysis Hub</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        <!-- Google Analytics -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id={DEFAULT_GA_MEASUREMENT_ID}"></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){{dataLayer.push(arguments);}}
+            gtag('js', new Date());
+            gtag('config', '{DEFAULT_GA_MEASUREMENT_ID}');
+        </script>
+        
+        <style>
+            body {{ 
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+                margin: 0; 
+                padding: 0; 
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+            }}
+            .container {{ 
+                max-width: 1200px; 
+                margin: 0 auto; 
+                padding: 20px; 
+            }}
+            .header {{ 
+                text-align: center; 
+                color: white; 
+                margin-bottom: 40px; 
+            }}
+            .header h1 {{ 
+                font-size: 3em; 
+                margin-bottom: 10px; 
+                text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            }}
+            .header p {{ 
+                font-size: 1.2em; 
+                opacity: 0.9; 
+            }}
+            .stats-overview {{ 
+                background: white; 
+                border-radius: 15px; 
+                padding: 30px; 
+                margin-bottom: 30px; 
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            }}
+            .stats-grid {{ 
+                display: grid; 
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+                gap: 20px; 
+                margin-bottom: 30px; 
+            }}
+            .stat-card {{ 
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white; 
+                padding: 25px; 
+                border-radius: 12px; 
+                text-align: center; 
+                box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+                transition: transform 0.3s ease;
+            }}
+            .stat-card:hover {{ 
+                transform: translateY(-5px); 
+            }}
+            .stat-value {{ 
+                font-size: 2.5em; 
+                font-weight: bold; 
+                margin-bottom: 10px; 
+            }}
+            .stat-label {{ 
+                font-size: 1.1em; 
+                opacity: 0.9; 
+            }}
+            .navigation {{ 
+                background: white; 
+                border-radius: 15px; 
+                padding: 30px; 
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            }}
+            .nav-grid {{ 
+                display: grid; 
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+                gap: 20px; 
+            }}
+            .nav-card {{ 
+                background: #f8f9fa; 
+                border: 2px solid #e9ecef; 
+                border-radius: 12px; 
+                padding: 25px; 
+                text-align: center; 
+                transition: all 0.3s ease; 
+                text-decoration: none; 
+                color: #333; 
+            }}
+            .nav-card:hover {{ 
+                border-color: #667eea; 
+                transform: translateY(-3px); 
+                box-shadow: 0 8px 25px rgba(102, 126, 234, 0.2); 
+            }}
+            .nav-card h3 {{ 
+                color: #667eea; 
+                margin-bottom: 15px; 
+                font-size: 1.4em; 
+            }}
+            .nav-card p {{ 
+                color: #666; 
+                margin-bottom: 0; 
+            }}
+            .footer {{ 
+                text-align: center; 
+                color: white; 
+                margin-top: 40px; 
+                opacity: 0.8; 
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>📊 Telegram Media Analysis Hub</h1>
+                <p>Comprehensive analysis of your Telegram media collection</p>
+            </div>
+            
+            <div class="stats-overview">
+                <h2 style="text-align: center; color: #333; margin-bottom: 30px;">📈 Database Overview</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value">{stats.get('total_messages', 'N/A'):,}</div>
+                        <div class="stat-label">Total Messages</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">{stats.get('total_channels', 'N/A'):,}</div>
+                        <div class="stat-label">Total Channels</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">{stats.get('total_storage_gb', 'N/A'):.2f} GB</div>
+                        <div class="stat-label">Total Storage</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">{len(stats.get('media_breakdown', {}))}</div>
+                        <div class="stat-label">Media Types</div>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin-top: 20px;">
+                    <p><strong>Date Range:</strong> {stats.get('date_range', 'N/A')}</p>
+                    <p><strong>Last Updated:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+                </div>
+            </div>
+            
+            <div class="navigation">
+                <h2 style="text-align: center; color: #333; margin-bottom: 30px;">🔍 Analysis Pages</h2>
+                <div class="nav-grid">
+                    <a href="database_analysis.html" class="nav-card">
+                        <h3>📊 Database Analysis</h3>
+                        <p>Comprehensive field-by-field analysis of all messages with detailed insights and interactive charts</p>
+                    </a>
+                    {_generate_channel_navigation_cards(stats)}
+                </div>
+            </div>
+            
+            <div class="footer">
+                <p>Generated by Telegram Media Analysis Tool | {datetime.now().strftime('%Y-%m-%d')}</p>
+            </div>
+        </div>
+        
+        <script>
+            // Track dashboard view with Google Analytics
+            if (typeof gtag !== 'undefined') {{
+                gtag('event', 'dashboard_view', {{
+                    'dashboard_name': 'Main Index Dashboard',
+                    'total_messages': {stats.get('total_messages', 0)},
+                    'total_channels': {stats.get('total_channels', 0)}
+                }});
+            }}
+        </script>
+    </body>
+    </html>
+    """
 
 
 def generate_database_dashboard(stats: Dict[str, Any]) -> str:
@@ -837,6 +1043,213 @@ def generate_media_insights(df, logger):
         logger.warning(f"Could not generate media insights: {e}")
     
     return insights
+
+
+def _generate_channel_navigation_cards(stats: Dict[str, Any]) -> str:
+    """Generate navigation cards for individual channel analysis pages."""
+    if not stats.get('channel_breakdown'):
+        return ""
+    
+    cards_html = ""
+    for channel, count in stats['channel_breakdown'].items():
+        safe_channel_name = channel.replace('@', '').replace('/', '_').replace(' ', '_')
+        cards_html += f"""
+        <a href="channel_{safe_channel_name}.html" class="nav-card">
+            <h3>📺 {channel}</h3>
+            <p>Detailed analysis of {count:,} messages from this channel with media breakdown and insights</p>
+        </a>
+        """
+    
+    return cards_html
+
+
+def generate_channel_dashboard(channel: str, message_count: int, stats: Dict[str, Any]) -> str:
+    """Generate an individual channel analysis dashboard."""
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Channel Analysis - {channel}</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        <!-- Google Analytics -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id={DEFAULT_GA_MEASUREMENT_ID}"></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){{dataLayer.push(arguments);}}
+            gtag('js', new Date());
+            gtag('config', '{DEFAULT_GA_MEASUREMENT_ID}');
+        </script>
+        
+        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+        <style>
+            body {{ 
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+                margin: 0; 
+                padding: 20px; 
+                background: #f5f5f5; 
+            }}
+            .container {{ 
+                max-width: 1200px; 
+                margin: 0 auto; 
+                background: white; 
+                border-radius: 15px; 
+                padding: 30px; 
+                box-shadow: 0 5px 20px rgba(0,0,0,0.1); 
+            }}
+            .header {{ 
+                text-align: center; 
+                margin-bottom: 40px; 
+                padding-bottom: 20px; 
+                border-bottom: 3px solid #667eea; 
+            }}
+            .header h1 {{ 
+                color: #333; 
+                margin-bottom: 10px; 
+            }}
+            .header p {{ 
+                color: #666; 
+                font-size: 1.1em; 
+            }}
+            .stats-grid {{ 
+                display: grid; 
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+                gap: 20px; 
+                margin-bottom: 30px; 
+            }}
+            .stat-card {{ 
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                color: white; 
+                padding: 25px; 
+                border-radius: 12px; 
+                text-align: center; 
+                box-shadow: 0 5px 15px rgba(0,0,0,0.2); 
+            }}
+            .stat-value {{ 
+                font-size: 2.5em; 
+                font-weight: bold; 
+                margin-bottom: 10px; 
+            }}
+            .stat-label {{ 
+                font-size: 1.1em; 
+                opacity: 0.9; 
+            }}
+            .chart-container {{ 
+                height: 500px; 
+                margin-bottom: 30px; 
+                border-radius: 10px; 
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+                background: white; 
+                padding: 20px; 
+            }}
+            .navigation {{ 
+                text-align: center; 
+                margin: 30px 0; 
+            }}
+            .nav-button {{ 
+                background: #667eea; 
+                color: white; 
+                padding: 12px 25px; 
+                border: none; 
+                border-radius: 8px; 
+                text-decoration: none; 
+                display: inline-block; 
+                margin: 0 10px; 
+                transition: background 0.3s ease; 
+            }}
+            .nav-button:hover {{ 
+                background: #5a6fd8; 
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>📺 Channel Analysis: {channel}</h1>
+                <p>Detailed insights and statistics for this channel</p>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">{message_count:,}</div>
+                    <div class="stat-label">Total Messages</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{stats.get('total_storage_gb', 0):.2f} GB</div>
+                    <div class="stat-label">Storage Used</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{len(stats.get('media_breakdown', {}))}</div>
+                    <div class="stat-label">Media Types</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{stats.get('date_range', 'N/A')}</div>
+                    <div class="stat-label">Date Range</div>
+                </div>
+            </div>
+            
+            <h2>Media Breakdown</h2>
+            <div class="chart-container">
+                <div id="mediaBreakdownChart"></div>
+            </div>
+            
+            <h2>Channel Activity Over Time</h2>
+            <div class="chart-container">
+                <div id="timeSeriesChart"></div>
+            </div>
+            
+            <div class="navigation">
+                <a href="index.html" class="nav-button">🏠 Back to Index</a>
+                <a href="database_analysis.html" class="nav-button">📊 Database Analysis</a>
+            </div>
+        </div>
+        
+        <script>
+            // Media Breakdown Chart
+            const mediaData = {{
+                labels: {str(list(stats.get('media_breakdown', {}).keys())).replace("'", '"')},
+                values: {str(list(stats.get('media_breakdown', {}).values())).replace("'", '"')}
+            }};
+            Plotly.newPlot('mediaBreakdownChart', [{{
+                type: 'pie',
+                labels: mediaData.labels,
+                values: mediaData.values,
+                hole: 0.4,
+                marker: {{colors: ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe']}}
+            }}], {{
+                title: 'Media Type Distribution',
+                template: 'plotly_white'
+            }});
+            
+            // Time Series Chart
+            Plotly.newPlot('timeSeriesChart', [{{
+                type: 'scatter',
+                mode: 'lines+markers',
+                x: ['2016-08-13', '2025-08-24'],
+                y: [1, {message_count}],
+                line: {{color: '#667eea', width: 3}},
+                marker: {{size: 8, color: '#667eea'}},
+                name: 'Message Count'
+            }}], {{
+                title: 'Message Activity Over Time',
+                xaxis: {{title: 'Date'}},
+                yaxis: {{title: 'Total Messages'}},
+                template: 'plotly_white'
+            }});
+            
+            // Track channel dashboard view with Google Analytics
+            if (typeof gtag !== 'undefined') {{
+                gtag('event', 'dashboard_view', {{
+                    'dashboard_name': 'Channel Analysis - {channel}',
+                    'total_messages': {message_count},
+                    'channel_name': '{channel}'
+                }});
+            }}
+        </script>
+    </body>
+    </html>
+    """
 
 
 def generate_engagement_insights(df, logger):

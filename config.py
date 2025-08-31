@@ -28,6 +28,8 @@ DEFAULT_DB_URL = "http://localhost:80"
 
 # Channel defaults
 DEFAULT_CHANNEL = "@SherwinVakiliLibrary"
+# other channels
+OTHER_CHANNELS = ["@books_magazine", "@books","@Free_Books_life" ]
 DEFAULT_CHANNEL_PRIORITY = 1
 
 # Rate limiting defaults

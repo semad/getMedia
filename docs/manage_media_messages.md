@@ -48,7 +48,7 @@ TELEGRAM_DB_URL=http://localhost:8000
 ### Basic Command Structure
 
 ```bash
-python 0_media_messages.py [COMMAND] [OPTIONS]
+python main.py [COMMAND] [OPTIONS]
 ```
 
 ### Available Commands
@@ -59,25 +59,25 @@ Collect new messages from specified Telegram channels with rate limiting and dat
 
 ```bash
 # Basic collection from default channels
-python 0_media_messages.py collect
+python main.py collect
 
 # Collect from specific channels
-python 0_media_messages.py collect --channels "@channel1,@channel2"
+python main.py collect --channels "@channel1,@channel2"
 
 # Limit messages per channel
-python 0_media_messages.py collect --max-messages 100
+python main.py collect --max-messages 100
 
 # Start from specific message ID
-python 0_media_messages.py collect --offset-id 12345
+python main.py collect --offset-id 12345
 
 # Custom rate limiting
-python 0_media_messages.py collect --rate-limit 60
+python main.py collect --rate-limit 60
 
 # Dry run (no database operations)
-python 0_media_messages.py collect --dry-run
+python main.py collect --dry-run
 
 # Verbose logging
-python 0_media_messages.py collect --verbose
+python main.py collect --verbose
 ```
 
 **Options:**
@@ -95,28 +95,28 @@ Export existing Telegram message data from the database in various formats.
 
 ```bash
 # Export to JSON (default)
-python 0_media_messages.py export
+python main.py export
 
 # Export to CSV
-python 0_media_messages.py export --format csv
+python main.py export --format csv
 
 # Export to Excel
-python 0_media_messages.py export --format excel
+python main.py export --format excel
 
 # Export to all formats
-python 0_media_messages.py export --format all
+python main.py export --format all
 
 # Custom output filename
-python 0_media_messages.py export --output my_export
+python main.py export --output my_export
 
 # Custom batch size
-python 0_media_messages.py export --batch-size 500
+python main.py export --batch-size 500
 
 # Generate summary report
-python 0_media_messages.py export --summary
+python main.py export --summary
 
 # Verbose logging
-python 0_media_messages.py export --verbose
+python main.py export --verbose
 ```
 
 **Options:**
@@ -128,53 +128,53 @@ python 0_media_messages.py export --verbose
 
 #### 3. 📊 **analyze** - Analyze Message Data
 
-Generate comprehensive analysis reports and interactive HTML dashboards from data files.
+Generate comprehensive analysis reports and interactive HTML dashboards from the database.
 
 ```bash
 # Basic analysis (console output only)
-python 0_media_messages.py analyze data.json
+python main.py analyze
 
 # Generate interactive HTML dashboard
-python 0_media_messages.py analyze data.json --dashboard
+python main.py analyze --dashboard
 
-# Custom dashboard filename
-python 0_media_messages.py analyze data.json --dashboard --output my_dashboard.html
+# Generate summary report
+python main.py analyze --summary
 
-# Verbose logging
-python 0_media_messages.py analyze data.json --verbose
+# Both dashboard and summary with verbose logging
+python main.py analyze -s -d -v
 ```
 
 **Options:**
 - `-d, --dashboard`: Generate interactive HTML dashboard
-- `-o, --output TEXT`: Output HTML file path (default: telegram_analysis_dashboard.html)
+- `-s, --summary`: Generate summary report
 - `-v, --verbose`: Enable verbose logging output
 
-**Supported Input Formats:**
-- JSON files (both structured and simple array formats)
-- CSV files
+**Data Source:**
+- Database analysis only (no file input required)
+- Connects to FastAPI database service
+- Analyzes all stored Telegram messages
 
-#### 4. 📚 **analyze-docname** - Document Filename Analysis
+#### 4. 📚 **Document Analysis** - Integrated in Main Analyze Command
 
-Specialized analysis of PDF and EPUB document filenames for uniqueness and duplicate detection.
+Document filename analysis is now integrated into the main analyze command and provides:
+- PDF and EPUB filename uniqueness analysis
+- Duplicate detection and reporting
+- File size distribution analysis
+- MIME type breakdown
 
 ```bash
-# Basic document analysis
-python 0_media_messages.py analyze-docname data.json
+# Document analysis included in main analyze command
+python main.py analyze --dashboard
 
-# Export duplicates to CSV
-python 0_media_messages.py analyze-docname data.json --export-csv
-
-# Custom CSV output filename
-python 0_media_messages.py analyze-docname data.json --export-csv --output duplicates.csv
-
-# Verbose logging
-python 0_media_messages.py analyze-docname data.json --verbose
+# For detailed document insights, use verbose mode
+python main.py analyze --dashboard --verbose
 ```
 
-**Options:**
-- `-e, --export-csv`: Export duplicate analysis to CSV
-- `-o, --output TEXT`: Output CSV file path (default: duplicate_documents.csv)
-- `-v, --verbose`: Enable verbose logging output
+**Features:**
+- Automatic duplicate detection
+- File extension analysis
+- File size categorization
+- MIME type distribution
 
 #### 5. 📥 **import** - Import Data to Database
 
@@ -182,25 +182,25 @@ Import Telegram message data from JSON or CSV files into the database via API.
 
 ```bash
 # Basic import from JSON file
-python 0_media_messages.py import-data data.json
+python main.py import data.json
 
 # Import from CSV file
-python 0_media_messages.py import-data data.csv
+python main.py import data.csv
 
 # Validate data format without importing
-python 0_media_messages.py import-data data.json --validate-only
+python main.py import data.json --validate-only
 
 # Dry run (show what would be imported)
-python 0_media_messages.py import-data data.json --dry-run
+python main.py import data.json --dry-run
 
 # Custom batch size for processing
-python 0_media_messages.py import-data data.json --batch-size 50
+python main.py import data.json --batch-size 50
 
 # Skip duplicate messages
-python 0_media_messages.py import-data data.json --skip-duplicates
+python main.py import data.json --skip-duplicates
 
 # Verbose logging
-python 0_media_messages.py import-data data.json --verbose
+python main.py import data.json --verbose
 ```
 
 **Options:**
@@ -372,7 +372,7 @@ CHANNEL ANALYSIS
 ### Debug Mode
 Enable verbose logging for detailed error information:
 ```bash
-python 0_media_messages.py [COMMAND] --verbose
+python main.py [COMMAND] --verbose
 ```
 
 ## 📚 Examples
@@ -381,20 +381,20 @@ python 0_media_messages.py [COMMAND] --verbose
 
 ```bash
 # 1. Collect messages from channels
-python 0_media_messages.py collect --channels "@SherwinVakiliLibrary" --max-messages 100
+python main.py collect --channels "@SherwinVakiliLibrary" --max-messages 100
 
 # 2. Export collected data
-python 0_media_messages.py export --format all --output my_collection
+python main.py export --format all --output my_collection
 
 # 3. Analyze the data
-python 0_media_messages.py analyze my_collection.json --dashboard
+python main.py analyze --dashboard
 
 # 4. Analyze document filenames
-python 0_media_messages.py analyze-docname my_collection.json --export-csv
+python main.py analyze --dashboard --verbose
 
 # 5. Import data to another database (optional)
-python 0_media_messages.py import-data my_collection.json --validate-only
-python 0_media_messages.py import-data my_collection.json --batch-size 200
+python main.py import my_collection.json --validate-only
+python main.py import my_collection.json --batch-size 200
 ```
 
 ### Batch Processing Example

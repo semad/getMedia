@@ -107,7 +107,7 @@ python main.py collect --channels "@SherwinVakiliLibrary,@books_magazine" --max-
 python main.py export --format all --summary
 
 # Analyze data and generate reports
-python main.py analyze reports/exports/current_db_export.json --verbose
+python main.py analyze --verbose
 ```
 
 ### Import Options
@@ -152,10 +152,10 @@ python main.py export [OPTIONS]
 ### Analyze Options
 
 ```bash
-python main.py analyze <data_file> [OPTIONS]
+python main.py analyze [OPTIONS]
   -v, --verbose            Enable verbose logging output
   -d, --dashboard          Generate interactive HTML dashboard
-  -o, --output TEXT        Output HTML file path for dashboard
+  -s, --summary            Generate summary report
 ```
 
 ## 🔧 Configuration
@@ -232,7 +232,7 @@ python main.py import reports/exports/current_db_export.json --dry-run --limit 1
 python main.py import reports/exports/current_db_export.json --verbose --limit 100
 
 # Test data analysis
-python main.py analyze reports/exports/current_db_export.json --verbose
+python main.py analyze --verbose
 
 # Test export (requires database connection)
 python main.py export --format json --summary

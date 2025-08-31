@@ -1,0 +1,30 @@
+{% macro histogram_chart(chart_id, title, data, xaxis_title, yaxis_title) %}
+<div class="chart-container">
+    <div class="chart-title">{{ title }}</div>
+    <div id="{{ chart_id }}" style="height:400px;"></div>
+</div>
+
+<script>
+    const histogramData = {
+        x: {{ data | tojson }},
+        type: 'histogram',
+        nbinsx: 20,
+        marker: {
+            color: '#1e3c72',
+            line: {color: 'white', width: 1}
+        },
+        name: '{{ title }}'
+    };
+    
+    const histogramLayout = {
+        title: '{{ title }}',
+        xaxis: {title: '{{ xaxis_title }}'},
+        yaxis: {title: '{{ yaxis_title }}'},
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        font: {color: '#333'}
+    };
+    
+    Plotly.newPlot('{{ chart_id }}', [histogramData], histogramLayout, {responsive: true});
+</script>
+{% endmacro %}

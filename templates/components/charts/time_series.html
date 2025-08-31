@@ -1,0 +1,29 @@
+{% macro time_series_chart(chart_id, title, dates, values) %}
+<div class="chart-container">
+    <div class="chart-title">{{ title }}</div>
+    <div id="{{ chart_id }}" style="height:400px;"></div>
+</div>
+
+<script>
+    const timeSeriesData = {
+        x: {{ dates | tojson }},
+        y: {{ values | tojson }},
+        type: 'scatter',
+        mode: 'lines+markers',
+        line: {color: '#1e3c72', width: 3},
+        marker: {color: '#2a5298', size: 6},
+        name: 'Messages per Month'
+    };
+    
+    const timeSeriesLayout = {
+        title: 'Monthly Message Activity',
+        xaxis: {title: 'Month'},
+        yaxis: {title: 'Message Count'},
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        font: {color: '#333'}
+    };
+    
+    Plotly.newPlot('{{ chart_id }}', [timeSeriesData], timeSeriesLayout, {responsive: true});
+</script>
+{% endmacro %}

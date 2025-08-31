@@ -1,0 +1,28 @@
+{% macro pie_chart(chart_id, title, values, labels) %}
+<div class="chart-container">
+    <div class="chart-title">{{ title }}</div>
+    <div id="{{ chart_id }}" style="height:400px;"></div>
+</div>
+
+<script>
+    const pieData = {
+        values: {{ values | tojson }},
+        labels: {{ labels | tojson }},
+        type: 'pie',
+        marker: {
+            colors: ['#1e3c72', '#2a5298', '#667eea', '#764ba2', '#f093fb']
+        },
+        textinfo: 'label+percent',
+        textposition: 'outside'
+    };
+    
+    const pieLayout = {
+        title: '{{ title }}',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        font: {color: '#333'}
+    };
+    
+    Plotly.newPlot('{{ chart_id }}', [pieData], pieLayout, {responsive: true});
+</script>
+{% endmacro %}

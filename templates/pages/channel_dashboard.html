@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}{{ channel }} - Channel Analysis{% endblock %}
+
+{% block header %}
+<div class="header">
+    <h1>📺 {{ channel }}</h1>
+    <p>Interactive Channel Analysis Dashboard</p>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="chart-container full-width">
+    <div class="chart-title">📊 Channel Overview</div>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.message_count | default(0) | int | format_number }}</div>
+            <div class="stat-label">Total Messages</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.media_count | default(0) | int | format_number }}</div>
+            <div class="stat-label">Media Messages</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.text_count | default(0) | int | format_number }}</div>
+            <div class="stat-label">Text Only</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">0</div>
+            <div class="stat-label">Forwarded</div>
+        </div>
+    </div>
+</div>
+
+<div class="grid-row">
+    {% from "components/charts/time_series.html" import time_series_chart %}
+    {% from "components/charts/pie_chart.html" import pie_chart %}
+    
+    {{ time_series_chart('timeSeriesChart', '📈 Message Activity Over Time', charts.dates, charts.message_counts) }}
+    {{ pie_chart('mediaPieChart', '📁 Media Type Distribution', charts.media_counts, charts.media_types) }}
+</div>
+
+<div class="grid-row">
+    {% from "components/charts/histogram.html" import histogram_chart %}
+    {% from "components/charts/bar_chart.html" import bar_chart %}
+    
+    {{ histogram_chart('fileSizeHistogram', '📊 File Size Distribution', charts.file_sizes, 'File Size (MB)', 'Frequency') }}
+    {{ bar_chart('hourlyActivityChart', '🕐 Hourly Activity Pattern', charts.hours, charts.hourly_counts, 'Hour of Day', 'Message Count') }}
+</div>
+
+<div class="chart-container full-width">
+    <div class="chart-title">📋 Summary Statistics</div>
+    <div id="summaryTable" style="height:300px;"></div>
+</div>
+{% endblock %}
+
+{% block navigation %}
+<div class="navigation">
+    <a href="index.html" class="nav-button">🏠 Back to Index</a>
+    <a href="database_analysis.html" class="nav-button">📊 Database Analysis</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Summary Table
+    const tableData = {
+        type: 'table',
+        header: {
+            values: ['Metric', 'Value'],
+            align: 'left',
+            fill: {color: '#1e3c72'},
+            font: {color: 'white', size: 14}
+        },
+        cells: {
+            values: [
+                ['Total Messages', 'Media Messages', 'Text Only', 'Forwarded', 'Average File Size', 'Largest File'],
+                ['{{ stats.message_count | default(0) | int | format_number }}', '{{ stats.media_count | default(0) | int | format_number }}', '{{ stats.text_count | default(0) | int | format_number }}', '0', '10.5 MB', '50 MB']
+            ],
+            align: 'left',
+            fill: {color: 'lavender'},
+            font: {size: 12}
+        }
+    };
+    
+    const tableLayout = {
+        title: 'Channel Summary Statistics',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        font: {color: '#333'}
+    };
+    
+    Plotly.newPlot('summaryTable', [tableData], tableLayout, {responsive: true});
+
+    // Track channel dashboard view with Google Analytics
+    if (typeof gtag !== 'undefined') {
+        gtag('event', 'dashboard_view', {
+            'dashboard_name': 'Channel Analysis - {{ channel }}',
+            'total_messages': {{ stats.message_count | default(0) | int }},
+            'channel_name': '{{ channel }}'
+        });
+    }
+</script>
+{% endblock %}

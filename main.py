@@ -239,24 +239,31 @@ def import_file(import_file, verbose):
         logger.error(f"Failed to import messages from {import_file} to database: {e}")
 
 
-@cli.command(name='analyze')
+
+
+
+@cli.command(name='reports')
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging output')
-@click.option('--dashboard', '-d', is_flag=True, help='Generate interactive HTML dashboard')
-@click.option('--summary', '-s', is_flag=True, help='Generate summary report')
+@click.option('--channels', '-c', multiple=True, help='Specific channels to generate reports for (default: all channels)')
+@click.option('--output-dir', '-o', default='./reports/channels', help='Output directory for channel reports')
 @click.help_option('-h', '--help')
-def analyze(verbose: bool, dashboard: bool, summary: bool) -> None:
-    """Analyze Telegram message data from database with comprehensive reports.
+def generate_reports(verbose: bool, channels: tuple, output_dir: str) -> None:
+    """Generate comprehensive pandas-based reports for Telegram channels.
     
-    This command provides:
-    - Database statistics and summary information
-    - Interactive HTML dashboards saved to ./reports/html/
-    - Comprehensive field-by-field analysis with detailed insights
+    This command creates detailed reports for each channel including:
+    - Message statistics and metrics
+    - Temporal analysis and trends
+    - Content and media analysis
+    - Engagement metrics
+    - Data quality assessment
+    - Export to multiple formats (CSV, JSON, Excel)
     
     Examples:
-        python main.py analyze                    # Basic analysis
-        python main.py analyze --summary         # Summary mode only
-        python main.py analyze --dashboard       # Generate HTML dashboard
-        python main.py analyze -s -d             # Both summary and dashboard
+        python main.py reports                    # Generate reports for all channels
+        python main.py reports -c @books         # Generate report for specific channel
+        python main.py reports -c @books -c @books_magazine  # Multiple channels
+        python main.py reports -o ./custom_reports  # Custom output directory
+        python main.py reports -v                # Verbose logging
     """
     # Setup logging
     setup_logging(verbose)
@@ -266,18 +273,184 @@ def analyze(verbose: bool, dashboard: bool, summary: bool) -> None:
         logger.info("Verbose logging enabled")
     
     try:
-        # Run database analysis
-        logger.info("🔍 DATABASE ANALYSIS MODE - Analyzing database statistics")
-        from modules.analyze_processor import analyze_database
-        analyze_database(logger, summary, dashboard)
+        # Determine which channels to process
+        if not channels:
+            # Use default channels from config
+            from config import OTHER_CHANNELS, DEFAULT_CHANNEL
+            channels_to_process = [DEFAULT_CHANNEL] + OTHER_CHANNELS
+            logger.info(f"📺 No channels specified, using default channels: {channels_to_process}")
+        else:
+            channels_to_process = list(channels)
+            logger.info(f"📺 Generating reports for specified channels: {channels_to_process}")
         
-        if dashboard:
-            logger.info("📊 HTML dashboard saved to ./reports/html/ directory")
+        # Initialize channel reporter
+        from modules.channel_reporter import ChannelReporter
+        from modules.database_service import TelegramDBService
+        from config import DEFAULT_DB_URL
         
-        logger.info("✅ Analysis completed successfully")
+        db_service = TelegramDBService(DEFAULT_DB_URL)
+        reporter = ChannelReporter(db_service, output_dir)
+        
+        logger.info(f"📊 Starting channel report generation...")
+        logger.info(f"📁 Output directory: {output_dir}")
+        
+        # Generate reports for all specified channels
+        results = asyncio.run(reporter.generate_all_channel_reports(channels_to_process))
+        
+        # Display results summary
+        logger.info("=" * 60)
+        logger.info("📋 CHANNEL REPORT GENERATION SUMMARY")
+        logger.info("=" * 60)
+        
+        successful = 0
+        failed = 0
+        errors = 0
+        
+        for channel, result in results.items():
+            if result['status'] == 'success':
+                successful += 1
+                report = result['report']
+                saved_files = report.get('saved_files', {})
+                
+                logger.info(f"✅ {channel}: SUCCESS")
+                logger.info(f"   📊 Total Messages: {report.get('data_summary', {}).get('total_messages', 0):,}")
+                logger.info(f"   📁 Files Generated:")
+                for file_type, file_path in saved_files.items():
+                    logger.info(f"     - {file_type.upper()}: {os.path.basename(file_path)}")
+                
+            elif result['status'] == 'failed':
+                failed += 1
+                logger.warning(f"⚠️  {channel}: FAILED - {result.get('error', 'Unknown error')}")
+            else:
+                errors += 1
+                logger.error(f"❌ {channel}: ERROR - {result.get('error', 'Unknown error')}")
+        
+        logger.info("=" * 60)
+        logger.info(f"📈 SUMMARY: {successful} successful, {failed} failed, {errors} errors")
+        logger.info(f"📁 All reports saved to: {output_dir}")
+        
+        if successful > 0:
+            logger.info("🎉 Channel reports generated successfully!")
+            logger.info("💡 Use the generated files for further analysis and visualization")
         
     except Exception as e:
-        logger.error(f"❌ Analysis failed: {e}")
+        logger.error(f"❌ Channel report generation failed: {e}")
+        if verbose:
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+        raise
+
+
+@cli.command(name='dashboard')
+@click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging output')
+@click.option('--channels', '-c', multiple=True, help='Specific channels to generate dashboards for (default: all channels)')
+@click.option('--reports-dir', '-r', default='./reports/channels', help='Directory containing channel reports')
+@click.option('--output-dir', '-o', default='./reports/dashboards', help='Output directory for generated dashboards')
+@click.option('--template-dir', '-t', default='./templates', help='Directory containing Jinja2 templates')
+@click.help_option('-h', '--help')
+def generate_dashboards(verbose: bool, channels: tuple, reports_dir: str, output_dir: str, template_dir: str) -> None:
+    """Generate interactive Plotly dashboards from channel reports.
+    
+    This command reads the JSON reports generated by the 'reports' command
+    and creates interactive HTML dashboards using Plotly charts and Jinja2 templates.
+    
+    Examples:
+        python main.py dashboard                    # Generate dashboards for all channels
+        python main.py dashboard -c @books         # Generate dashboard for specific channel
+        python main.py dashboard -c @books -c @books_magazine  # Multiple channels
+        python main.py dashboard -r ./custom_reports  # Custom reports directory
+        python main.py dashboard -o ./custom_dashboards  # Custom output directory
+        python main.py dashboard -t ./custom_templates  # Custom template directory
+        python main.py dashboard -v                # Verbose logging
+    """
+    # Setup logging
+    setup_logging(verbose)
+    logger = logging.getLogger(__name__)
+    
+    if verbose:
+        logger.info("Verbose logging enabled")
+    
+    try:
+        # Determine which channels to process
+        if not channels:
+            # Scan reports directory to find available channels
+            import glob
+            import os
+            from pathlib import Path
+            
+            reports_path = Path(reports_dir)
+            if not reports_path.exists():
+                logger.error(f"❌ Reports directory not found: {reports_dir}")
+                logger.error("Please run 'python main.py reports' first to generate channel reports")
+                return
+            
+            # Find all channel directories
+            channel_dirs = [d.name for d in reports_path.iterdir() if d.is_dir()]
+            if not channel_dirs:
+                logger.error(f"❌ No channel reports found in: {reports_dir}")
+                logger.error("Please run 'python main.py reports' first to generate channel reports")
+                return
+            
+            channels_to_process = channel_dirs
+            logger.info(f"📺 No channels specified, found {len(channels_to_process)} channels with reports: {channels_to_process}")
+        else:
+            channels_to_process = list(channels)
+            logger.info(f"📺 Generating dashboards for specified channels: {channels_to_process}")
+        
+        # Initialize dashboard generator
+        from modules.dashboard_generator import ReportDashboardGenerator
+        
+        dashboard_gen = ReportDashboardGenerator(reports_dir, output_dir, template_dir)
+        
+        logger.info(f"📊 Starting dashboard generation...")
+        logger.info(f"📁 Reports directory: {reports_dir}")
+        logger.info(f"📁 Output directory: {output_dir}")
+        logger.info(f"📁 Template directory: {template_dir}")
+        
+        # Generate dashboards for all specified channels
+        results = dashboard_gen.generate_all_dashboards(channels_to_process)
+        
+        # Display results summary
+        logger.info("=" * 60)
+        logger.info("📋 DASHBOARD GENERATION SUMMARY")
+        logger.info("=" * 60)
+        
+        successful = 0
+        failed = 0
+        errors = 0
+        
+        for channel, result in results.items():
+            if result['status'] == 'success':
+                successful += 1
+                dashboard_info = result['dashboard']
+                
+                logger.info(f"✅ {channel}: SUCCESS")
+                logger.info(f"   📊 Dashboard: {dashboard_info.get('html_file', 'N/A')}")
+                logger.info(f"   📁 Output: {dashboard_info.get('output_dir', 'N/A')}")
+                
+            elif result['status'] == 'failed':
+                failed += 1
+                logger.warning(f"⚠️  {channel}: FAILED - {result.get('error', 'Unknown error')}")
+            else:
+                errors += 1
+                logger.error(f"❌ {channel}: ERROR - {result.get('error', 'Unknown error')}")
+        
+        logger.info("=" * 60)
+        logger.info(f"📈 SUMMARY: {successful} successful, {failed} failed, {errors} errors")
+        logger.info(f"📁 All dashboards saved to: {output_dir}")
+        
+        if successful > 0:
+            logger.info("🎉 Dashboards generated successfully!")
+            logger.info("💡 Open the HTML files in your browser to view interactive charts")
+            
+            # Show index file if it exists
+            import os
+            index_file = os.path.join(output_dir, 'index.html')
+            if os.path.exists(index_file):
+                logger.info(f"🏠 Main dashboard index: {index_file}")
+        
+    except Exception as e:
+        logger.error(f"❌ Dashboard generation failed: {e}")
         if verbose:
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")

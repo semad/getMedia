@@ -7,9 +7,9 @@ import logging
 import math
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Union, List
-from dataclasses import asdict
 
-from .models import TelegramMessage
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -76,20 +76,14 @@ class TelegramDBService:
         
         return cleaned_data
     
-    async def store_message(self, message: Union[TelegramMessage, Dict[str, Any]]) -> bool:
+    async def store_message(self, message: Dict[str, Any]) -> bool:
         """Store a Telegram message in the database."""
         try:
             logger.debug(f"Starting to store message...")
             
-            # Handle both TelegramMessage objects and dictionaries
-            if isinstance(message, TelegramMessage):
-                message_data = asdict(message)
-                message_id = message.message_id
-                logger.debug(f"Processing TelegramMessage object with ID: {message_id}")
-            else:
-                message_data = message.copy()
-                message_id = message_data.get('message_id', 'unknown')
-                logger.debug(f"Processing dictionary message with ID: {message_id}")
+            message_data = message.copy()
+            message_id = message_data.get('message_id', 'unknown')
+            logger.debug(f"Processing message with ID: {message_id}")
             
             logger.debug(f"Original message data keys: {list(message_data.keys())}")
             

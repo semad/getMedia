@@ -11,7 +11,7 @@ from typing import List, Optional, Dict, Any
 from telethon import TelegramClient
 from telethon.tl.types import Message, MessageMediaDocument, MessageMediaPhoto
 
-from .models import TelegramMessage, ChannelConfig, RateLimitConfig
+from .models import ChannelConfig, RateLimitConfig
 from .database_service import TelegramDBService
 
 # Import config constants
@@ -149,7 +149,7 @@ class TelegramCollector:
     
     async def collect_from_channel(self, channel_config: ChannelConfig, 
                                  max_messages: Optional[int] = None, 
-                                 offset_id: Optional[int] = None) -> List[TelegramMessage]:
+                                 offset_id: Optional[int] = None) -> List[Dict[str, Any]]:
         """Collect messages from a specific channel."""
         if not self.client:
             logger.error("Telegram client not initialized")
@@ -189,11 +189,11 @@ class TelegramCollector:
                     try:
                         success = await self.db_service.store_message(telegram_message)
                         if success:
-                            logger.debug(f"Successfully stored message {telegram_message.message_id} in database")
+                            logger.debug(f"Successfully stored message {telegram_message['message_id']} in database")
                         else:
-                            logger.warning(f"Failed to store message {telegram_message.message_id} in database")
+                            logger.warning(f"Failed to store message {telegram_message['message_id']} in database")
                     except Exception as e:
-                        logger.error(f"Error storing message {telegram_message.message_id} in database: {e}")
+                        logger.error(f"Error storing message {telegram_message['message_id']} in database: {e}")
                 
                 # Progress update
                 if message_count % 10 == 0:
@@ -211,7 +211,7 @@ class TelegramCollector:
         
         return messages
     
-    def get_collected_messages(self) -> List[TelegramMessage]:
+    def get_collected_messages(self) -> List[Dict[str, Any]]:
         """Get all messages collected so far."""
         return self.collected_messages.copy()
     
@@ -221,7 +221,7 @@ class TelegramCollector:
     
 
     
-    async def process_message(self, message: Message, channel_username: str) -> Optional[TelegramMessage]:
+    async def process_message(self, message: Message, channel_username: str) -> Optional[Dict[str, Any]]:
         """Process a Telegram message and extract metadata."""
         try:
             if not hasattr(message, 'id') or message.id is None:
@@ -275,30 +275,30 @@ class TelegramCollector:
             if hasattr(message, 'forwards'):
                 forwards_count = message.forwards
             
-            # Create TelegramMessage object
-            telegram_message = TelegramMessage(
-                message_id=message.id,
-                channel_username=channel_username,
-                date=message_date,
-                text=message_text,
-                media_type=media_type,
-                file_name=file_name,
-                file_size=file_size,
-                mime_type=mime_type,
-                duration=None,  # Could be extracted for video/audio
-                width=None,      # Could be extracted for media
-                height=None,     # Could be extracted for media
-                caption=None,    # Could be extracted
-                views=views_count,
-                forwards=forwards_count,
-                replies=replies_count,
-                edit_date=None,  # Could be extracted
-                is_forwarded=False,  # Could be extracted
-                forwarded_from=None,  # Could be extracted
-                forwarded_message_id=None,  # Could be extracted
-                created_at=datetime.now(),
-                updated_at=datetime.now()
-            )
+            # Create message dictionary
+            telegram_message = {
+                'message_id': message.id,
+                'channel_username': channel_username,
+                'date': message_date,
+                'text': message_text,
+                'media_type': media_type,
+                'file_name': file_name,
+                'file_size': file_size,
+                'mime_type': mime_type,
+                'duration': None,  # Could be extracted for video/audio
+                'width': None,      # Could be extracted for media
+                'height': None,     # Could be extracted for media
+                'caption': None,    # Could be extracted
+                'views': views_count,
+                'forwards': forwards_count,
+                'replies': replies_count,
+                'edit_date': None,  # Could be extracted
+                'is_forwarded': False,  # Could be extracted
+                'forwarded_from': None,  # Could be extracted
+                'forwarded_message_id': None,  # Could be extracted
+                'created_at': datetime.now(),
+                'updated_at': datetime.now()
+            }
             
             return telegram_message
             

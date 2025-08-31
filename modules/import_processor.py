@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 
-from .models import TelegramMessage, ImportStats
+
 from .database_service import TelegramDBService
 from .retry_handler import RetryHandler
 
@@ -151,15 +151,22 @@ async def run_import(
     max_delay: float = 60.0,
     batch_delay: float = 1.0,
     limit: Optional[int] = None
-) -> ImportStats:
+) -> Dict[str, Any]:
     """Run the import process."""
-    stats = ImportStats()
-    stats.start_time = datetime.now()
+    stats: Dict[str, Any] = {
+        'total_messages': 0,
+        'imported_count': 0,
+        'skipped_count': 0,
+        'error_count': 0,
+        'retry_count': 0,
+        'start_time': datetime.now(),
+        'end_time': None
+    }
     
     try:
         # Load messages from file
         messages = load_messages_from_file(data_file)
-        stats.total_messages = len(messages)
+        stats['total_messages'] = len(messages)
         
         if not messages:
             logger.error("No messages found in file")
@@ -240,9 +247,9 @@ async def run_import(
                         batch, db_service, retry_handler, skip_duplicates
                     )
                     
-                    stats.imported_count += success
-                    stats.error_count += errors
-                    stats.skipped_count += skipped
+                    stats['imported_count'] += success
+                    stats['error_count'] += errors
+                    stats['skipped_count'] += skipped
                     
                     logger.info(f"Batch {batch_num} complete. Success: {success}, Errors: {errors}, Skipped: {skipped}")
                     logger.debug(f"Batch {batch_num} statistics - Total: {len(batch)}, Success: {success}, Errors: {errors}, Skipped: {skipped}")
@@ -258,16 +265,16 @@ async def run_import(
                 else:
                     logger.info(f"DRY RUN - Would process batch {batch_num} ({len(batch)} messages)")
                     logger.debug(f"DRY RUN - Batch {batch_num} would contain: {[msg.get('message_id', 'unknown') for msg in batch[:5]]}{'...' if len(batch) > 5 else ''}")
-                    stats.imported_count += len(batch)
+                    stats['imported_count'] += len(batch)
             
             # Update retry statistics
-            stats.retry_count = retry_handler.total_retries
+            stats['retry_count'] = retry_handler.total_retries
     
     except Exception as e:
         logger.error(f"Import failed: {e}")
-        stats.error_count += 1
+        stats['error_count'] += 1
     
     finally:
-        stats.end_time = datetime.now()
+        stats['end_time'] = datetime.now()
     
     return stats

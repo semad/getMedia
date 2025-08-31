@@ -6,8 +6,6 @@ __version__ = "1.0.0"
 __author__ = "MediaLib Team"
 
 from .modules import (
-    TelegramMessage, 
-    ImportStats, 
     ChannelConfig, 
     RateLimitConfig,
     TelegramDBService,
@@ -18,8 +16,6 @@ from .modules import (
 )
 
 __all__ = [
-    'TelegramMessage',
-    'ImportStats', 
     'ChannelConfig',
     'RateLimitConfig',
     'TelegramDBService',

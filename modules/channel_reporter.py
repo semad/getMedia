@@ -18,8 +18,13 @@ from datetime import datetime, timedelta
 import json
 import os
 from pathlib import Path
+import sys
+
+# Add the current directory to the Python path for config import
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from modules.database_service import TelegramDBService
+from config import API_ENDPOINTS
 
 
 class ChannelReporter:
@@ -33,7 +38,7 @@ class ChannelReporter:
         # Ensure output directory exists
         Path(output_dir).mkdir(parents=True, exist_ok=True)
     
-    async def generate_channel_report(self, channel: str) -> Optional[Dict[str, Any]]:
+    async def generate_channel_report(self, channel: str, formats: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
         """Generate comprehensive report for a specific channel."""
         try:
             self.logger.info(f"📊 Generating comprehensive report for channel: {channel}")
@@ -54,8 +59,8 @@ class ChannelReporter:
                 # Generate comprehensive report using pandas
                 report = self._create_channel_report_pandas(channel, df)
                 
-                # Save report to files
-                saved_files = await self._save_channel_report_pandas(channel, report, df)
+                # Save report to files (using specified formats or JSON only by default)
+                saved_files = await self._save_channel_report_pandas(channel, report, df, formats)
                 
                 report['saved_files'] = saved_files
                 return report
@@ -68,7 +73,7 @@ class ChannelReporter:
         """Fetch all messages for a specific channel."""
         try:
             # Use the bulk export endpoint for efficiency
-            url = f"{self.db_service.db_url}/api/v1/telegram/messages/export/all"
+            url = f"{self.db_service.db_url}{API_ENDPOINTS['export_all']}"
             params = {
                 'fields': 'message_id,channel_username,date,text,media_type,file_name,file_size,mime_type,caption,views,forwards,replies,created_at,updated_at',
                 'channel': channel
@@ -99,7 +104,7 @@ class ChannelReporter:
             limit = 1000
             
             while True:
-                url = f"{self.db_service.db_url}/api/v1/telegram/messages"
+                url = f"{self.db_service.db_url}{API_ENDPOINTS['messages']}"
                 params = {
                     'limit': limit,
                     'offset': offset,
@@ -616,8 +621,8 @@ class ChannelReporter:
         except Exception:
             return 0.0
     
-    async def _save_channel_report_pandas(self, channel: str, report: Dict[str, Any], df: pd.DataFrame) -> Dict[str, str]:
-        """Save channel report to various file formats using pandas."""
+    async def _save_channel_report_pandas(self, channel: str, report: Dict[str, Any], df: pd.DataFrame, formats: Optional[List[str]] = None) -> Dict[str, str]:
+        """Save channel report to specified file formats using pandas. Defaults to JSON only."""
         try:
             safe_channel_name = channel.replace('@', '').replace('/', '_').replace(' ', '_')
             channel_dir = os.path.join(self.output_dir, safe_channel_name)
@@ -625,70 +630,77 @@ class ChannelReporter:
             
             saved_files = {}
             
-            # Save JSON report (pandas-compatible)
+            # Default to JSON only if no formats specified
+            if formats is None:
+                formats = ['json']
+            
+            # Save JSON report (pandas-compatible) - always included
             json_file = os.path.join(channel_dir, f"{safe_channel_name}_report.json")
             with open(json_file, 'w', encoding='utf-8') as f:
                 json.dump(report, f, indent=2, default=str)
             saved_files['json'] = json_file
             
-            # Save CSV data using pandas
-            csv_file = os.path.join(channel_dir, f"{safe_channel_name}_data.csv")
-            df.to_csv(csv_file, index=False, encoding='utf-8')
-            saved_files['csv'] = csv_file
+            # Save CSV data using pandas (if requested)
+            if 'csv' in formats:
+                csv_file = os.path.join(channel_dir, f"{safe_channel_name}_data.csv")
+                df.to_csv(csv_file, index=False, encoding='utf-8')
+                saved_files['csv'] = csv_file
             
-            # Save Excel file with multiple sheets using pandas
-            excel_file = os.path.join(channel_dir, f"{safe_channel_name}_report.xlsx")
-            with pd.ExcelWriter(excel_file, engine='openpyxl') as writer:
-                # Main data
-                df.to_excel(writer, sheet_name='Raw_Data', index=False)
-                
-                # Summary statistics
-                summary_data = []
-                for category, data in report.items():
-                    if isinstance(data, dict) and category != 'saved_files':
-                        summary_data.append([category, json.dumps(data, default=str)])
-                
-                summary_df = pd.DataFrame(summary_data, columns=['Category', 'Data'])
-                summary_df.to_excel(writer, sheet_name='Summary', index=False)
-                
-                # Temporal analysis sheets using pandas DataFrames
-                if 'temporal_analysis' in report and 'error' not in report['temporal_analysis']:
-                    temp_data = report['temporal_analysis']
+            # Save Excel file with multiple sheets using pandas (if requested)
+            if 'excel' in formats:
+                excel_file = os.path.join(channel_dir, f"{safe_channel_name}_report.xlsx")
+                with pd.ExcelWriter(excel_file, engine='openpyxl') as writer:
+                    # Main data
+                    df.to_excel(writer, sheet_name='Raw_Data', index=False)
                     
-                    if 'monthly_activity' in temp_data:
-                        monthly_df = pd.DataFrame(temp_data['monthly_activity'])
-                        monthly_df.to_excel(writer, sheet_name='Monthly_Activity', index=False)
+                    # Summary statistics
+                    summary_data = []
+                    for category, data in report.items():
+                        if isinstance(data, dict) and category != 'saved_files':
+                            summary_data.append([category, json.dumps(data, default=str)])
                     
-                    if 'daily_activity' in temp_data:
-                        daily_df = pd.DataFrame(temp_data['daily_activity'])
-                        daily_df.to_excel(writer, sheet_name='Daily_Activity', index=False)
+                    summary_df = pd.DataFrame(summary_data, columns=['Category', 'Data'])
+                    summary_df.to_excel(writer, sheet_name='Summary', index=False)
                     
-                    if 'hourly_activity' in temp_data:
-                        hourly_df = pd.DataFrame(temp_data['hourly_activity'])
-                        hourly_df.to_excel(writer, sheet_name='Hourly_Activity', index=False)
+                    # Temporal analysis sheets using pandas DataFrames
+                    if 'temporal_analysis' in report and 'error' not in report['temporal_analysis']:
+                        temp_data = report['temporal_analysis']
+                        
+                        if 'monthly_activity' in temp_data:
+                            monthly_df = pd.DataFrame(temp_data['monthly_activity'])
+                            monthly_df.to_excel(writer, sheet_name='Monthly_Activity', index=False)
+                        
+                        if 'daily_activity' in temp_data:
+                            daily_df = pd.DataFrame(temp_data['daily_activity'])
+                            daily_df.to_excel(writer, sheet_name='Daily_Activity', index=False)
+                        
+                        if 'hourly_activity' in temp_data:
+                            hourly_df = pd.DataFrame(temp_data['hourly_activity'])
+                            hourly_df.to_excel(writer, sheet_name='Hourly_Activity', index=False)
+                    
+                    # Media analysis sheet
+                    if 'media_analysis' in report and 'error' not in report['media_analysis']:
+                        media_data = report['media_analysis']
+                        if 'media_distribution' in media_data:
+                            media_df = pd.DataFrame(list(media_data['media_distribution'].items()), 
+                                                  columns=['Media_Type', 'Count'])
+                            media_df.to_excel(writer, sheet_name='Media_Distribution', index=False)
                 
-                # Media analysis sheet
-                if 'media_analysis' in report and 'error' not in report['media_analysis']:
-                    media_data = report['media_analysis']
-                    if 'media_distribution' in media_data:
-                        media_df = pd.DataFrame(list(media_data['media_distribution'].items()), 
-                                              columns=['Media_Type', 'Count'])
-                        media_df.to_excel(writer, sheet_name='Media_Distribution', index=False)
+                saved_files['excel'] = excel_file
             
-            saved_files['excel'] = excel_file
-            
-            # Save summary text file
-            summary_file = os.path.join(channel_dir, f"{safe_channel_name}_summary.txt")
-            with open(summary_file, 'w', encoding='utf-8') as f:
-                f.write(f"Channel Report Summary: {channel}\n")
-                f.write("=" * 50 + "\n\n")
-                f.write(f"Total Messages: {len(df):,}\n")
-                f.write(f"Date Range: {df['date'].min()} to {df['date'].max()}\n")
-                f.write(f"Media Messages: {df['media_type'].notna().sum():,}\n")
-                f.write(f"Text Messages: {df['text'].notna().sum():,}\n")
-                f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            
-            saved_files['summary'] = summary_file
+            # Save summary text file (if requested)
+            if 'summary' in formats:
+                summary_file = os.path.join(channel_dir, f"{safe_channel_name}_summary.txt")
+                with open(summary_file, 'w', encoding='utf-8') as f:
+                    f.write(f"Channel Report Summary: {channel}\n")
+                    f.write("=" * 50 + "\n\n")
+                    f.write(f"Total Messages: {len(df):,}\n")
+                    f.write(f"Date Range: {df['date'].min()} to {df['date'].max()}\n")
+                    f.write(f"Media Messages: {df['media_type'].notna().sum():,}\n")
+                    f.write(f"Text Messages: {df['text'].notna().sum():,}\n")
+                    f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                
+                saved_files['summary'] = summary_file
             
             self.logger.info(f"✅ Channel report saved to: {channel_dir}")
             return saved_files
@@ -697,14 +709,14 @@ class ChannelReporter:
             self.logger.error(f"Error saving channel report for {channel}: {e}")
             return {}
     
-    async def generate_all_channel_reports(self, channels: List[str]) -> Dict[str, Any]:
+    async def generate_all_channel_reports(self, channels: List[str], formats: Optional[List[str]] = None) -> Dict[str, Any]:
         """Generate reports for all specified channels."""
         results = {}
         
         for channel in channels:
             try:
                 self.logger.info(f"🔄 Processing channel: {channel}")
-                report = await self.generate_channel_report(channel)
+                report = await self.generate_channel_report(channel, formats)
                 if report:
                     results[channel] = {
                         'status': 'success',

@@ -2,6 +2,10 @@
 Database service for storing Telegram messages.
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import API_ENDPOINTS
 import aiohttp
 import logging
 import math
@@ -124,41 +128,32 @@ class TelegramDBService:
             return False
 
     async def store_messages_bulk(self, messages: List[Dict[str, Any]], skip_duplicates: bool = True) -> Dict[str, Any]:
-        """Store multiple Telegram messages using the bulk import endpoint."""
+        """Store multiple Telegram messages in bulk."""
         try:
             logger.debug(f"Starting bulk import of {len(messages)} messages...")
             logger.debug(f"Skip duplicates setting: {skip_duplicates}")
             
-            # Clean and prepare messages for bulk import
             cleaned_messages = []
-            for i, msg in enumerate(messages):
-                logger.debug(f"Processing message {i+1}/{len(messages)}: {msg.get('message_id', 'unknown')}")
-                # Only include the most essential fields to avoid validation issues
-                allowed_fields = {
-                    'message_id', 'channel_username', 'date', 'text', 'media_type',
-                    'file_name', 'file_size', 'mime_type', 'caption'
-                }
-                
-                cleaned_msg = {}
-                for key, value in msg.items():
-                    if key in allowed_fields and value is not None:
-                        # Clean NaN and inf values
-                        if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
-                            continue  # Skip this field
-                        elif isinstance(value, str) and value in ['NaN', 'NaT', 'nan', 'nat']:
-                            continue  # Skip this field
-                        else:
-                            # Convert float values to int for integer fields
-                            if key in ['file_size', 'views', 'forwards', 'replies'] and isinstance(value, float):
-                                cleaned_msg[key] = int(value)
-                            else:
-                                cleaned_msg[key] = value
-                
-                # Ensure required fields are present
-                if 'message_id' in cleaned_msg and 'channel_username' in cleaned_msg and 'text' in cleaned_msg:
-                    cleaned_messages.append(cleaned_msg)
-                else:
-                    logger.warning(f"Skipping message with missing required fields: {cleaned_msg}")
+            
+            for message in messages:
+                try:
+                    # Create a copy to avoid modifying the original
+                    msg_copy = message.copy()
+                    
+                    # Remove fields that are not in the API schema
+                    fields_to_remove = ['created_at', 'updated_at', 'id', 'uuid', 'deleted_at', 'is_deleted', 'duration', 'width', 'height', 'edit_date', 'forwarded_message_id']
+                    for field in fields_to_remove:
+                        msg_copy.pop(field, None)
+                    
+                    # Data is already cleaned by the import processor, just ensure required fields
+                    if 'message_id' in msg_copy and 'channel_username' in msg_copy and 'text' in msg_copy:
+                        cleaned_messages.append(msg_copy)
+                    else:
+                        logger.warning(f"Skipping message with missing required fields: {msg_copy}")
+                        
+                except Exception as e:
+                    logger.error(f"Error processing message in bulk import: {e}")
+                    continue
             
             if not cleaned_messages:
                 logger.warning("No valid messages after cleaning")
@@ -175,6 +170,15 @@ class TelegramDBService:
             if cleaned_messages:
                 logger.debug(f"Sending {len(cleaned_messages)} messages:")
                 for i, msg in enumerate(cleaned_messages):
+                    # Check for any boolean values in the message
+                    boolean_fields = []
+                    for key, value in msg.items():
+                        if isinstance(value, bool):
+                            boolean_fields.append(f"{key}: {value} ({type(value).__name__})")
+                    
+                    if boolean_fields:
+                        logger.warning(f"Message {i} contains boolean values: {boolean_fields}")
+                    
                     logger.debug(f"Message {i}: {msg}")
             
             if self.session:

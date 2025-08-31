@@ -1,15 +1,15 @@
 """
-Import processor for Telegram messages.
+Import processor for Telegram messages using pandas for data handling.
 """
 
 import json
 import logging
 import math
 import asyncio
+import pandas as pd
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from pathlib import Path
-
 
 from .database_service import TelegramDBService
 from .retry_handler import RetryHandler
@@ -44,29 +44,150 @@ def check_data_quality(msg: Dict[str, Any]) -> List[str]:
 
 
 def load_messages_from_file(file_path: str) -> List[Dict[str, Any]]:
-    """Load messages from JSON or CSV file."""
+    """Load messages from JSON file using pandas for better data handling."""
     path = Path(file_path)
     
     if not path.exists():
         raise FileNotFoundError(f"File not found: {file_path}")
     
-    if path.suffix.lower() == '.json':
+    if path.suffix.lower() != '.json':
+        raise ValueError(f"Only JSON files are supported. Found: {path.suffix}")
+    
+    try:
+        # First read the JSON file to understand its structure
         with open(path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            
+            raw_data = json.load(f)
+        
         # Handle different JSON structures
-        if isinstance(data, list):
-            messages = data
-        elif isinstance(data, dict) and 'messages' in data:
-            messages = data['messages']
+        if isinstance(raw_data, dict) and 'messages' in raw_data:
+            # Structured format with metadata (our collector format)
+            messages_data = raw_data['messages']
+            logger.info(f"Found structured JSON with {len(messages_data)} messages")
+            logger.info(f"Metadata: {list(raw_data.keys())}")
+            
+            # Convert to pandas DataFrame for better data handling
+            if isinstance(messages_data, list):
+                df = pd.DataFrame(messages_data)
+                messages = df.to_dict('records')
+            else:
+                messages = messages_data
+                
+        elif isinstance(raw_data, list):
+            # Simple list format
+            df = pd.DataFrame(raw_data)
+            messages = df.to_dict('records')
+            logger.info(f"Found simple list format with {len(messages)} messages")
+            
+        elif isinstance(raw_data, dict):
+            # Try to find messages in other possible keys
+            possible_keys = ['data', 'items', 'results']
+            for key in possible_keys:
+                if key in raw_data and isinstance(raw_data[key], list):
+                    df = pd.DataFrame(raw_data[key])
+                    messages = df.to_dict('records')
+                    logger.info(f"Found messages in '{key}' key: {len(messages)} messages")
+                    break
+            else:
+                raise ValueError("Could not find messages array in JSON structure")
         else:
             raise ValueError("Invalid JSON structure. Expected list of messages or dict with 'messages' key.")
-            
-        logger.info(f"Found JSON with messages array: {len(messages)} messages")
+        
+        # Validate that we have messages
+        if not messages:
+            raise ValueError("No messages found in file")
+        
+        # Convert to list of dictionaries if needed
+        if isinstance(messages, pd.DataFrame):
+            messages = messages.to_dict('records')
+        
+        logger.info(f"Successfully loaded {len(messages)} messages from {file_path}")
         return messages
+        
+    except Exception as e:
+        logger.error(f"Error reading file {file_path}: {e}")
+        raise
+
+
+def clean_message_data(msg: Dict[str, Any]) -> Dict[str, Any]:
+    """Clean and prepare message data for API import using pandas."""
+    logger.debug(f"Starting to clean message data for message ID: {msg.get('message_id', 'unknown')}")
     
-    else:
-        raise ValueError(f"Unsupported file format: {path.suffix}")
+    # Start with required fields
+    cleaned_msg = {
+        'message_id': msg['message_id'],
+        'channel_username': msg['channel_username'],
+        'date': msg.get('date'),
+        'text': msg.get('text', ''),
+        'media_type': msg.get('media_type'),
+        'file_name': msg.get('file_name'),
+        'file_size': msg.get('file_size'),
+        'mime_type': msg.get('mime_type'),
+        'caption': msg.get('caption')
+    }
+    
+    # Add optional fields that might be present
+    optional_fields = ['views', 'forwards', 'replies', 'is_forwarded', 'forwarded_from', 
+                      'creator_username', 'creator_first_name', 'creator_last_name']
+    
+    for field in optional_fields:
+        if field in msg and msg[field] is not None:
+            cleaned_msg[field] = msg[field]
+    
+    # Remove fields that conflict with database schema
+    fields_to_remove = ['id', 'created_at', 'updated_at', 'deleted_at', 'is_deleted', 'text_length', 'has_media']
+    for field in fields_to_remove:
+        cleaned_msg.pop(field, None)
+    
+    logger.debug(f"Message data before cleaning: {cleaned_msg}")
+    
+    # Clean pandas-specific values (NaN, NaT, etc.) and handle data types
+    for key, value in cleaned_msg.items():
+        if pd.isna(value) or (isinstance(value, str) and value in ['NaN', 'NaT', 'nan', 'nat']):
+            cleaned_msg[key] = None
+        elif isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+            cleaned_msg[key] = None
+        elif isinstance(value, bool):
+            # Convert boolean to string for API compatibility
+            logger.debug(f"Converting boolean field '{key}' from {value} to '{str(value).lower()}'")
+            cleaned_msg[key] = str(value).lower()
+        elif isinstance(value, str) and value.lower() in ['bool', 'true', 'false']:
+            # Handle string representations of boolean values
+            if value.lower() == 'bool':
+                logger.debug(f"Converting string 'bool' field '{key}' to 'false'")
+                cleaned_msg[key] = 'false'  # Default to false for "bool" strings
+            else:
+                logger.debug(f"Converting string boolean field '{key}' from '{value}' to '{value.lower()}'")
+                cleaned_msg[key] = value.lower()
+        elif isinstance(value, (list, dict)):
+            # Convert complex types to JSON strings
+            try:
+                cleaned_msg[key] = json.dumps(value, ensure_ascii=False)
+            except (TypeError, ValueError):
+                cleaned_msg[key] = str(value)
+    
+    logger.debug(f"Message data after cleaning: {cleaned_msg}")
+    
+    # Convert float values to int for integer fields
+    if 'file_size' in cleaned_msg and isinstance(cleaned_msg['file_size'], (int, float)) and cleaned_msg['file_size'] is not None:
+        try:
+            cleaned_msg['file_size'] = int(cleaned_msg['file_size'])
+        except (ValueError, TypeError):
+            cleaned_msg['file_size'] = None
+    
+    # Convert numeric fields
+    numeric_fields = ['views', 'forwards', 'replies']
+    for field in numeric_fields:
+        if field in cleaned_msg and cleaned_msg[field] is not None:
+            try:
+                if isinstance(cleaned_msg[field], str) and cleaned_msg[field].isdigit():
+                    cleaned_msg[field] = int(cleaned_msg[field])
+                elif isinstance(cleaned_msg[field], (int, float)):
+                    cleaned_msg[field] = int(cleaned_msg[field])
+            except (ValueError, TypeError):
+                cleaned_msg[field] = None
+    
+    logger.debug(f"Final cleaned message data: {cleaned_msg}")
+    return cleaned_msg
 
 
 async def process_import_batch(
@@ -76,65 +197,41 @@ async def process_import_batch(
     skip_duplicates: bool = False
 ) -> tuple[int, int, int]:
     """Process a batch of messages for import using individual endpoints."""
-    logger.debug(f"Processing import batch of {len(batch)} messages...")
+    logger.debug(f"Processing import batch of {len(batch)} messages using individual endpoints...")
     logger.debug(f"Skip duplicates setting: {skip_duplicates}")
     
     success_count = 0
     error_count = 0
     skipped_count = 0
     
+    # Process messages individually to avoid bulk endpoint data type issues
     for i, msg in enumerate(batch):
-        logger.debug(f"Processing message {i+1}/{len(batch)}: ID {msg.get('message_id', 'unknown')}")
         try:
-            # Validate message format
-            if not validate_message_format(msg):
-                logger.warning(f"Skipping invalid message: {msg}")
-                error_count += 1
-                continue
-            
-            # Clean and prepare message data for API
-            cleaned_msg = {
-                'message_id': msg['message_id'],
-                'channel_username': msg['channel_username'],
-                'date': msg['date'],
-                'text': msg['text'],
-                'media_type': msg.get('media_type'),
-                'file_name': msg.get('file_name'),
-                'file_size': msg.get('file_size'),
-                'mime_type': msg.get('mime_type'),
-                'caption': msg.get('caption')
-            }
-            
-            # Remove fields that conflict with database schema
-            fields_to_remove = ['id', 'created_at', 'updated_at', 'deleted_at', 'is_deleted', 'text_length', 'has_media']
-            for field in fields_to_remove:
-                cleaned_msg.pop(field, None)
-            
-            # Clean NaN and inf values
-            for key, value in cleaned_msg.items():
-                if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
-                    cleaned_msg[key] = None
-                elif isinstance(value, str) and value in ['NaN', 'NaT', 'nan', 'nat']:
-                    cleaned_msg[key] = None
-            
-            # Convert float values to int for integer fields
-            if 'file_size' in cleaned_msg and isinstance(cleaned_msg['file_size'], float):
-                cleaned_msg['file_size'] = int(cleaned_msg['file_size'])
-            
-            # Store message with retry logic
-            success = await retry_handler.execute_with_retry(
-                db_service.store_message, cleaned_msg
-            )
-            
-            if success:
-                success_count += 1
+            if validate_message_format(msg):
+                cleaned_msg = clean_message_data(msg)
+                logger.debug(f"Final cleaned message data: {cleaned_msg}")
+                
+                # Use individual message import to avoid bulk endpoint issues
+                result = await retry_handler.execute_with_retry(
+                    db_service.store_message, cleaned_msg
+                )
+                
+                if result:
+                    success_count += 1
+                    logger.debug(f"Successfully imported message {i+1}/{len(batch)}: {cleaned_msg.get('message_id')}")
+                else:
+                    error_count += 1
+                    logger.warning(f"Failed to import message {i+1}/{len(batch)}: {cleaned_msg.get('message_id')}")
             else:
-                error_count += 1
+                skipped_count += 1
+                logger.warning(f"Skipping invalid message {i+1}/{len(batch)}")
                 
         except Exception as e:
-            logger.error(f"Error processing message: {e}")
             error_count += 1
+            logger.error(f"Error processing message {i+1}/{len(batch)}: {e}")
+            continue
     
+    logger.debug(f"Batch processing complete - Success: {success_count}, Errors: {error_count}, Skipped: {skipped_count}")
     return success_count, error_count, skipped_count
 
 
@@ -164,7 +261,8 @@ async def run_import(
     }
     
     try:
-        # Load messages from file
+        # Load messages from file using pandas
+        logger.info(f"Loading messages from {data_file} using pandas...")
         messages = load_messages_from_file(data_file)
         stats['total_messages'] = len(messages)
         

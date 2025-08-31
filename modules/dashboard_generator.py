@@ -83,8 +83,11 @@ class ReportDashboardGenerator:
     def generate_channel_dashboard(self, channel: str) -> Dict[str, Any]:
         """Generate dashboard for a specific channel."""
         try:
+            # Strip @ symbol from channel name for file paths
+            channel_clean = channel.lstrip('@')
+            
             # Load channel report
-            report_file = self.reports_dir / channel / f"{channel}_report.json"
+            report_file = self.reports_dir / channel_clean / f"{channel_clean}_report.json"
             if not report_file.exists():
                 return {
                     'status': 'failed',
@@ -100,26 +103,28 @@ class ReportDashboardGenerator:
             # Render dashboard using our custom template
             template = self.env.get_template('dashboard_channel.html')
             
-            # Prepare template context
+            # Prepare template context with fallbacks for missing data
             context = {
                 'channel_name': channel,
                 'ga_id': self.ga_id,
                 'total_messages': report_data.get('data_summary', {}).get('total_messages', 0),
-                'media_messages': report_data.get('message_statistics', {}).get('media_messages', 0),
-                'text_messages': report_data.get('message_statistics', {}).get('text_only_messages', 0),
-                'active_days': report_data.get('channel_info', {}).get('active_days', 0),
-                'time_series_data': charts['time_series'],
-                'media_pie_data': charts['media_pie'],
-                'file_size_data': charts['file_size'],
-                'hourly_data': charts['hourly'],
-                'content_data': charts['content']
+                'media_messages': report_data.get('data_summary', {}).get('media_messages', 0),
+                'text_messages': report_data.get('data_summary', {}).get('text_messages', 0),
+                'active_days': report_data.get('data_summary', {}).get('active_days', 0),
+                'time_series_data': charts.get('time_series', None),
+                'media_pie_data': charts.get('media_pie', None),
+                'file_size_data': charts.get('file_size', None),
+                'hourly_data': charts.get('hourly', None),
+                'content_data': charts.get('content', None),
+                'media_types_data': charts.get('media_types', None),
+                'basic_stats': charts.get('basic_stats', None)
             }
             
             # Render HTML
             html_content = template.render(**context)
             
             # Save dashboard
-            output_file = self.output_dir / f"{channel}_dashboard.html"
+            output_file = self.output_dir / f"{channel_clean}_dashboard.html"
             with open(output_file, 'w', encoding='utf-8') as f:
                 f.write(html_content)
             
@@ -152,7 +157,10 @@ class ReportDashboardGenerator:
             
             for channel in channels:
                 try:
-                    report_file = self.reports_dir / channel / f"{channel}_report.json"
+                    # Strip @ symbol from channel name for file paths
+                    channel_clean = channel.lstrip('@')
+                    
+                    report_file = self.reports_dir / channel_clean / f"{channel_clean}_report.json"
                     if report_file.exists():
                         with open(report_file, 'r', encoding='utf-8') as f:
                             report_data = json.load(f)
@@ -160,37 +168,29 @@ class ReportDashboardGenerator:
                         message_count = report_data.get('data_summary', {}).get('total_messages', 0)
                         total_messages += message_count
                         
-                        # Estimate storage (simplified)
-                        media_count = report_data.get('message_statistics', {}).get('media_messages', 0)
-                        estimated_storage_mb = media_count * 5  # Assume 5MB average per media
-                        total_storage_gb += estimated_storage_mb / 1024
-                        
-                        # Date range
-                        if 'channel_info' in report_data:
-                            start_date = report_data['channel_info'].get('first_message_date')
-                            end_date = report_data['channel_info'].get('last_message_date')
-                            if start_date and end_date:
-                                date_ranges.append((start_date, end_date))
+                        # Get storage info from file_analysis if available
+                        if 'file_analysis' in report_data:
+                            total_size_mb = report_data['file_analysis'].get('total_size_mb', 0)
+                            total_storage_gb += total_size_mb / 1024
+                        else:
+                            # Fallback: estimate storage from media messages
+                            media_count = report_data.get('data_summary', {}).get('media_messages', 0)
+                            estimated_storage_mb = media_count * 5  # Assume 5MB average per media
+                            total_storage_gb += estimated_storage_mb / 1024
                         
                         channel_info.append({
                             'name': channel,
                             'message_count': message_count,
-                            'html_file': f"{channel}_dashboard.html"
+                            'html_file': f"{channel_clean}_dashboard.html"
                         })
+                        
+                        self.logger.debug(f"✅ Processed {channel}: {message_count} messages")
+                    else:
+                        self.logger.warning(f"⚠️  Report file not found for {channel}: {report_file}")
+                        
                 except Exception as e:
-                    self.logger.warning(f"Could not process {channel}: {e}")
-            
-            # Calculate overall date range
-            date_range_days = 0
-            if date_ranges:
-                try:
-                    start_dates = [datetime.fromisoformat(start.replace('Z', '+00:00')) for start, _ in date_ranges]
-                    end_dates = [datetime.fromisoformat(end.replace('Z', '+00:00')) for _, end in date_ranges]
-                    overall_start = min(start_dates)
-                    overall_end = max(end_dates)
-                    date_range_days = (overall_end - overall_start).days
-                except:
-                    pass
+                    self.logger.warning(f"⚠️  Could not process {channel}: {e}")
+                    continue
             
             # Generate overview chart
             overview_chart = self._generate_overview_chart(channel_info)
@@ -202,8 +202,7 @@ class ReportDashboardGenerator:
                 'ga_id': self.ga_id,
                 'total_channels': len(channel_info),
                 'total_messages': total_messages,
-                'total_storage_gb': total_storage_gb,
-                'date_range_days': date_range_days,
+                'total_storage_gb': round(total_storage_gb, 2),
                 'channels': channel_info,
                 'channel_overview_data': overview_chart
             }
@@ -238,143 +237,80 @@ class ReportDashboardGenerator:
         charts = {}
         
         try:
-            # Time Series Chart
-            if 'temporal_analysis' in report_data and 'error' not in report_data['temporal_analysis']:
-                temp_data = report_data['temporal_analysis']
-                if 'daily_activity' in temp_data:
-                    daily_data = temp_data['daily_activity']
-                    if isinstance(daily_data, list):
-                        dates = [item['date'] for item in daily_data]
-                        counts = [item['count'] for item in daily_data]
-                        
-                        charts['time_series'] = {
-                            'data': [{
-                                'x': dates,
-                                'y': counts,
-                                'type': 'scatter',
-                                'mode': 'lines+markers',
-                                'name': 'Daily Messages',
-                                'line': {'color': '#3498db', 'width': 2},
-                                'marker': {'size': 6}
-                            }],
-                            'layout': {
-                                'title': 'Message Activity Over Time',
-                                'xaxis': {'title': 'Date'},
-                                'yaxis': {'title': 'Message Count'},
-                                'height': 400,
-                                'margin': {'l': 50, 'r': 50, 't': 50, 'b': 50}
-                            }
-                        }
+            # Basic statistics charts
+            data_summary = report_data.get('data_summary', {})
             
-            # Media Pie Chart
-            if 'media_analysis' in report_data and 'error' not in report_data['media_analysis']:
-                media_data = report_data['media_analysis']
-                if 'media_distribution' in media_data:
-                    media_dist = media_data['media_distribution']
-                    if isinstance(media_dist, dict):
-                        labels = list(media_dist.keys())
-                        values = list(media_dist.values())
-                        
-                        charts['media_pie'] = {
-                            'data': [{
-                                'labels': labels,
-                                'values': values,
-                                'type': 'pie',
-                                'hole': 0.4,
-                                'marker': {'colors': ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6']}
-                            }],
-                            'layout': {
-                                'title': 'Media Type Distribution',
-                                'height': 400,
-                                'margin': {'l': 50, 'r': 50, 't': 50, 'b': 50}
-                            }
-                        }
+            # Message type distribution (pie chart)
+            if 'media_messages' in data_summary and 'text_messages' in data_summary:
+                media_count = data_summary.get('media_messages', 0)
+                text_count = data_summary.get('text_messages', 0)
+                
+                if media_count > 0 or text_count > 0:
+                    charts['media_pie'] = {
+                        'labels': ['Media Messages', 'Text Messages'],
+                        'values': [media_count, text_count],
+                        'type': 'pie'
+                    }
             
-            # File Size Histogram
-            if 'media_analysis' in report_data and 'error' not in report_data['media_analysis']:
-                media_data = report_data['media_analysis']
-                if 'file_size_statistics' in media_data:
-                    file_stats = media_data['file_size_statistics']
-                    if file_stats:
-                        # Create sample data for histogram (since we don't have individual file sizes)
-                        mean_size = file_stats.get('mean_mb', 5)
-                        std_size = file_stats.get('std_mb', 2)
-                        
-                        import numpy as np
-                        sample_sizes = np.random.normal(mean_size, std_size, 1000)
-                        sample_sizes = np.clip(sample_sizes, 0, mean_size * 3)  # Clip outliers
-                        
-                        charts['file_size'] = {
-                            'data': [{
-                                'x': sample_sizes,
-                                'type': 'histogram',
-                                'nbinsx': 20,
-                                'name': 'File Sizes',
-                                'marker': {'color': '#2ecc71', 'line': {'color': 'white', 'width': 1}}
-                            }],
-                            'layout': {
-                                'title': 'File Size Distribution',
-                                'xaxis': {'title': 'File Size (MB)'},
-                                'yaxis': {'title': 'Count'},
-                                'height': 400,
-                                'margin': {'l': 50, 'r': 50, 't': 50, 'b': 50}
-                            }
-                        }
+            # Media types distribution
+            if 'media_types' in report_data and report_data['media_types']:
+                media_types = report_data['media_types']
+                if isinstance(media_types, dict) and media_types:
+                    charts['media_types'] = {
+                        'labels': list(media_types.keys()),
+                        'values': list(media_types.values()),
+                        'type': 'bar'
+                    }
             
-            # Hourly Activity Chart
-            if 'temporal_analysis' in report_data and 'error' not in report_data['temporal_analysis']:
-                temp_data = report_data['temporal_analysis']
-                if 'hourly_activity' in temp_data:
-                    hourly_data = temp_data['hourly_activity']
-                    if isinstance(hourly_data, list):
-                        hours = [item['hour'] for item in hourly_data]
-                        counts = [item['count'] for item in hourly_data]
-                        
-                        charts['hourly'] = {
-                            'data': [{
-                                'x': hours,
-                                'y': counts,
-                                'type': 'bar',
-                                'name': 'Hourly Activity',
-                                'marker': {'color': '#e74c3c'}
-                            }],
-                            'layout': {
-                                'title': 'Hourly Activity Pattern',
-                                'xaxis': {'title': 'Hour of Day', 'tickmode': 'linear', 'tick0': 0, 'dtick': 6},
-                                'yaxis': {'title': 'Message Count'},
-                                'height': 400,
-                                'margin': {'l': 50, 'r': 50, 't': 50, 'b': 50}
-                            }
-                        }
+            # File size analysis
+            if 'file_analysis' in report_data:
+                file_analysis = report_data['file_analysis']
+                total_size = file_analysis.get('total_size_mb', 0)
+                avg_size = file_analysis.get('average_size_mb', 0)
+                
+                if total_size > 0:
+                    charts['file_size'] = {
+                        'total_size_mb': total_size,
+                        'average_size_mb': avg_size,
+                        'type': 'stats'
+                    }
             
-            # Content Analysis Chart
-            if 'content_analysis' in report_data and 'error' not in report_data['content_analysis']:
-                content_data = report_data['content_analysis']
-                if 'content_categories' in content_data:
-                    categories = content_data['content_categories']
-                    if isinstance(categories, dict):
-                        labels = list(categories.keys())
-                        values = list(categories.values())
-                        
-                        charts['content'] = {
-                            'data': [{
-                                'x': labels,
-                                'y': values,
-                                'type': 'bar',
-                                'name': 'Content Categories',
-                                'marker': {'color': '#9b59b6'}
-                            }],
-                            'layout': {
-                                'title': 'Content Length Categories',
-                                'xaxis': {'title': 'Category'},
-                                'yaxis': {'title': 'Message Count'},
-                                'height': 400,
-                                'margin': {'l': 50, 'r': 50, 't': 50, 'b': 50}
-                            }
-                        }
+            # Generate default charts if none were created
+            if not charts:
+                charts = self._generate_default_charts(data_summary)
+            
+            return charts
             
         except Exception as e:
-            self.logger.error(f"Error generating charts: {e}")
+            self.logger.warning(f"⚠️  Error generating charts: {e}")
+            return self._generate_default_charts(data_summary)
+    
+    def _generate_default_charts(self, data_summary: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate default charts when detailed analysis is not available."""
+        charts = {}
+        
+        try:
+            # Simple message count chart
+            total_messages = data_summary.get('total_messages', 0)
+            if total_messages > 0:
+                charts['basic_stats'] = {
+                    'total_messages': total_messages,
+                    'type': 'stats'
+                }
+            
+            # Media vs text distribution (if available)
+            media_messages = data_summary.get('media_messages', 0)
+            text_messages = data_summary.get('text_messages', 0)
+            
+            if media_messages > 0 or text_messages > 0:
+                charts['message_distribution'] = {
+                    'labels': ['Media', 'Text'],
+                    'values': [media_messages, text_messages],
+                    'type': 'pie'
+                }
+            
+        except Exception as e:
+            self.logger.warning(f"⚠️  Error generating default charts: {e}")
         
         return charts
     

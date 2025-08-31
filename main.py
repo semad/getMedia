@@ -10,6 +10,7 @@ import asyncio
 import logging
 import json
 from pathlib import Path
+from datetime import datetime
 
 # Add the current directory to the Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -238,13 +239,105 @@ def import_file(import_file, verbose):
 
 
 
-@cli.command(name='reports')
+@cli.group(name='report')
+def report():
+    """Generate various types of reports for Telegram data analysis."""
+    pass
+
+
+def generate_pandas_report(df, channel_name: str) -> dict:
+    """Generate a comprehensive report using pandas DataFrame."""
+    try:
+        # Basic statistics
+        total_messages = len(df)
+        
+        # Media analysis
+        if 'media_type' in df.columns:
+            media_messages = len(df[df['media_type'].notna() & (df['media_type'] != '')])
+            media_types = df['media_type'].value_counts().to_dict()
+        else:
+            media_messages = 0
+            media_types = {}
+        
+        # Text analysis
+        if 'text' in df.columns:
+            text_messages = len(df[df['text'].notna() & (df['text'] != '')])
+        else:
+            text_messages = 0
+        
+        # Date analysis
+        if 'date' in df.columns:
+            try:
+                df['date'] = pd.to_datetime(df['date'], errors='coerce')
+                min_date = df['date'].min()
+                max_date = df['date'].max()
+                if pd.notna(min_date) and pd.notna(max_date):
+                    date_range = f"{min_date} to {max_date}"
+                    active_days = df['date'].dt.date.nunique()
+                else:
+                    date_range = "Unknown"
+                    active_days = 0
+            except:
+                date_range = "Unknown"
+                active_days = 0
+        else:
+            date_range = "Unknown"
+            active_days = 0
+        
+        # File size analysis
+        if 'file_size' in df.columns:
+            try:
+                total_size_mb = df['file_size'].fillna(0).sum() / 1024 / 1024
+                avg_size_mb = df['file_size'].fillna(0).mean() / 1024 / 1024
+            except:
+                total_size_mb = 0
+                avg_size_mb = 0
+        else:
+            total_size_mb = 0
+            avg_size_mb = 0
+        
+        # Create comprehensive report
+        report = {
+            'channel_name': channel_name,
+            'generated_at': datetime.now().isoformat(),
+            'data_summary': {
+                'total_messages': total_messages,
+                'media_messages': media_messages,
+                'text_messages': text_messages,
+                'active_days': active_days
+            },
+            'file_analysis': {
+                'total_size_mb': round(total_size_mb, 2),
+                'average_size_mb': round(avg_size_mb, 2)
+            },
+            'media_types': media_types,
+            'date_range': date_range,
+            'report_type': 'pandas_analysis'
+        }
+        
+        return report
+        
+    except Exception as e:
+        # Return basic report if detailed analysis fails
+        return {
+            'channel_name': channel_name,
+            'generated_at': datetime.now().isoformat(),
+            'data_summary': {
+                'total_messages': len(df),
+                'error': str(e)
+            },
+            'report_type': 'pandas_analysis_basic'
+        }
+
+
+@report.command(name='messages')
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging output')
-@click.option('--channels', '-c', multiple=True, help='Specific channels to generate reports for (default: all channels)')
+@click.option('--collections-dir', '-c', default='./reports/collections', help='Directory containing collected JSON files (default: ./reports/collections)')
 @click.option('--output-dir', '-o', default='./reports/channels', help='Output directory for channel reports')
+@click.option('--formats', '-f', multiple=True, default=['json'], help='Output formats: json, csv, excel, summary (default: json only)')
 @click.help_option('-h', '--help')
-def generate_reports(verbose: bool, channels: tuple, output_dir: str) -> None:
-    """Generate comprehensive pandas-based reports for Telegram channels.
+def report_messages(verbose: bool, collections_dir: str, output_dir: str, formats: tuple) -> None:
+    """Generate comprehensive message analysis reports for Telegram channels.
     
     This command creates detailed reports for each channel including:
     - Message statistics and metrics
@@ -255,11 +348,12 @@ def generate_reports(verbose: bool, channels: tuple, output_dir: str) -> None:
     - Export to multiple formats (CSV, JSON, Excel)
     
     Examples:
-        python main.py reports                    # Generate reports for all channels
-        python main.py reports -c @books         # Generate report for specific channel
-        python main.py reports -c @books -c @books_magazine  # Multiple channels
-        python main.py reports -o ./custom_reports  # Custom output directory
-        python main.py reports -v                # Verbose logging
+        python main.py report messages                    # Generate reports from all JSON files in ./reports/collections
+        python main.py report messages -c ./custom_collections  # Custom collections directory
+        python main.py report messages -o ./custom_reports  # Custom output directory
+        python main.py report messages -v                # Verbose logging
+        python main.py report messages -f json -f csv    # Generate JSON and CSV formats
+        python main.py report messages -f json -f excel -f summary  # Generate all formats
     """
     # Setup logging
     setup_logging(verbose)
@@ -269,28 +363,113 @@ def generate_reports(verbose: bool, channels: tuple, output_dir: str) -> None:
         logger.info("Verbose logging enabled")
     
     try:
-        # Determine which channels to process
-        if not channels:
-            # Use default channels from config
-            from config import OTHER_CHANNELS, DEFAULT_CHANNEL
-            channels_to_process = [DEFAULT_CHANNEL] + OTHER_CHANNELS
-            logger.info(f"📺 No channels specified, using default channels: {channels_to_process}")
-        else:
-            channels_to_process = list(channels)
-            logger.info(f"📺 Generating reports for specified channels: {channels_to_process}")
+        # Scan collections directory for JSON files
+        from pathlib import Path
+        import json
+        import pandas as pd
         
-        # Initialize channel reporter
-        from modules.channel_reporter import ChannelReporter
-        from modules.database_service import TelegramDBService
+        collections_path = Path(collections_dir)
+        if not collections_path.exists():
+            logger.error(f"❌ Collections directory not found: {collections_dir}")
+            return
         
-        db_service = TelegramDBService(DEFAULT_DB_URL)
-        reporter = ChannelReporter(db_service, output_dir)
+        # Find all JSON files in collections directory
+        json_files = list(collections_path.glob("*.json"))
+        if not json_files:
+            logger.error(f"❌ No JSON files found in: {collections_dir}")
+            return
         
-        logger.info(f"📊 Starting channel report generation...")
-        logger.info(f"📁 Output directory: {output_dir}")
+        logger.info(f"📁 Found {len(json_files)} JSON files in collections directory")
         
-        # Generate reports for all specified channels
-        results = asyncio.run(reporter.generate_all_channel_reports(channels_to_process))
+        # Process each JSON file with pandas
+        results = {}
+        for json_file in json_files:
+            try:
+                channel_name = json_file.stem  # Get filename without extension
+                logger.info(f"🔄 Processing: {channel_name}")
+                
+                # Read JSON file with pandas
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                
+                # Convert to pandas DataFrame
+                if 'messages' in data:
+                    df = pd.DataFrame(data['messages'])
+                else:
+                    df = pd.DataFrame(data)
+                
+                logger.info(f"✅ Loaded {len(df)} messages from {channel_name}")
+                
+                # Generate pandas-based report
+                report = generate_pandas_report(df, channel_name)
+                
+                # Save report
+                output_path = Path(output_dir)
+                output_path.mkdir(parents=True, exist_ok=True)
+                
+                saved_files = {}
+                
+                # Save JSON report
+                if 'json' in formats:
+                    json_file_path = output_path / f"{channel_name}_report.json"
+                    with open(json_file_path, 'w', encoding='utf-8') as f:
+                        json.dump(report, f, indent=2, default=str)
+                    saved_files['json'] = str(json_file_path)
+                
+                # Save CSV report
+                if 'csv' in formats:
+                    csv_file_path = output_path / f"{channel_name}_data.csv"
+                    df.to_csv(csv_file_path, index=False)
+                    saved_files['csv'] = str(csv_file_path)
+                
+                # Save Excel report
+                if 'excel' in formats:
+                    excel_file_path = output_path / f"{channel_name}_report.xlsx"
+                    with pd.ExcelWriter(excel_file_path, engine='openpyxl') as writer:
+                        df.to_excel(writer, sheet_name='Messages', index=False)
+                        
+                        # Create summary sheet
+                        summary_data = {
+                            'Metric': ['Total Messages', 'Media Messages', 'Text Messages', 'Date Range'],
+                            'Value': [
+                                len(df),
+                                len(df[df.get('media_type', '').notna() & (df.get('media_type', '') != '')]),
+                                len(df[df.get('text', '').notna() & (df.get('text', '') != '')]),
+                                f"{df.get('date', pd.Timestamp.now()).min()} to {df.get('date', pd.Timestamp.now()).max()}"
+                            ]
+                        }
+                        summary_df = pd.DataFrame(summary_data)
+                        summary_df.to_excel(writer, sheet_name='Summary', index=False)
+                    
+                    saved_files['excel'] = str(excel_file_path)
+                
+                # Save summary text
+                if 'summary' in formats:
+                    summary_file_path = output_path / f"{channel_name}_summary.txt"
+                    with open(summary_file_path, 'w', encoding='utf-8') as f:
+                        f.write(f"Channel Report Summary: {channel_name}\n")
+                        f.write("=" * 50 + "\n\n")
+                        f.write(f"Total Messages: {len(df):,}\n")
+                        f.write(f"Media Messages: {len(df[df.get('media_type', '').notna() & (df.get('media_type', '') != '')]):,}\n")
+                        f.write(f"Text Messages: {len(df[df.get('text', '').notna() & (df.get('text', '') != '')]):,}\n")
+                        f.write(f"File Size: {json_file.stat().st_size / 1024 / 1024:.2f} MB\n")
+                    
+                    saved_files['summary'] = str(summary_file_path)
+                
+                results[channel_name] = {
+                    'status': 'success',
+                    'saved_files': saved_files,
+                    'message_count': len(df)
+                }
+                
+                logger.info(f"✅ Report generated for {channel_name}: {len(saved_files)} files saved")
+                
+            except Exception as e:
+                logger.error(f"❌ Error processing {json_file.name}: {e}")
+                results[channel_name] = {
+                    'status': 'failed',
+                    'error': str(e)
+                }
         
         # Display results summary
         logger.info("=" * 60)
@@ -304,11 +483,11 @@ def generate_reports(verbose: bool, channels: tuple, output_dir: str) -> None:
         for channel, result in results.items():
             if result['status'] == 'success':
                 successful += 1
-                report = result['report']
-                saved_files = report.get('saved_files', {})
+                saved_files = result.get('saved_files', {})
+                message_count = result.get('message_count', 0)
                 
                 logger.info(f"✅ {channel}: SUCCESS")
-                logger.info(f"   📊 Total Messages: {report.get('data_summary', {}).get('total_messages', 0):,}")
+                logger.info(f"   📊 Total Messages: {message_count:,}")
                 logger.info(f"   📁 Files Generated:")
                 for file_type, file_path in saved_files.items():
                     logger.info(f"     - {file_type.upper()}: {os.path.basename(file_path)}")
@@ -336,27 +515,116 @@ def generate_reports(verbose: bool, channels: tuple, output_dir: str) -> None:
         raise
 
 
-@cli.command(name='dashboard')
+@report.command(name='channels')
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging output')
-@click.option('--channels', '-c', multiple=True, help='Specific channels to generate dashboards for (default: all channels)')
-@click.option('--reports-dir', '-r', default='./reports/channels', help='Directory containing channel reports')
-@click.option('--output-dir', '-o', default='./reports/dashboards', help='Output directory for generated dashboards')
-@click.option('--template-dir', '-t', default='./templates', help='Directory containing Jinja2 templates')
+@click.help_option('-h', '--help')
+def report_channels(verbose: bool) -> None:
+    """Generate a channel overview report.
+    
+    This command creates a summary report of all channels in the database
+    including basic statistics and activity information.
+    
+    Examples:
+        python main.py report channels              # Generate channel overview report
+        python main.py report channels -v          # Verbose logging
+    """
+    # Setup logging
+    setup_logging(verbose)
+    logger = logging.getLogger(__name__)
+    
+    if verbose:
+        logger.info("Verbose logging enabled")
+    
+    try:
+        logger.info("📺 Starting channel overview report generation...")
+        
+        # Initialize database service
+        from modules.database_service import TelegramDBService
+        
+        db_service = TelegramDBService(DEFAULT_DB_URL)
+        
+        # Generate channel overview report
+        async def generate_channel_report():
+            async with db_service:
+                # Get basic stats which include channel information
+                stats = await db_service.get_stats()
+                
+                # Create channel overview report
+                channel_report = {
+                    'timestamp': datetime.now().isoformat(),
+                    'report_type': 'channel_overview',
+                    'generated_by': 'main.py report channels',
+                    'summary': {
+                        'total_messages': stats.get('total_messages', 0),
+                        'total_channels': stats.get('total_channels', 0),
+                        'media_messages': stats.get('media_messages', 0),
+                        'text_messages': stats.get('text_messages', 0)
+                    }
+                }
+                
+                return channel_report
+        
+        report = asyncio.run(generate_channel_report())
+        
+        # Save the report to a JSON file
+        report_filename = os.path.join('./reports', 'channels_overview.json')
+        with open(report_filename, 'w', encoding='utf-8') as f:
+            json.dump(report, f, indent=4)
+        
+        logger.info(f"✅ Channel overview report generated successfully at: {report_filename}")
+        logger.info(f"📺 Total Channels: {report['summary']['total_channels']}")
+        logger.info(f"📊 Total Messages: {report['summary']['total_messages']:,}")
+        logger.info(f"📁 Media Messages: {report['summary']['media_messages']:,}")
+        logger.info(f"📝 Text Messages: {report['summary']['text_messages']:,}")
+        
+    except Exception as e:
+        logger.error(f"❌ Channel overview report generation failed: {e}")
+        if verbose:
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+        raise
+
+
+@cli.command(name='dashboard')
+@click.option('--verbose', '-v', is_flag=True, help='Enable detailed logging and progress information')
+@click.option('--channels', '-c', multiple=True, help='Specific channels to process (e.g., @books, @books_magazine). If not specified, processes all available channels')
+@click.option('--reports-dir', '-r', default='./reports/channels', help='Source directory containing channel JSON reports (default: ./reports/channels)')
+@click.option('--output-dir', '-o', default='./reports/dashboards', help='Output directory for generated HTML dashboards (default: ./reports/dashboards)')
+@click.option('--template-dir', '-t', default='./templates', help='Directory containing Jinja2 HTML templates (default: ./templates)')
 @click.help_option('-h', '--help')
 def generate_dashboards(verbose: bool, channels: tuple, reports_dir: str, output_dir: str, template_dir: str) -> None:
     """Generate interactive Plotly dashboards from channel reports.
     
-    This command reads the JSON reports generated by the 'reports' command
-    and creates interactive HTML dashboards using Plotly charts and Jinja2 templates.
+    This command creates professional HTML dashboards with interactive charts from
+    the JSON reports generated by 'python main.py report messages'.
     
-    Examples:
-        python main.py dashboard                    # Generate dashboards for all channels
-        python main.py dashboard -c @books         # Generate dashboard for specific channel
-        python main.py dashboard -c @books -c @books_magazine  # Multiple channels
-        python main.py dashboard -r ./custom_reports  # Custom reports directory
-        python main.py dashboard -o ./custom_dashboards  # Custom output directory
-        python main.py dashboard -t ./custom_templates  # Custom template directory
-        python main.py dashboard -v                # Verbose logging
+    FEATURES:
+        • Interactive Plotly charts (time series, pie charts, histograms)
+        • Professional HTML templates with responsive design
+        • Auto-discovery of available channel reports
+        • Individual channel dashboards + main index dashboard
+        • Google Analytics integration
+    
+    EXAMPLES:
+        Basic Usage:
+            python main.py dashboard                    # Generate dashboards for all channels
+        
+        Specific Channels:
+            python main.py dashboard -c @books         # Single channel
+            python main.py dashboard -c @books -c @books_magazine  # Multiple channels
+        
+        Custom Directories:
+            python main.py dashboard -r ./custom_reports     # Custom reports location
+            python main.py dashboard -o ./custom_output     # Custom output location
+            python main.py dashboard -t ./custom_templates  # Custom template location
+        
+        Verbose Mode:
+            python main.py dashboard -v                # Enable detailed logging
+    
+    OUTPUT:
+        • Individual channel dashboards: ./reports/dashboards/{channel}_dashboard.html
+        • Main index dashboard: ./reports/dashboards/index.html
+        • All files are self-contained and can be shared/viewed in any browser
     """
     # Setup logging
     setup_logging(verbose)
@@ -374,14 +642,14 @@ def generate_dashboards(verbose: bool, channels: tuple, reports_dir: str, output
             reports_path = Path(reports_dir)
             if not reports_path.exists():
                 logger.error(f"❌ Reports directory not found: {reports_dir}")
-                logger.error("Please run 'python main.py reports' first to generate channel reports")
+                logger.error("Please run 'python main.py report messages' first to generate channel reports")
                 return
             
             # Find all channel directories
             channel_dirs = [d.name for d in reports_path.iterdir() if d.is_dir()]
             if not channel_dirs:
                 logger.error(f"❌ No channel reports found in: {reports_dir}")
-                logger.error("Please run 'python main.py reports' first to generate channel reports")
+                logger.error("Please run 'python main.py report messages' first to generate channel reports")
                 return
             
             channels_to_process = channel_dirs

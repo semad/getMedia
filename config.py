@@ -36,3 +36,14 @@ DEFAULT_SESSION_COOLDOWN = 60
 
 # Google Analytics configuration
 DEFAULT_GA_MEASUREMENT_ID = "G-KH0N6NM83F"
+
+# API Endpoints
+API_BASE_PATH = "/api/v1/telegram"
+API_ENDPOINTS = {
+    'messages': f"{API_BASE_PATH}/messages",
+    'messages_bulk': f"{API_BASE_PATH}/messages/bulk",
+    'stats': f"{API_BASE_PATH}/stats",
+    'stats_enhanced': f"{API_BASE_PATH}/stats/enhanced",
+    'channels': f"{API_BASE_PATH}/channels",
+    'export_all': f"{API_BASE_PATH}/messages/export/all"
+}

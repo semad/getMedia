@@ -9,10 +9,7 @@ from pathlib import Path
 # File paths and directories
 REPORTS_DIR = "./reports"
 COLLECTIONS_DIR = "./reports/collections"
-ANALYSIS_DIR = "./reports/analysis"
-HTML_DIR = "./reports/html"
 DEFAULT_EXPORT_PATH = "./reports/collections/telegram_collection"
-DEFAULT_ANALYSIS_OUTPUT = "./reports/html/telegram_analysis_dashboard.html"
 
 # Filename patterns
 F_PREFIX = "tg"
@@ -39,11 +36,3 @@ DEFAULT_SESSION_COOLDOWN = 60
 
 # Google Analytics configuration
 DEFAULT_GA_MEASUREMENT_ID = "G-KH0N6NM83F"
-
-
-
-
-
-
-
-

@@ -9,20 +9,19 @@ import click
 import asyncio
 import logging
 import json
-import signal
-import re
-from datetime import datetime, timezone
 from pathlib import Path
 
 # Add the current directory to the Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from config import *
-from modules.import_processor import run_import
-from modules.telegram_collector import TelegramCollector, DatabaseChecker, convert_messages_to_dataframe_format, export_messages_to_file
+from config import (
+    DEFAULT_MAX_MESSAGES, DEFAULT_OFFSET_ID, DEFAULT_RATE_LIMIT,
+    DEFAULT_SESSION_NAME, DEFAULT_EXPORT_PATH, DEFAULT_DB_URL,
+    DEFAULT_CHANNEL, DEFAULT_CHANNEL_PRIORITY, DEFAULT_MESSAGES_PER_MINUTE,
+    DEFAULT_DELAY_BETWEEN_CHANNELS, DEFAULT_SESSION_COOLDOWN
+)
+from modules.telegram_collector import TelegramCollector, export_messages_to_file
 from modules.models import ChannelConfig, RateLimitConfig
-from modules.database_service import TelegramDBService
-from modules.telegram_analyzer import TelegramDataAnalyzer
 
 
 def setup_logging(verbose: bool):
@@ -87,7 +86,7 @@ def collect(channels, max_messages, offset_id, rate_limit, session_name, file_na
     
     # Configure rate limiting
     rate_config = RateLimitConfig(
-        messages_per_minute=rate_limit if rate_limit != DEFAULT_RATE_LIMIT else DEFAULT_MESSAGES_PER_MINUTE,
+        messages_per_minute=rate_limit,
         delay_between_channels=DEFAULT_DELAY_BETWEEN_CHANNELS,
         session_cooldown=DEFAULT_SESSION_COOLDOWN
     )
@@ -102,9 +101,6 @@ def collect(channels, max_messages, offset_id, rate_limit, session_name, file_na
                 logger.error("Failed to initialize Telegram collector")
                 return all_messages
             
-            # Use provided offset ID directly
-            actual_offset_id = offset_id
-            
             # Collect messages from each channel
             channel_messages = {}  # Store messages per channel
             for channel in channel_list:
@@ -113,7 +109,7 @@ def collect(channels, max_messages, offset_id, rate_limit, session_name, file_na
                     
                 logger.info(f"Starting collection from channel: {channel.username}")
                 try:
-                    messages = await collector.collect_from_channel(channel, max_messages, actual_offset_id)
+                    messages = await collector.collect_from_channel(channel, max_messages, offset_id)
                     channel_messages[channel.username] = messages
                     all_messages.extend(messages)
                     logger.info(f"Collected {len(messages)} messages from {channel.username}")
@@ -286,7 +282,6 @@ def generate_reports(verbose: bool, channels: tuple, output_dir: str) -> None:
         # Initialize channel reporter
         from modules.channel_reporter import ChannelReporter
         from modules.database_service import TelegramDBService
-        from config import DEFAULT_DB_URL
         
         db_service = TelegramDBService(DEFAULT_DB_URL)
         reporter = ChannelReporter(db_service, output_dir)
@@ -374,8 +369,6 @@ def generate_dashboards(verbose: bool, channels: tuple, reports_dir: str, output
         # Determine which channels to process
         if not channels:
             # Scan reports directory to find available channels
-            import glob
-            import os
             from pathlib import Path
             
             reports_path = Path(reports_dir)
@@ -444,7 +437,6 @@ def generate_dashboards(verbose: bool, channels: tuple, reports_dir: str, output
             logger.info("💡 Open the HTML files in your browser to view interactive charts")
             
             # Show index file if it exists
-            import os
             index_file = os.path.join(output_dir, 'index.html')
             if os.path.exists(index_file):
                 logger.info(f"🏠 Main dashboard index: {index_file}")

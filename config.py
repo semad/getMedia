@@ -21,7 +21,7 @@ DEFAULT_MAX_MESSAGES = None
 DEFAULT_OFFSET_ID = 0
 DEFAULT_RATE_LIMIT = 120
 DEFAULT_SESSION_NAME = "telegram_collector"
-DEFAULT_DB_URL = "http://localhost:80"
+DEFAULT_DB_URL = "http://localhost:8000"
 
 # Channel defaults
 DEFAULT_CHANNEL = "@SherwinVakiliLibrary"

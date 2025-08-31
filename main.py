@@ -159,14 +159,14 @@ def collect(channels, max_messages, offset_id, rate_limit, session_name, file_na
             if messages:  # Only export if there are messages
                 # Create single-channel list for this export
                 single_channel_list = [ChannelConfig(channel_username)]
-                export_filename = export_messages_to_file(messages, DEFAULT_EXPORT_PATH, single_channel_list, logger)
+                export_filename = export_messages_to_file(messages, DEFAULT_EXPORT_PATH, single_channel_list)
                 if export_filename:
                     exported_files.append(export_filename)
                     logger.info(f"📁 Messages from {channel_username} exported to: {export_filename}")
     
     # Also export combined file if custom filename is provided
     if all_messages and file_name != DEFAULT_EXPORT_PATH:
-        export_filename = export_messages_to_file(all_messages, file_name, channel_list, logger)
+        export_filename = export_messages_to_file(all_messages, file_name, channel_list)
         if export_filename:
             exported_files.append(export_filename)
             logger.info(f"📁 Combined messages exported to: {export_filename}")

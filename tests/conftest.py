@@ -23,7 +23,7 @@ from modules.database_service import TelegramDBService
 def temp_dir():
     """Create a temporary directory for tests."""
     temp_dir = tempfile.mkdtemp()
-    yield temp_dir
+    yield Path(temp_dir)  # Return Path object instead of string
     shutil.rmtree(temp_dir)
 
 
@@ -138,7 +138,7 @@ def sample_json_file(temp_dir, sample_messages):
         'messages': sample_messages
     }
     
-    json_file = Path(temp_dir) / 'test_messages.json'
+    json_file = temp_dir / 'test_messages.json'  # temp_dir is now a Path object
     with open(json_file, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2, default=str)
     

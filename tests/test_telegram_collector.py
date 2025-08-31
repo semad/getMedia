@@ -47,7 +47,7 @@ class TestTelegramCollector:
             mock_client.start = AsyncMock(return_value=True)
             mock_client_class.return_value = mock_client
             
-            result = await collector.initialize("test_api_id", "test_api_hash", "test_session")
+            result = await collector.initialize("12345", "test_api_hash", "test_session")
             
             assert result is True
             assert collector.client is not None
@@ -114,17 +114,16 @@ class TestTelegramCollector:
         message.date = None
         message.text = "Photo message"
         message.media = Mock()
+        message.media.photo = Mock()  # Add photo attribute to media
         message.replies = None
         message.views = None
         message.forwards = None
         
-        # Mock the isinstance check for MessageMediaPhoto
-        with patch('modules.telegram_collector.MessageMediaPhoto', return_value=type(message.media)):
-            result = await collector.process_message(message, "@test_channel")
-            
-            assert result is not None
-            assert result['media_type'] == "photo"
-            assert result['file_size'] == 0
+        result = await collector.process_message(message, "@test_channel")
+        
+        assert result is not None
+        assert result['media_type'] == "photo"
+        assert result['file_size'] == 0
     
     @pytest.mark.asyncio
     async def test_process_message_missing_id(self, collector):

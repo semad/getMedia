@@ -6,13 +6,13 @@ import os
 import logging
 import asyncio
 import json
+import pandas as pd
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from telethon import TelegramClient
-from telethon.tl.types import Message, MessageMediaDocument, MessageMediaPhoto
+from telethon.tl.types import Message
 
 from .models import ChannelConfig, RateLimitConfig
-from .database_service import TelegramDBService
 
 # Import config constants
 import sys
@@ -22,13 +22,15 @@ from config import COLLECTIONS_DIR, DEFAULT_EXPORT_PATH, F_PREFIX, F_SEPARATOR, 
 logger = logging.getLogger(__name__)
 
 
-def convert_messages_to_dataframe_format(messages: List[Any], logger: logging.Logger) -> List[Dict[str, Any]]:
-    """Convert TelegramMessage objects to a DataFrame-compatible structured format."""
+def convert_messages_to_dataframe(messages: List[Any]) -> pd.DataFrame:
+    """Convert TelegramMessage objects to a pandas DataFrame."""
     if not messages:
-        return []
+        return pd.DataFrame()
     
-    structured_messages = []
-    for i, msg in enumerate(messages):
+    # Prepare data for DataFrame
+    data_rows = []
+    
+    for msg in messages:
         try:
             if hasattr(msg, '__dict__'):
                 # Handle TelegramMessage objects
@@ -38,7 +40,7 @@ def convert_messages_to_dataframe_format(messages: List[Any], logger: logging.Lo
                         msg_dict[attr_name] = attr_value.isoformat()
                     else:
                         msg_dict[attr_name] = attr_value
-                structured_messages.append(msg_dict)
+                data_rows.append(msg_dict)
             elif isinstance(msg, dict):
                 # Handle already-dict messages
                 msg_dict = {}
@@ -47,24 +49,45 @@ def convert_messages_to_dataframe_format(messages: List[Any], logger: logging.Lo
                         msg_dict[key] = value.isoformat()
                     else:
                         msg_dict[key] = value
-                structured_messages.append(msg_dict)
+                data_rows.append(msg_dict)
             else:
-                logger.warning(f"Message {i+1} has unexpected format: {type(msg)}")
+                logger.warning(f"Message has unexpected format: {type(msg)}")
                 continue
         except Exception as e:
-            logger.error(f"Error processing message {i+1}: {e}")
+            logger.error(f"Error processing message: {e}")
             continue
     
-    if structured_messages:
-        logger.info(f"🔧 Converted {len(structured_messages)} messages to structured format")
-        sample_fields = list(structured_messages[0].keys())
-        logger.info(f"📋 Available fields: {', '.join(sample_fields[:10])}{'...' if len(sample_fields) > 10 else ''}")
-    
-    return structured_messages
+    if data_rows:
+        # Create DataFrame
+        df = pd.DataFrame(data_rows)
+        
+        # Clean up the DataFrame
+        df = df.replace([pd.NA, pd.NaT, 'NaN', 'NaT', 'nan', 'nat'], None)
+        
+        # Convert numeric columns
+        numeric_columns = ['message_id', 'file_size', 'views', 'forwards', 'replies']
+        for col in numeric_columns:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Convert date columns
+        date_columns = ['date', 'edit_date']
+        for col in date_columns:
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+        
+        logger.info(f"🔧 Converted {len(df)} messages to pandas DataFrame")
+        logger.info(f"📋 DataFrame shape: {df.shape}")
+        logger.info(f"📋 DataFrame columns: {list(df.columns)}")
+        
+        return df
+    else:
+        logger.warning("No valid messages to convert to DataFrame")
+        return pd.DataFrame()
 
 
-def export_messages_to_file(messages: List[Any], export_path: str, channel_list: List[Any], logger: logging.Logger) -> Optional[str]:
-    """Export messages to structured file (JSON with DataFrame-like structure)."""
+def export_messages_to_file(messages: List[Any], export_path: str, channel_list: List[Any]) -> Optional[str]:
+    """Export messages to structured file using pandas DataFrame."""
     try:
         # Ensure export directory exists
         os.makedirs(COLLECTIONS_DIR, exist_ok=True)
@@ -72,7 +95,6 @@ def export_messages_to_file(messages: List[Any], export_path: str, channel_list:
         # Generate filename
         if export_path == DEFAULT_EXPORT_PATH:
             # Create descriptive filename with channel name and message ID range
-            # Get channel names (remove @ symbol for filename)
             channel_names = [ch.username.replace('@', '') for ch in channel_list if ch.enabled]
             channel_str = F_SEPARATOR.join(channel_names) if channel_names else 'unknown'
             
@@ -93,53 +115,68 @@ def export_messages_to_file(messages: List[Any], export_path: str, channel_list:
         else:
             filename = export_path if export_path.endswith(F_EXTENSION) else f"{export_path}{F_EXTENSION}"
         
-        # Convert messages to structured DataFrame-like format
-        structured_messages = convert_messages_to_dataframe_format(messages, logger)
+        # Convert messages to pandas DataFrame
+        df = convert_messages_to_dataframe(messages)
+        
+        if df.empty:
+            logger.warning("No messages to export")
+            return None
         
         # Prepare export data with structured format
         export_data = {
             'metadata': {
                 'collected_at': datetime.now().isoformat(),
                 'channels': [ch.username for ch in channel_list if ch.enabled],
-                'total_messages': len(messages),
                 'data_format': 'structured_dataframe',
-                'fields': list(structured_messages[0].keys()) if structured_messages else []
+                'total_messages': len(df),
+                'dataframe_info': {
+                    'shape': df.shape,
+                    'columns': list(df.columns),
+                    'dtypes': df.dtypes.to_dict()
+                }
             },
-            'messages': structured_messages
+            'messages': df.to_dict('records')  # Convert DataFrame to list of dictionaries
         }
         
-        # Write file
+        # Export to JSON
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(export_data, f, ensure_ascii=False, indent=2, default=str)
         
-        logger.info(f"✅ Exported {len(messages)} messages to structured format: {filename}")
-        logger.info(f"📊 Data converted to DataFrame-compatible structure with {len(structured_messages[0]) if structured_messages else 0} fields")
+        logger.info(f"✅ Successfully exported {len(df)} messages to: {filename}")
+        logger.info(f"📊 DataFrame shape: {df.shape}")
+        logger.info(f"📋 Columns: {list(df.columns)}")
+        
         return filename
         
     except Exception as e:
-        logger.error(f"Failed to export messages: {e}")
+        logger.error(f"❌ Failed to export messages: {e}")
         return None
 
 
 class TelegramCollector:
-    """Collects messages from Telegram channels."""
+    """Collects messages from Telegram channels and exports them to files."""
     
     def __init__(self, rate_config: RateLimitConfig):
         self.client: Optional[TelegramClient] = None
-        self.db_service: Optional[TelegramDBService] = None
         self.rate_config = rate_config
         self.stats = {
             'total_messages': 0,
             'channels_processed': 0,
             'errors': 0
         }
-        self.collected_messages = []  # Store messages as they're collected
-
+        self.collected_messages: List[Dict[str, Any]] = []
     
     async def initialize(self, api_id: str, api_hash: str, session_name: str) -> bool:
         """Initialize the Telegram client."""
         try:
-            self.client = TelegramClient(session_name, int(api_id), api_hash)
+            # Validate and convert API ID
+            try:
+                api_id_int = int(api_id)
+            except ValueError:
+                logger.error(f"Invalid API ID: {api_id}. Must be a valid integer.")
+                return False
+                
+            self.client = TelegramClient(session_name, api_id_int, api_hash)
             await self.client.start()
             logger.info("Telegram client initialized successfully")
             return True
@@ -158,20 +195,21 @@ class TelegramCollector:
         messages = []
         message_count = 0
         
-        if max_messages is None:
-            max_messages = None
-        elif max_messages == 0:
+        # Set max_messages if not specified
+        if max_messages == 0:
             max_messages = channel_config.max_messages_per_session
         
         try:
             logger.info(f"Starting collection from channel: {channel_config.username}")
             
+            # Prepare collection parameters
             collection_params = {}
             if max_messages is not None:
                 collection_params['limit'] = max_messages
-            if offset_id > 0:
+            if offset_id is not None and offset_id > 0:
                 collection_params['max_id'] = offset_id
             
+            # Collect messages
             async for message in self.client.iter_messages(channel_config.username, **collection_params):
                 # Rate limiting
                 await self._wait_for_rate_limit()
@@ -180,25 +218,15 @@ class TelegramCollector:
                 telegram_message = await self.process_message(message, channel_config.username)
                 if telegram_message:
                     messages.append(telegram_message)
-                    self.collected_messages.append(telegram_message)  # Store in instance variable
+                    self.collected_messages.append(telegram_message)
                     message_count += 1
                     self.stats['total_messages'] += 1
-                
-                # Update database immediately to ensure it's saved
-                if self.db_service and telegram_message:
-                    try:
-                        success = await self.db_service.store_message(telegram_message)
-                        if success:
-                            logger.debug(f"Successfully stored message {telegram_message['message_id']} in database")
-                        else:
-                            logger.warning(f"Failed to store message {telegram_message['message_id']} in database")
-                    except Exception as e:
-                        logger.error(f"Error storing message {telegram_message['message_id']} in database: {e}")
                 
                 # Progress update
                 if message_count % 10 == 0:
                     logger.info(f"Processed {message_count} messages from {channel_config.username}")
                 
+                # Check if we've reached the limit
                 if max_messages is not None and message_count >= max_messages:
                     break
             
@@ -211,69 +239,24 @@ class TelegramCollector:
         
         return messages
     
-    def get_collected_messages(self) -> List[Dict[str, Any]]:
-        """Get all messages collected so far."""
-        return self.collected_messages.copy()
-    
-    def clear_collected_messages(self):
-        """Clear the collected messages list."""
-        self.collected_messages.clear()
-    
-
-    
     async def process_message(self, message: Message, channel_username: str) -> Optional[Dict[str, Any]]:
         """Process a Telegram message and extract metadata."""
         try:
+            # Validate message has required fields
             if not hasattr(message, 'id') or message.id is None:
                 return None
                 
-            if not hasattr(message, 'date') or message.date is None:
-                message_date = datetime.now()
-            else:
-                message_date = message.date
+            # Get message date
+            message_date = message.date if hasattr(message, 'date') and message.date else datetime.now()
             
             # Extract media information
-            media_type = None
-            file_name = None
-            file_size = None
-            mime_type = None
+            media_info = self._extract_media_info(message)
             
-            if hasattr(message, 'media') and message.media:
-                if isinstance(message.media, MessageMediaDocument):
-                    media_type = "document"
-                    if hasattr(message.media.document, 'attributes') and message.media.document.attributes:
-                        for attr in message.media.document.attributes:
-                            if hasattr(attr, 'file_name') and attr.file_name:
-                                file_name = attr.file_name
-                                break
-                    file_size = getattr(message.media.document, 'size', None)
-                    mime_type = getattr(message.media.document, 'mime_type', None)
-                    
-                elif isinstance(message.media, MessageMediaPhoto):
-                    media_type = "photo"
-                    file_size = 0
+            # Extract text content
+            message_text = self._extract_text_content(message)
             
-            # Extract text
-            message_text = ""
-            if hasattr(message, 'text') and message.text:
-                message_text = str(message.text)
-            
-            if not message_text or len(message_text.strip()) == 0:
-                message_text = "[No text content]"
-            
-            # Extract other fields
-            replies_count = None
-            views_count = None
-            forwards_count = None
-            
-            if hasattr(message, 'replies') and message.replies:
-                replies_count = message.replies.replies
-            
-            if hasattr(message, 'views'):
-                views_count = message.views
-            
-            if hasattr(message, 'forwards'):
-                forwards_count = message.forwards
+            # Extract engagement metrics
+            engagement_metrics = self._extract_engagement_metrics(message)
             
             # Create message dictionary
             telegram_message = {
@@ -281,23 +264,8 @@ class TelegramCollector:
                 'channel_username': channel_username,
                 'date': message_date,
                 'text': message_text,
-                'media_type': media_type,
-                'file_name': file_name,
-                'file_size': file_size,
-                'mime_type': mime_type,
-                'duration': None,  # Could be extracted for video/audio
-                'width': None,      # Could be extracted for media
-                'height': None,     # Could be extracted for media
-                'caption': None,    # Could be extracted
-                'views': views_count,
-                'forwards': forwards_count,
-                'replies': replies_count,
-                'edit_date': None,  # Could be extracted
-                'is_forwarded': False,  # Could be extracted
-                'forwarded_from': None,  # Could be extracted
-                'forwarded_message_id': None,  # Could be extracted
-                'created_at': datetime.now(),
-                'updated_at': datetime.now()
+                **media_info,
+                **engagement_metrics
             }
             
             return telegram_message
@@ -306,31 +274,95 @@ class TelegramCollector:
             logger.error(f"Error processing message: {e}")
             return None
     
+    def _extract_media_info(self, message: Message) -> Dict[str, Any]:
+        """Extract media information from a message."""
+        media_type = None
+        file_name = None
+        file_size = None
+        mime_type = None
+        
+        if hasattr(message, 'media') and message.media:
+            # Check if it's a document
+            if hasattr(message.media, 'document') and message.media.document:
+                media_type = "document"
+                if hasattr(message.media.document, 'attributes') and message.media.document.attributes:
+                    for attr in message.media.document.attributes:
+                        if hasattr(attr, 'file_name') and attr.file_name:
+                            file_name = attr.file_name
+                            break
+                file_size = getattr(message.media.document, 'size', None)
+                mime_type = getattr(message.media.document, 'mime_type', None)
+                
+            # Check if it's a photo
+            elif hasattr(message.media, 'photo') and message.media.photo:
+                media_type = "photo"
+                file_size = 0
+        
+        return {
+            'media_type': media_type,
+            'file_name': file_name,
+            'file_size': file_size,
+            'mime_type': mime_type,
+            'duration': None,
+            'width': None,
+            'height': None,
+            'caption': None
+        }
+    
+    def _extract_text_content(self, message: Message) -> str:
+        """Extract text content from a message."""
+        message_text = ""
+        if hasattr(message, 'text') and message.text:
+            message_text = str(message.text)
+        
+        if not message_text or len(message_text.strip()) == 0:
+            message_text = "[No text content]"
+        
+        return message_text
+    
+    def _extract_engagement_metrics(self, message: Message) -> Dict[str, Any]:
+        """Extract engagement metrics from a message."""
+        replies_count = None
+        views_count = None
+        forwards_count = None
+        
+        if hasattr(message, 'replies') and message.replies:
+            replies_count = message.replies.replies
+        
+        if hasattr(message, 'views'):
+            views_count = message.views
+        
+        if hasattr(message, 'forwards'):
+            forwards_count = message.forwards
+        
+        return {
+            'views': views_count,
+            'forwards': forwards_count,
+            'replies': replies_count,
+            'edit_date': None,
+            'is_forwarded': False,
+            'forwarded_from': None,
+            'forwarded_message_id': None
+        }
+    
     async def _wait_for_rate_limit(self):
         """Wait for rate limiting."""
         await asyncio.sleep(60 / self.rate_config.messages_per_minute)
+    
+    def get_collected_messages(self) -> List[Dict[str, Any]]:
+        """Get all messages collected so far."""
+        return self.collected_messages.copy()
+    
+    def clear_collected_messages(self):
+        """Clear the collected messages list."""
+        self.collected_messages.clear()
+    
+    def export_messages_to_file(self, export_path: str, channel_list: List[ChannelConfig]) -> Optional[str]:
+        """Export collected messages to structured file (JSON with DataFrame-like structure)."""
+        return export_messages_to_file(self.collected_messages, export_path, channel_list)
     
     async def close(self):
         """Close the Telegram client."""
         if self.client:
             await self.client.disconnect()
             logger.info("Telegram client disconnected")
-
-
-class DatabaseChecker:
-    """Utility class for checking database state."""
-    
-    def __init__(self, db_url: str):
-        self.db_url = db_url
-    
-    async def __aenter__(self):
-        return self
-    
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        pass
-    
-    async def get_last_message_id(self, channel_username: str) -> Optional[int]:
-        """Get the highest message ID for a channel from the database."""
-        # This would need to be implemented based on your database schema
-        # For now, return None to indicate no existing messages
-        return None

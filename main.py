@@ -59,8 +59,8 @@ def cli():
 @cli.command(name="collect")
 @click.option("--channels", "-c", help="Comma-separated list of channel usernames")
 @click.option(
-    "--max-messages",
-    "-m",
+    "--fax-fessages",
+    "-f",
     default=DEFAULT_MAX_MESSAGES,
     type=int,
     help="Maximum messages to collect per channel (default: no limit)",
@@ -340,31 +340,21 @@ def import_file(import_file, verbose):
 @cli.command(name="report")
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging output")
 @click.option(
-    "--message-files",
-    "-m",
+    "--file-messages",
+    "-f",
     is_flag=True,
     help="Generate message analysis reports from combined files",
 )
-@click.option(
-    "--formats",
-    "-f",
-    multiple=True,
-    default=["json", "summary"],
-    help="Output formats: json, csv, excel, summary (default: json and summary)",
-)
 @click.help_option("-h", "--help")
-def report(verbose: bool, messages_file: bool, formats: tuple) -> None:
+def report(verbose: bool, file_messages: bool) -> None:
     """Generate reports for Telegram data analysis.
     This command can generate different types of reports:
-    - Message analysis reports (when --messages-file flag is used)
+    - Message analysis reports (when --file-messages flag is used)
     - Channel overview reports
     - Data quality assessment
-    - Export to multiple formats (CSV, JSON, Excel, Summary)
+    - Automatic JSON and text summary output
     Examples:
-        python main.py report --messages-file              # Generate message analysis reports from combined files
-        python main.py report --messages-file -v          # Verbose logging with message analysis
-        python main.py report --messages-file -f json -f csv    # Generate JSON and CSV formats
-        python main.py report --messages-file -f json -f excel -f summary  # Generate all formats
+        python main.py report --file-messages              # Generate message analysis reports from combined files
     """
     # Setup logging
     setup_logging(verbose)
@@ -372,21 +362,21 @@ def report(verbose: bool, messages_file: bool, formats: tuple) -> None:
     if verbose:
         logger.info("Verbose logging enabled")
     try:
-        if messages_file:
+        if file_messages:
             logger.info("📊 Generating message analysis reports from combined files...")
             # Process channel reports using the new module
             results = process_channel_reports(
-                "reports/collections", "reports/messages", formats
+                "reports/collections", "reports/messages"
             )
             # Display results summary
             display_results_summary(results)
         else:
             logger.info(
-                "No analysis type specified. Use --messages-file to generate message analysis reports."
+                "No analysis type specified. Use --file-messages to generate message analysis reports."
             )
             logger.info("💡 Available options:")
             logger.info(
-                "   --messages-file, -m    Generate message analysis reports from combined files"
+                "   --file-messages, -f    Generate message analysis reports from combined files"
             )
     except Exception as e:
         logger.error(f"❌ Report generation failed: {e}")

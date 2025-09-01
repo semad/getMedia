@@ -367,13 +367,20 @@ def report(verbose: bool, file_messages: bool, db_messages: bool) -> None:
             display_results_summary(results)
         elif db_messages:
             logger.info("📊 Generating message analysis reports from database API endpoints...")
-            # Process channel reports using the new module
-            results = process_channel_reports(
-                "reports/collections", "reports/messages"
-            )
-            # Display results summary
-            display_results_summary(results)
-        else:
+            # Import and use the database report processor
+            from modules.db_report_processor import DatabaseReportProcessor, display_db_results_summary
+            
+            async def process_db_reports():
+                async with DatabaseReportProcessor() as db_processor:
+                    return await db_processor.process_channel_reports_from_db(
+                        channels=None,  # Auto-detect channels
+                        output_dir="reports/analysis/db_messages/channels",
+                        verbose=verbose
+                    )
+            
+            # Run the async function
+            results = asyncio.run(process_db_reports())
+            display_db_results_summary(results)
             logger.info("No analysis type specified. Use --file-messages to generate message analysis reports.")
             return
 

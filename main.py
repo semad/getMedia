@@ -339,22 +339,17 @@ def import_file(import_file, verbose):
 
 @cli.command(name="report")
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging output")
-@click.option(
-    "--file-messages",
-    "-f",
-    is_flag=True,
-    help="Generate message analysis reports from combined files",
-)
+@click.option("--file-messages", "-f", is_flag=True, help="Generate message analysis reports from combined files")
+@click.option( "--db-messages", "-d", is_flag=True, help="Generate message analysis reports from database API endpoints",)
 @click.help_option("-h", "--help")
-def report(verbose: bool, file_messages: bool) -> None:
+def report(verbose: bool, file_messages: bool, db_messages: bool) -> None:
     """Generate reports for Telegram data analysis.
     This command can generate different types of reports:
     - Message analysis reports (when --file-messages flag is used)
-    - Channel overview reports
-    - Data quality assessment
-    - Automatic JSON and text summary output
+    - Message analysis reports (when --db-messages flag is used)
     Examples:
         python main.py report --file-messages              # Generate message analysis reports from combined files
+        python main.py report --db-messages              # Generate message analysis reports from database API endpoints
     """
     # Setup logging
     setup_logging(verbose)
@@ -370,14 +365,19 @@ def report(verbose: bool, file_messages: bool) -> None:
             )
             # Display results summary
             display_results_summary(results)
+        elif db_messages:
+            logger.info("📊 Generating message analysis reports from database API endpoints...")
+            # Process channel reports using the new module
+            results = process_channel_reports(
+                "reports/collections", "reports/messages"
+            )
+            # Display results summary
+            display_results_summary(results)
         else:
-            logger.info(
-                "No analysis type specified. Use --file-messages to generate message analysis reports."
-            )
-            logger.info("💡 Available options:")
-            logger.info(
-                "   --file-messages, -f    Generate message analysis reports from combined files"
-            )
+            logger.info("No analysis type specified. Use --file-messages to generate message analysis reports.")
+            return
+
+            display_results_summary(results)
     except Exception as e:
         logger.error(f"❌ Report generation failed: {e}")
         if verbose:
@@ -385,24 +385,6 @@ def report(verbose: bool, file_messages: bool) -> None:
 
             logger.error(f"Traceback: {traceback.format_exc()}")
         raise
-    """Generate a channel overview report.
-    This command creates a summary report of all channels in the database
-    including basic statistics and activity information.
-    Examples:
-        python main.py report channels              # Generate channel overview report
-        python main.py report channels -v          # Verbose logging
-    """
-    # Setup logging
-    setup_logging(verbose)
-    logger = logging.getLogger(__name__)
-    if verbose:
-        logger.info("Verbose logging enabled")
-    try:
-        logger.info("📺 Starting channel overview report generation...")
-        # Initialize database service
-        from modules.database_service import TelegramDBService
-
-        db_service = TelegramDBService(DEFAULT_DB_URL)
 
         # Generate channel overview report
         async def generate_channel_report():

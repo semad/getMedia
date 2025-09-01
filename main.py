@@ -33,7 +33,8 @@ from modules.combine_processor import (
     combine_existing_collections,
 )
 from modules.models import ChannelConfig, RateLimitConfig
-from modules.report_processor import display_results_summary, process_channel_reports
+from modules.file_report_processor import display_results_summary, process_channel_reports
+from modules.db_report_processor import display_db_results_summary
 from modules.telegram_collector import TelegramCollector, export_messages_to_file
 
 

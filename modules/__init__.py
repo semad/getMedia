@@ -1,20 +1,35 @@
 """
-Modules package for Telegram Media Messages Tool.
+Reporting Module
+
+This module contains all reporting functionality for Telegram data analysis.
+It provides comprehensive reporting capabilities including message analysis,
+field discovery, and channel overview reports.
 """
 
-from .models import ChannelConfig, RateLimitConfig
-from .database_service import TelegramDBService
-from .retry_handler import RetryHandler
-from .import_processor import run_import, validate_message_format, check_data_quality
-from .telegram_collector import TelegramCollector
+from .report_generator import (
+    generate_channel_overview_report,
+    generate_field_discovery_report,
+    generate_pandas_report,
+)
+from .file_report_processor import (
+    generate_summary_text,
+    process_channel_reports,
+    display_results_summary,
+    parse_json_file,
+)
+from .db_report_processor import (
+    DatabaseReportProcessor,
+    display_db_results_summary,
+)
 
 __all__ = [
-    'ChannelConfig',
-    'RateLimitConfig',
-    'TelegramDBService',
-    'RetryHandler',
-    'run_import',
-    'validate_message_format',
-    'check_data_quality',
-    'TelegramCollector'
+    "generate_channel_overview_report",
+    "generate_field_discovery_report",
+    "generate_pandas_report",
+    "generate_summary_text",
+    "process_channel_reports",
+    "display_results_summary",
+    "parse_json_file",
+    "DatabaseReportProcessor",
+    "display_db_results_summary",
 ]

@@ -14,6 +14,7 @@ import pandas as pd
 
 from .database_service import TelegramDBService
 from .retry_handler import RetryHandler
+from config import COLLECTIONS_DIR, COMBINED_COLLECTION_GLOB
 
 logger = logging.getLogger(__name__)
 
@@ -539,13 +540,13 @@ def import_single_file(file_path: str, db_url: str, logger: logging.Logger) -> b
 def import_all_combined_collections(db_url: str, logger: logging.Logger, verbose: bool = False) -> bool:
     """Import messages from all available combined collections."""
     try:
-        collections_dir = Path("reports/collections")
+        collections_dir = Path(COLLECTIONS_DIR)
         if not collections_dir.exists():
             logger.error("❌ Collections directory not found")
             return False
         
         # Find all combined collection files
-        combined_files = list(collections_dir.glob("tg_*_combined.json"))
+        combined_files = list(collections_dir.glob(COMBINED_COLLECTION_GLOB))
         if not combined_files:
             logger.warning("⚠️  No combined collection files found")
             return False

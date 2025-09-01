@@ -7,6 +7,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Dict, List, Any
+from config import DB_MESSAGES_DIR
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -109,4 +110,4 @@ def analyze_text_sizes(file_path: str):
         logger.info(f"\nNo obvious text/caption size issues found.")
 
 if __name__ == "__main__":
-    analyze_text_sizes("reports/exports/current_db_export.json")
+    analyze_text_sizes(f"{DB_MESSAGES_DIR}/current_db_export.json")

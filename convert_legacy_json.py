@@ -7,7 +7,7 @@ of TelegramMessage objects and converts them to a structured DataFrame-compatibl
 
 Usage:
     python convert_legacy_json.py [input_file] [output_file]
-    python convert_legacy_json.py --batch --input-dir ./reports/collections
+    python convert_legacy_json.py --batch --input-dir {COLLECTIONS_DIR}
     python convert_legacy_json.py --help
 """
 
@@ -19,6 +19,7 @@ from datetime import datetime
 import re
 from pathlib import Path
 import glob
+from config import COLLECTIONS_DIR
 
 
 def parse_telegram_message_string(msg_str):
@@ -334,7 +335,7 @@ Examples:
                        help='Output JSON file (optional, auto-generated if not provided)')
     parser.add_argument('--batch', action='store_true',
                        help='Process multiple files in batch mode')
-    parser.add_argument('--input-dir', default='./reports/collections',
+    parser.add_argument('--input-dir', default=COLLECTIONS_DIR,
                        help='Input directory for batch processing (default: ./reports/collections)')
     parser.add_argument('--pattern', default='*.json',
                        help='File pattern for batch processing (default: *.json)')
@@ -353,7 +354,7 @@ Examples:
     # Single file mode
     if not args.input_file:
         # Default input file
-        input_file = "./reports/collections/tg_SherwinVakiliLibrary_1_150244.json"
+        input_file = f"{COLLECTIONS_DIR}/tg_SherwinVakiliLibrary_1_150244.json"
         
         # Check if default file exists
         if not os.path.exists(input_file):

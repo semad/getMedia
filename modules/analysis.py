@@ -928,6 +928,383 @@ class FileDataLoader(BaseDataLoader):
             self.logger.warning(f"Failed to calculate quality score: {e}")
             return 0.5  # Default medium quality
 
+# Data Loaders - API-based Data Loading
+class ApiDataLoader(BaseDataLoader):
+    """API-based data loader with async support and pagination."""
+    
+    def __init__(self, config: AnalysisConfig):
+        super().__init__(config)
+        self.required_columns = [
+            'message_id', 'channel_username', 'date', 'text', 'media_type',
+            'file_name', 'file_size', 'mime_type', 'views', 'forwards', 'replies'
+        ]
+        self.session = None
+    
+    def discover_sources(self) -> List[DataSource]:
+        """Discover available data sources from API endpoints."""
+        try:
+            self.start_performance_monitoring()
+            sources = []
+            
+            # Check if API is available
+            if not self._is_endpoint_available():
+                self.logger.warning("API endpoint not available")
+                return sources
+            
+            # Get available channels from API
+            try:
+                channels = self._get_available_channels()
+                if not channels:
+                    self.logger.warning("No channels available from API")
+                    return sources
+                
+                # Create DataSource for each channel
+                for channel in channels:
+                    try:
+                        source = self._analyze_api_source(channel)
+                        if source:
+                            sources.append(source)
+                            self.logger.debug(f"Added API source: {source.channel_name}")
+                    except Exception as e:
+                        self.logger.warning(f"Failed to analyze API source {channel}: {e}")
+                        continue
+                
+                self.logger.info(f"Successfully discovered {len(sources)} API data sources")
+                return sources
+                
+            except Exception as e:
+                self.logger.error(f"Failed to get available channels: {e}")
+                return sources
+            
+        except Exception as e:
+            self._handle_loading_error(e, "discover_sources")
+            return []
+        finally:
+            self.log_performance_stats()
+    
+    def _is_endpoint_available(self) -> bool:
+        """Check if API endpoint is available."""
+        try:
+            import requests
+            response = requests.get(
+                f"{self.config.api_base_url}/health",
+                timeout=self.config.api_timeout
+            )
+            return response.status_code == 200
+        except Exception:
+            return False
+    
+    def _get_available_channels(self) -> List[str]:
+        """Get list of available channels from API."""
+        try:
+            import requests
+            response = requests.get(
+                f"{self.config.api_base_url}{API_ENDPOINTS['channels']}",
+                timeout=self.config.api_timeout
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            if isinstance(data, list):
+                return data
+            elif isinstance(data, dict) and 'channels' in data:
+                return data['channels']
+            else:
+                return []
+                
+        except Exception as e:
+            self.logger.error(f"Failed to get available channels: {e}")
+            return []
+    
+    def _analyze_api_source(self, channel: str) -> Optional[DataSource]:
+        """Analyze a single API source to create a DataSource object."""
+        try:
+            # Get basic stats for the channel
+            stats = self._get_channel_stats(channel)
+            if not stats:
+                return None
+            
+            # Create metadata
+            metadata = {
+                'api_endpoint': f"{self.config.api_base_url}{API_ENDPOINTS['messages']}",
+                'channel': channel,
+                'total_messages': stats.get('total_messages', 0),
+                'date_range': stats.get('date_range', {}),
+                'last_updated': stats.get('last_updated', None)
+            }
+            
+            # Create DataSource
+            return self._create_data_source(
+                source_type="api",
+                channel_name=channel,
+                total_records=stats.get('total_messages', 0),
+                date_range=(None, None),  # Will be updated when data is loaded
+                quality_score=0.95,  # Assume good quality for API data
+                metadata=metadata
+            )
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to analyze API source {channel}: {e}")
+            return None
+    
+    def _get_channel_stats(self, channel: str) -> Optional[Dict[str, Any]]:
+        """Get statistics for a specific channel."""
+        try:
+            import requests
+            response = requests.get(
+                f"{self.config.api_base_url}{API_ENDPOINTS['stats']}",
+                params={'channel': channel},
+                timeout=self.config.api_timeout
+            )
+            response.raise_for_status()
+            return response.json()
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to get stats for channel {channel}: {e}")
+            return None
+    
+    def load_data(self, source_path: str = None) -> Tuple[pd.DataFrame, DataSource]:
+        """Load data from API with pagination and async support."""
+        try:
+            self.start_performance_monitoring()
+            
+            if source_path:
+                channel = source_path
+            else:
+                # Use first available source
+                sources = self.discover_sources()
+                if not sources:
+                    raise ValueError("No API data sources available")
+                channel = sources[0].channel_name
+            
+            self.logger.info(f"Loading data from API for channel: {channel}")
+            
+            # Load data asynchronously
+            df = asyncio.run(self.load_data_async(channel))
+            
+            if df.empty:
+                self.logger.warning(f"No data loaded for channel: {channel}")
+                return df, None
+            
+            # Validate the loaded data
+            if not self._validate_dataframe(df, self.required_columns):
+                raise ValueError("Loaded data failed validation")
+            
+            # Optimize memory usage
+            df = self._optimize_dataframe_memory(df)
+            
+            # Create updated DataSource with actual data info
+            actual_records = len(df)
+            date_range = self._get_date_range(df)
+            quality_score = self._calculate_quality_score(df)
+            
+            source = self._create_data_source(
+                source_type="api",
+                channel_name=channel,
+                total_records=actual_records,
+                date_range=date_range,
+                quality_score=quality_score,
+                metadata={
+                    'api_endpoint': f"{self.config.api_base_url}{API_ENDPOINTS['messages']}",
+                    'channel': channel,
+                    'actual_records': actual_records,
+                    'loading_method': 'async_pagination'
+                }
+            )
+            
+            self.logger.info(f"Successfully loaded {actual_records} records from API for {channel}")
+            return df, source
+            
+        except Exception as e:
+            self._handle_loading_error(e, f"load_data({source_path})")
+            return pd.DataFrame(), None
+        finally:
+            self.log_performance_stats()
+    
+    async def load_data_async(self, channel: str) -> pd.DataFrame:
+        """Load data from API asynchronously with pagination."""
+        try:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.config.api_timeout)) as session:
+                self.session = session
+                
+                # Get total count first
+                total_count = await self._get_total_count(channel)
+                if total_count == 0:
+                    self.logger.warning(f"No data available for channel: {channel}")
+                    return pd.DataFrame()
+                
+                self.logger.info(f"Loading {total_count} records from API for {channel}")
+                
+                # Load data in pages
+                all_data = []
+                page = 1
+                items_per_page = self.config.items_per_page
+                
+                while True:
+                    try:
+                        page_data = await self._fetch_page_with_retry(
+                            channel, page, items_per_page
+                        )
+                        
+                        if not page_data:
+                            break
+                        
+                        all_data.extend(page_data)
+                        
+                        # Log progress
+                        if page % 10 == 0:  # Log every 10 pages
+                            self.logger.info(f"Loaded {len(all_data)}/{total_count} records")
+                        
+                        # Check if we've loaded all data
+                        if len(page_data) < items_per_page:
+                            break
+                        
+                        page += 1
+                        
+                        # Memory management
+                        if len(all_data) > self.config.memory_limit:
+                            self.logger.warning("Memory limit reached, stopping data loading")
+                            break
+                            
+                    except Exception as e:
+                        self.logger.error(f"Failed to fetch page {page}: {e}")
+                        break
+                
+                # Convert to DataFrame
+                if all_data:
+                    df = pd.DataFrame(all_data)
+                    
+                    # Convert date column if present
+                    if 'date' in df.columns:
+                        df['date'] = pd.to_datetime(df['date'], errors='coerce')
+                    
+                    self.logger.info(f"Successfully loaded {len(df)} records from API")
+                    return df
+                else:
+                    return pd.DataFrame()
+                    
+        except Exception as e:
+            self.logger.error(f"Failed to load data asynchronously: {e}")
+            return pd.DataFrame()
+        finally:
+            if self.session:
+                await self.session.close()
+                self.session = None
+    
+    async def _get_total_count(self, channel: str) -> int:
+        """Get total count of records for a channel."""
+        try:
+            url = f"{self.config.api_base_url}{API_ENDPOINTS['stats']}"
+            params = {'channel': channel}
+            
+            async with self.session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data.get('total_messages', 0)
+                else:
+                    self.logger.warning(f"Failed to get total count: {response.status}")
+                    return 0
+                    
+        except Exception as e:
+            self.logger.error(f"Failed to get total count: {e}")
+            return 0
+    
+    async def _fetch_page_with_retry(self, channel: str, page: int, items_per_page: int) -> List[Dict[str, Any]]:
+        """Fetch a page of data with retry logic."""
+        for attempt in range(self.config.retry_attempts):
+            try:
+                return await self._fetch_page(channel, page, items_per_page)
+            except Exception as e:
+                if attempt < self.config.retry_attempts - 1:
+                    self.logger.warning(f"Attempt {attempt + 1} failed, retrying: {e}")
+                    await asyncio.sleep(self.config.retry_delay * (attempt + 1))
+                else:
+                    self.logger.error(f"All attempts failed for page {page}: {e}")
+                    raise
+        
+        return []
+    
+    async def _fetch_page(self, channel: str, page: int, items_per_page: int) -> List[Dict[str, Any]]:
+        """Fetch a single page of data from API."""
+        try:
+            url = f"{self.config.api_base_url}{API_ENDPOINTS['messages']}"
+            params = {
+                'channel': channel,
+                'page': page,
+                'per_page': items_per_page
+            }
+            
+            async with self.session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    # Handle different response formats
+                    if isinstance(data, list):
+                        return data
+                    elif isinstance(data, dict):
+                        if 'messages' in data:
+                            return data['messages']
+                        elif 'data' in data:
+                            return data['data']
+                        else:
+                            return []
+                    else:
+                        return []
+                        
+                elif response.status == 404:
+                    self.logger.warning(f"Channel not found: {channel}")
+                    return []
+                else:
+                    self.logger.error(f"API request failed: {response.status}")
+                    raise aiohttp.ClientError(f"HTTP {response.status}")
+                    
+        except Exception as e:
+            self.logger.error(f"Failed to fetch page {page}: {e}")
+            raise
+    
+    def _get_date_range(self, df: pd.DataFrame) -> Tuple[Optional[datetime], Optional[datetime]]:
+        """Extract date range from DataFrame."""
+        try:
+            if 'date' in df.columns and not df['date'].isna().all():
+                min_date = df['date'].min()
+                max_date = df['date'].max()
+                return (min_date, max_date)
+            return (None, None)
+        except Exception as e:
+            self.logger.warning(f"Failed to extract date range: {e}")
+            return (None, None)
+    
+    def _calculate_quality_score(self, df: pd.DataFrame) -> float:
+        """Calculate data quality score based on completeness and validity."""
+        try:
+            if df.empty:
+                return 0.0
+            
+            total_cells = len(df) * len(df.columns)
+            if total_cells == 0:
+                return 0.0
+            
+            # Count non-null values
+            non_null_cells = df.count().sum()
+            completeness_score = non_null_cells / total_cells
+            
+            # Check for critical columns
+            critical_columns = ['message_id', 'channel_username', 'date']
+            critical_completeness = 0.0
+            for col in critical_columns:
+                if col in df.columns:
+                    critical_completeness += (df[col].count() / len(df))
+            critical_completeness /= len(critical_columns)
+            
+            # Combine scores (weight critical columns more)
+            quality_score = (completeness_score * 0.6) + (critical_completeness * 0.4)
+            
+            return min(1.0, max(0.0, quality_score))
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to calculate quality score: {e}")
+            return 0.5  # Default medium quality
+
 # Main entry point for CLI integration
 def create_analysis_config(**kwargs) -> AnalysisConfig:
     """Create analysis configuration from kwargs."""

@@ -220,7 +220,7 @@ class BaseDataLoader:
         raise NotImplementedError
     
     def _normalize_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Normalize DataFrame to common schema using pandas."""
+        """Normalize DataFrame to common schema."""
         if df.empty:
             return df
         
@@ -230,11 +230,11 @@ class BaseDataLoader:
             if col not in df.columns:
                 df[col] = None
         
-        # Convert date strings to datetime using pandas
+        # Convert date strings to datetime
         if 'date' in df.columns:
             df['date'] = pd.to_datetime(df['date'], errors='coerce')
         
-        # Convert numeric columns using pandas
+        # Convert numeric columns
         numeric_columns = ['file_size', 'views', 'forwards', 'replies']
         for col in numeric_columns:
             if col in df.columns:
@@ -245,13 +245,27 @@ class BaseDataLoader:
             df['is_forwarded'] = df['is_forwarded'].astype(bool)
         
         return df
+    
+    def _optimize_dataframe_memory(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Optimize DataFrame memory usage."""
+        # Convert object columns to category where appropriate
+        for col in df.select_dtypes(include=['object']).columns:
+            if df[col].nunique() / len(df) < 0.5:  # Less than 50% unique values
+                df[col] = df[col].astype('category')
+        
+        # Convert numeric columns to appropriate types
+        for col in df.select_dtypes(include=['int64']).columns:
+            if df[col].min() >= 0 and df[col].max() <= 2**31 - 1:
+                df[col] = df[col].astype('int32')
+        
+        return df
 ```
 
 ### File Data Loader
 
 ```python
 class FileDataLoader(BaseDataLoader):
-    """Loads data from combined JSON files using pandas."""
+    """Loads data from combined JSON files."""
     
     def __init__(self, config: AnalysisConfig):
         super().__init__(config)
@@ -259,7 +273,7 @@ class FileDataLoader(BaseDataLoader):
         self.file_pattern = "tg_*_combined.json"
     
     async def discover_sources(self) -> List[DataSource]:
-        """Discover available combined JSON files using pandas."""
+        """Discover available combined JSON files."""
         sources = []
         
         if not self.collections_dir.exists():
@@ -268,13 +282,13 @@ class FileDataLoader(BaseDataLoader):
         
         for file_path in self.collections_dir.glob(self.file_pattern):
             try:
-                # Load JSON data using pandas
+                # Load JSON data
                 data = pd.read_json(file_path, lines=False)
                 
                 if data.empty or not isinstance(data, pd.DataFrame):
                     continue
                 
-                # Extract metadata using pandas
+                # Extract metadata
                 if 'metadata' in data.columns:
                     metadata_series = data['metadata'].iloc[0] if len(data) > 0 else {}
                     metadata = metadata_series if isinstance(metadata_series, dict) else {}
@@ -287,7 +301,7 @@ class FileDataLoader(BaseDataLoader):
                 if total_messages == 0:
                     continue
                 
-                # Calculate date range and quality score using pandas
+                # Calculate date range and quality score
                 date_range = self._calculate_date_range_pandas(data)
                 quality_score = self._calculate_quality_score_pandas(data)
                 
@@ -315,7 +329,7 @@ class FileDataLoader(BaseDataLoader):
         return sources
     
     def load_data(self, source: DataSource) -> pd.DataFrame:
-        """Load data from file source using pandas JSON operations with chunking."""
+        """Load data from file source with chunking support."""
         file_path = Path(source.metadata['file_path'])
         
         # Validate file exists
@@ -334,7 +348,7 @@ class FileDataLoader(BaseDataLoader):
             self.logger.info(f"Large file detected ({file_size_mb:.1f}MB), using chunked processing")
             return self._load_large_file_chunked(file_path, chunk_size)
         
-        # Load JSON data using pandas for smaller files
+        # Load JSON data for smaller files
         try:
             data = pd.read_json(file_path, lines=False)
         except pd.errors.EmptyDataError:
@@ -342,9 +356,9 @@ class FileDataLoader(BaseDataLoader):
         except pd.errors.ParserError as e:
             raise ValueError(f"Invalid JSON format in file {file_path}: {e}")
         
-        # Extract messages from nested structure using pandas
+        # Extract messages from nested structure
         if 'messages' in data.columns:
-            # Use pandas explode to expand nested messages
+            # Use explode to expand nested messages
             messages_df = data.explode('messages')
             messages_df = messages_df.dropna(subset=['messages'])
             
@@ -370,7 +384,7 @@ class FileDataLoader(BaseDataLoader):
             # Read file in chunks
             with open(file_path, 'r', encoding='utf-8') as f:
                 # For very large files, we might need to implement streaming JSON parsing
-                # For now, we'll use pandas chunking
+                # Use chunking for large files
                 chunk_iter = pd.read_json(f, lines=False, chunksize=chunk_size)
                 
                 for chunk in chunk_iter:
@@ -405,26 +419,12 @@ class FileDataLoader(BaseDataLoader):
             self.logger.error(f"Error loading large file {file_path}: {e}")
             raise ValueError(f"Failed to load large file: {e}")
     
-    def _optimize_dataframe_memory(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Optimize DataFrame memory usage."""
-        # Convert object columns to category where appropriate
-        for col in df.select_dtypes(include=['object']).columns:
-            if df[col].nunique() / len(df) < 0.5:  # Less than 50% unique values
-                df[col] = df[col].astype('category')
-        
-        # Convert numeric columns to appropriate types
-        for col in df.select_dtypes(include=['int64']).columns:
-            if df[col].min() >= 0 and df[col].max() <= 2**31 - 1:
-                df[col] = df[col].astype('int32')
-        
-        return df
-    
     def _calculate_date_range_pandas(self, data: pd.DataFrame) -> Tuple[Optional[datetime], Optional[datetime]]:
-        """Calculate date range from message data using pandas operations."""
+        """Calculate date range from message data."""
         if data.empty:
             return (None, None)
         
-        # Extract dates from messages using pandas
+        # Extract dates from messages
         if 'messages' in data.columns:
             messages_df = data.explode('messages')
             messages_df = messages_df.dropna(subset=['messages'])
@@ -442,11 +442,11 @@ class FileDataLoader(BaseDataLoader):
         return (None, None)
     
     def _calculate_quality_score_pandas(self, data: pd.DataFrame) -> float:
-        """Calculate data quality score based on completeness using pandas."""
+        """Calculate data quality score based on completeness."""
         if data.empty:
             return 0.0
         
-        # Extract messages using pandas
+        # Extract messages
         if 'messages' in data.columns:
             messages_df = data.explode('messages')
             messages_df = messages_df.dropna(subset=['messages'])
@@ -457,7 +457,7 @@ class FileDataLoader(BaseDataLoader):
             if messages_df.empty:
                 return 0.0
             
-            # Check for required fields using pandas vectorized operations
+            # Check for required fields
             required_fields = ['message_id', 'channel_username', 'date']
             complete_messages = 0
             
@@ -588,25 +588,11 @@ class ApiDataLoader(BaseDataLoader):
         # Convert to DataFrame with memory optimization
         if all_messages:
             df = pd.DataFrame(all_messages)
-            # Optimize memory usage
+            # Optimize memory usage using base class method
             df = self._optimize_dataframe_memory(df)
             return self._normalize_dataframe(df)
         else:
             return pd.DataFrame()
-    
-    def _optimize_dataframe_memory(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Optimize DataFrame memory usage."""
-        # Convert object columns to category where appropriate
-        for col in df.select_dtypes(include=['object']).columns:
-            if df[col].nunique() / len(df) < 0.5:  # Less than 50% unique values
-                df[col] = df[col].astype('category')
-        
-        # Convert numeric columns to appropriate types
-        for col in df.select_dtypes(include=['int64']).columns:
-            if df[col].min() >= 0 and df[col].max() <= 2**31 - 1:
-                df[col] = df[col].astype('int32')
-        
-        return df
     
     async def _get_message_count(self, session: aiohttp.ClientSession, channel_username: str) -> int:
         """Get message count for a channel."""
@@ -696,14 +682,14 @@ class ApiDataLoader(BaseDataLoader):
 
 ```python
 class FilenameAnalyzer:
-    """Analyzes filename patterns and duplicates using pandas."""
+    """Analyzes filename patterns and duplicates."""
     
     def __init__(self, config: AnalysisConfig):
         self.config = config
         self.logger = logging.getLogger(__name__)
     
     def analyze(self, df: pd.DataFrame, source: DataSource) -> FilenameAnalysisResult:
-        """Perform filename analysis using pandas operations."""
+        """Perform filename analysis."""
         # Filter to only records with filenames
         media_df = df[df['file_name'].notna() & (df['file_name'] != '')]
         
@@ -730,7 +716,7 @@ class FilenameAnalyzer:
         )
     
     def _analyze_duplicate_filenames(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """Analyze duplicate filenames using pandas value_counts."""
+        """Analyze duplicate filenames."""
         filename_counts = df['file_name'].value_counts()
         
         # Find duplicates (count > 1)
@@ -756,10 +742,10 @@ class FilenameAnalyzer:
         }
     
     def _analyze_filename_patterns(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """Analyze filename patterns using pandas string operations."""
+        """Analyze filename patterns."""
         filenames = df['file_name']
         
-        # Filename length analysis using pandas
+        # Filename length analysis
         filename_lengths = filenames.str.len()
         length_stats = {
             "count": len(filename_lengths),
@@ -769,7 +755,7 @@ class FilenameAnalyzer:
             "median": int(filename_lengths.median())
         }
         
-        # Extension analysis using pandas
+        # Extension analysis
         extensions = filenames.str.extract(r'\.([^.]+)$')[0].str.lower()
         extension_counts = extensions.value_counts()
         common_extensions = [
@@ -777,11 +763,11 @@ class FilenameAnalyzer:
             for ext, count in extension_counts.head(10).items()
         ]
         
-        # Special character analysis using pandas
+        # Special character analysis
         special_char_pattern = r'[^\w\s.-]'
         files_with_special_chars = filenames.str.contains(special_char_pattern, regex=True).sum()
         
-        # Space analysis using pandas
+        # Space analysis
         files_with_spaces = filenames.str.contains(' ').sum()
         
         return {
@@ -796,14 +782,14 @@ class FilenameAnalyzer:
 
 ```python
 class FilesizeAnalyzer:
-    """Analyzes filesize patterns and duplicates using pandas."""
+    """Analyzes filesize patterns and duplicates."""
     
     def __init__(self, config: AnalysisConfig):
         self.config = config
         self.logger = logging.getLogger(__name__)
     
     def analyze(self, df: pd.DataFrame, source: DataSource) -> FilesizeAnalysisResult:
-        """Perform filesize analysis using pandas operations."""
+        """Perform filesize analysis."""
         # Filter to only records with filesizes
         media_df = df[df['file_size'].notna() & (df['file_size'] > 0)]
         
@@ -828,7 +814,7 @@ class FilesizeAnalyzer:
         )
     
     def _analyze_duplicate_filesizes(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """Analyze duplicate filesizes using pandas value_counts."""
+        """Analyze duplicate filesizes."""
         filesize_counts = df['file_size'].value_counts()
         
         # Find duplicates (count > 1)
@@ -858,10 +844,10 @@ class FilesizeAnalyzer:
         }
     
     def _analyze_filesize_distribution(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """Analyze filesize distribution using pandas cut."""
+        """Analyze filesize distribution."""
         file_sizes = df['file_size']
         
-        # Size distribution bins using pandas cut
+        # Size distribution bins
         size_bins = pd.cut(
             file_sizes,
             bins=[0, 1024*1024, 5*1024*1024, 10*1024*1024, float('inf')],
@@ -869,7 +855,7 @@ class FilesizeAnalyzer:
         )
         size_distribution = size_bins.value_counts().to_dict()
         
-        # Potential duplicates by size using pandas groupby with filtering
+        # Potential duplicates by size with filtering
         size_groups = df.groupby('file_size')
         
         # Filter groups with more than one file and convert to list efficiently
@@ -909,14 +895,14 @@ class FilesizeAnalyzer:
 
 ```python
 class MessageAnalyzer:
-    """Analyzes message content, patterns, and creators using pandas."""
+    """Analyzes message content, patterns, and creators."""
     
     def __init__(self, config: AnalysisConfig):
         self.config = config
         self.logger = logging.getLogger(__name__)
     
     def analyze(self, df: pd.DataFrame, source: DataSource) -> MessageAnalysisResult:
-        """Perform comprehensive message analysis using pandas operations."""
+        """Perform comprehensive message analysis."""
         if df.empty:
             return MessageAnalysisResult(
                 content_statistics={},
@@ -933,7 +919,7 @@ class MessageAnalyzer:
         )
     
     def _analyze_content_statistics(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """Analyze content statistics using pandas operations."""
+        """Analyze content statistics."""
         # Text content analysis
         text_df = df[df['text'].notna() & (df['text'] != '')]
         
@@ -946,7 +932,7 @@ class MessageAnalyzer:
                 "forwarded_messages": len(df[df['is_forwarded'] == True]) if 'is_forwarded' in df.columns else 0
             }
         
-        # Text length statistics using pandas
+        # Text length statistics
         text_lengths = text_df['text'].str.len()
         text_length_stats = {
             "count": len(text_lengths),
@@ -965,7 +951,7 @@ class MessageAnalyzer:
         }
     
     def _analyze_patterns(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """Analyze message patterns using pandas string operations."""
+        """Analyze message patterns."""
         text_df = df[df['text'].notna() & (df['text'] != '')]
         
         if text_df.empty:
@@ -975,17 +961,17 @@ class MessageAnalyzer:
                 "url_analysis": {"messages_with_urls": 0, "total_urls": 0}
             }
         
-        # Hashtag analysis using pandas
+        # Hashtag analysis
         hashtag_pattern = r'#\w+'
         hashtags = text_df['text'].str.extractall(f'({hashtag_pattern})')[0]
         hashtag_counts = hashtags.value_counts()
         
-        # Mention analysis using pandas
+        # Mention analysis
         mention_pattern = r'@\w+'
         mentions = text_df['text'].str.extractall(f'({mention_pattern})')[0]
         mention_counts = mentions.value_counts()
         
-        # URL analysis using pandas
+        # URL analysis
         url_pattern = r'https?://\S+'
         urls = text_df['text'].str.extractall(f'({url_pattern})')[0]
         messages_with_urls = text_df['text'].str.contains(url_pattern, regex=True).sum()
@@ -1709,8 +1695,6 @@ This implementation specification provides a complete, production-ready guide fo
 ### Production Readiness
 - ✅ **Complete Implementation**: All classes and methods fully implemented
 - ✅ **Error Resilience**: Specific exception handling and graceful degradation
-- ✅ **Memory Management**: Chunked processing and memory optimization
-- ✅ **Performance**: Vectorized operations and concurrent processing
 - ✅ **Validation**: Comprehensive input validation and data integrity
 - ✅ **Testing**: Unit, integration, performance, and edge case tests
 - ✅ **Documentation**: Detailed implementation guidance and examples

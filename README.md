@@ -14,13 +14,10 @@ python main.py combine
 # 3. Import to database
 python main.py import reports/collections/tg_channel_combined.json
 
-# 4. Generate reports
-python main.py report messages
-
-# 5. Run advanced analysis
+# 4. Run advanced analysis
 python main.py analysis --channels "books" --verbose
 
-# 6. Create interactive dashboard
+# 5. Create interactive dashboard
 python main.py dashboard
 
 # Get help for any command
@@ -136,33 +133,7 @@ python main.py import reports/collections/tg_books_1_482_combined.json
 python main.py import reports/collections/tg_books_1_482_combined.json -v
 ```
 
-### 4. Report Command
-
-Generates various types of reports for Telegram data analysis.
-
-#### Basic Usage
-```bash
-python main.py report [OPTIONS] REPORT_TYPE
-```
-
-#### Report Types
-- `messages` - Generate message analysis reports
-- `channels` - Create channel summary reports
-- `stats` - Generate statistical reports
-
-#### Examples
-
-**Generate message reports:**
-```bash
-python main.py report messages
-```
-
-**Generate channel reports:**
-```bash
-python main.py report channels
-```
-
-### 5. Analysis Command
+### 4. Analysis Command
 
 Performs comprehensive analysis of Telegram channel data including filename analysis, filesize analysis, and message content analysis with advanced pattern recognition and language detection.
 
@@ -268,7 +239,7 @@ Analysis results are saved as JSON files with the following structure:
 }
 ```
 
-### 6. Dashboard Command
+### 5. Dashboard Command
 
 Creates interactive Plotly dashboards from channel reports and data.
 
@@ -302,7 +273,6 @@ reports/
 │   └──                               # Combined files (created by combine command)
 │       ├── tg_books_1_482_combined.json
 │       └── tg_SherwinVakiliLibrary_1_150300_combined.json
-├── channels/                          # Channel reports and summaries
 ├── html/                             # Interactive dashboards and HTML reports
 └── analysis/                         # Advanced analysis results and reports
     ├── filename_analysis/            # Filename analysis results
@@ -417,17 +387,7 @@ python main.py import reports/collections/tg_books_1_1000_combined.json
 # Data is now available for analysis and reporting
 ```
 
-### Phase 4: Reporting
-```bash
-# Generate various analysis reports
-python main.py report messages
-python main.py report channels
-python main.py report stats
-
-# Reports are generated and saved to appropriate directories
-```
-
-### Phase 5: Advanced Analysis
+### Phase 4: Advanced Analysis
 ```bash
 # Run comprehensive analysis on channel data
 python main.py analysis -c "books" -v
@@ -435,7 +395,7 @@ python main.py analysis -c "books" -v
 # Analysis results are saved to reports/analysis/ with detailed JSON reports
 ```
 
-### Phase 6: Dashboard
+### Phase 5: Dashboard
 ```bash
 # Create interactive visualizations
 python main.py dashboard
@@ -460,11 +420,6 @@ python main.py dashboard
 - **Use combined files**: Import consolidated data for efficiency
 - **Validate data**: Ensure JSON files are properly formatted
 - **Monitor progress**: Check import logs for any issues
-
-### Reporting Phase
-- **Multiple report types**: Generate different types of analysis
-- **Review outputs**: Check generated reports for insights
-- **Organize results**: Keep reports organized by date/channel
 
 ### Analysis Phase
 - **Start with specific channels**: Use `-c` flag to analyze specific channels first
@@ -522,7 +477,6 @@ python main.py --help
 python main.py collect --help
 python main.py combine --help
 python main.py import --help
-python main.py report --help
 python main.py analysis --help
 python main.py dashboard --help
 
@@ -568,13 +522,6 @@ python main.py collect -c "channel" -v
 ```
 🔄 Importing messages from existing file: tg_books_1_1000_combined.json
 ✅ Successfully imported 1000 messages to database
-```
-
-### Report Output
-```
-📊 Generating message analysis reports...
-📁 Reports saved to: reports/channels/
-✅ Report generation completed!
 ```
 
 ### Analysis Output

@@ -2255,23 +2255,26 @@ class JsonOutputManager:
             
             report_paths = {}
             
-            # Generate filename analysis report
-            filename_path = Path(output_dir) / "filename_analysis.json"
-            filename_data = self._prepare_filename_report_data(filename_result)
-            self._write_json_with_pandas(filename_data, str(filename_path))
-            report_paths['filename'] = str(filename_path)
+            # Generate filename analysis report (only if result exists)
+            if filename_result is not None:
+                filename_path = Path(output_dir) / "filename_analysis.json"
+                filename_data = self._prepare_filename_report_data(filename_result)
+                self._write_json_with_pandas(filename_data, str(filename_path))
+                report_paths['filename'] = str(filename_path)
             
-            # Generate filesize analysis report
-            filesize_path = Path(output_dir) / "filesize_analysis.json"
-            filesize_data = self._prepare_filesize_report_data(filesize_result)
-            self._write_json_with_pandas(filesize_data, str(filesize_path))
-            report_paths['filesize'] = str(filesize_path)
+            # Generate filesize analysis report (only if result exists)
+            if filesize_result is not None:
+                filesize_path = Path(output_dir) / "filesize_analysis.json"
+                filesize_data = self._prepare_filesize_report_data(filesize_result)
+                self._write_json_with_pandas(filesize_data, str(filesize_path))
+                report_paths['filesize'] = str(filesize_path)
             
-            # Generate message analysis report
-            message_path = Path(output_dir) / "message_analysis.json"
-            message_data = self._prepare_message_report_data(message_result)
-            self._write_json_with_pandas(message_data, str(message_path))
-            report_paths['message'] = str(message_path)
+            # Generate message analysis report (only if result exists)
+            if message_result is not None:
+                message_path = Path(output_dir) / "message_analysis.json"
+                message_data = self._prepare_message_report_data(message_result)
+                self._write_json_with_pandas(message_data, str(message_path))
+                report_paths['message'] = str(message_path)
             
             # Generate summary report
             summary_path = Path(output_dir) / "analysis_summary.json"

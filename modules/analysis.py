@@ -1025,18 +1025,24 @@ class ApiDataLoader(BaseDataLoader):
             self.logger.error(f"Failed to get available channels: {e}")
             return []
     
-    def _analyze_api_source(self, channel: str) -> Optional[DataSource]:
+    def _analyze_api_source(self, channel) -> Optional[DataSource]:
         """Analyze a single API source to create a DataSource object."""
         try:
+            # Handle both string and dictionary channel formats
+            if isinstance(channel, dict):
+                channel_name = channel.get('username', channel.get('name', str(channel)))
+            else:
+                channel_name = str(channel)
+            
             # Get basic stats for the channel
-            stats = self._get_channel_stats(channel)
+            stats = self._get_channel_stats(channel_name)
             if not stats:
                 return None
             
             # Create metadata
             metadata = {
                 'api_endpoint': f"{self.config.api_base_url}{API_ENDPOINTS['messages']}",
-                'channel': channel,
+                'channel': channel_name,
                 'total_messages': stats.get('total_messages', 0),
                 'date_range': stats.get('date_range', {}),
                 'last_updated': stats.get('last_updated', None)
@@ -1045,7 +1051,7 @@ class ApiDataLoader(BaseDataLoader):
             # Create DataSource
             return self._create_data_source(
                 source_type="api",
-                channel_name=channel,
+                channel_name=channel_name,
                 total_records=stats.get('total_messages', 0),
                 date_range=(None, None),  # Will be updated when data is loaded
                 quality_score=0.95,  # Assume good quality for API data
@@ -2503,45 +2509,479 @@ class JsonOutputManager:
             self.logger.error(f"Failed to calculate analysis completeness: {e}")
             return 0.0
 
+# Main Orchestration - Concurrent Processing
+class AnalysisOrchestrator:
+    """Main orchestration class for coordinating all analysis operations."""
+    
+    def __init__(self, config: AnalysisConfig):
+        self.config = config
+        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+        self.performance_monitor = PerformanceMonitor()
+        
+        # Initialize components
+        self.file_loader = FileDataLoader(config)
+        self.api_loader = ApiDataLoader(config)
+        self.filename_analyzer = FilenameAnalyzer(config)
+        self.filesize_analyzer = FilesizeAnalyzer(config)
+        self.message_analyzer = MessageAnalyzer(config)
+        self.output_manager = JsonOutputManager(config)
+    
+    async def run_comprehensive_analysis(self, 
+                                       channels: List[str] = None,
+                                       output_dir: str = None,
+                                       analysis_types: List[str] = None) -> Dict[str, Any]:
+        """Run comprehensive analysis with concurrent processing."""
+        try:
+            self.performance_monitor.start()
+            self.logger.info("Starting comprehensive analysis")
+            
+            # Set default analysis types if not provided
+            if not analysis_types:
+                analysis_types = ['filename', 'filesize', 'message']
+            
+            # Discover and load data sources
+            data_sources = await self._discover_and_load_data_sources(channels)
+            
+            if not data_sources:
+                self.logger.warning("No data sources found for analysis")
+                return self._create_empty_analysis_result()
+            
+            self.logger.info(f"Found {len(data_sources)} data sources")
+            
+            # Run concurrent analysis
+            analysis_results = await self._run_concurrent_analysis(data_sources, analysis_types)
+            
+            # Generate output reports
+            output_paths = await self._generate_output_reports(analysis_results, output_dir)
+            
+            # Create final result
+            final_result = {
+                'analysis_id': f"comprehensive_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                'timestamp': datetime.now().isoformat(),
+                'data_sources': [source.model_dump() for source in data_sources],
+                'analysis_results': analysis_results,
+                'output_paths': output_paths,
+                'performance_stats': self.performance_monitor.get_stats(),
+                'config': self.config.model_dump()
+            }
+            
+            self.logger.info("Comprehensive analysis completed successfully")
+            return final_result
+            
+        except Exception as e:
+            self.logger.error(f"Comprehensive analysis failed: {e}")
+            raise
+        finally:
+            stats = self.performance_monitor.get_stats()
+            if stats:
+                self.logger.info(f"Performance stats: {stats}")
+    
+    async def _discover_and_load_data_sources(self, channels: List[str] = None) -> List[DataSource]:
+        """Discover and load data sources concurrently."""
+        try:
+            self.logger.info("Discovering data sources")
+            
+            # Discover file sources
+            file_sources = self.file_loader.discover_sources()
+            self.logger.info(f"Discovered {len(file_sources)} file sources")
+            
+            # Discover API sources
+            api_sources = self.api_loader.discover_sources()
+            self.logger.info(f"Discovered {len(api_sources)} API sources")
+            
+            # Filter by channels if specified
+            all_sources = file_sources + api_sources
+            if channels:
+                filtered_sources = []
+                for source in all_sources:
+                    if any(channel.lower() in source.channel_name.lower() for channel in channels):
+                        filtered_sources.append(source)
+                all_sources = filtered_sources
+                self.logger.info(f"Filtered to {len(all_sources)} sources matching channels: {channels}")
+            
+            # Load data concurrently
+            loaded_sources = await self._load_data_sources_concurrently(all_sources)
+            
+            return loaded_sources
+            
+        except Exception as e:
+            self.logger.error(f"Failed to discover and load data sources: {e}")
+            raise
+    
+    async def _load_data_sources_concurrently(self, sources: List[DataSource]) -> List[DataSource]:
+        """Load data from multiple sources concurrently."""
+        try:
+            if not sources:
+                return []
+            
+            self.logger.info(f"Loading data from {len(sources)} sources concurrently")
+            
+            # Create tasks for concurrent loading
+            tasks = []
+            for source in sources:
+                if source.source_type == "file":
+                    task = self._load_file_source(source)
+                elif source.source_type == "api":
+                    task = self._load_api_source(source)
+                else:
+                    self.logger.warning(f"Unknown source type: {source.source_type}")
+                    continue
+                tasks.append(task)
+            
+            # Execute all tasks concurrently
+            loaded_sources = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Filter out exceptions and return successful loads
+            successful_sources = []
+            for i, result in enumerate(loaded_sources):
+                if isinstance(result, Exception):
+                    self.logger.error(f"Failed to load source {i}: {result}")
+                elif result is not None:
+                    successful_sources.append(result)
+                else:
+                    self.logger.warning(f"Source {i} returned None")
+            
+            self.logger.info(f"Successfully loaded {len(successful_sources)} sources")
+            return successful_sources
+            
+        except Exception as e:
+            self.logger.error(f"Failed to load data sources concurrently: {e}")
+            raise
+    
+    async def _load_file_source(self, source: DataSource) -> DataSource:
+        """Load data from a file source."""
+        try:
+            self.logger.debug(f"Loading file source: {source.channel_name}")
+            
+            # Get file path from metadata
+            file_path = source.metadata.get('file_path')
+            if not file_path:
+                raise ValueError(f"No file path found in metadata for source: {source.channel_name}")
+            
+            # Load data using file loader (returns tuple of DataFrame, DataSource)
+            data, loaded_source = self.file_loader.load_data(file_path)
+            
+            if loaded_source is None:
+                self.logger.warning(f"Failed to load file source: {source.channel_name}")
+                return None
+            
+            self.logger.debug(f"Successfully loaded file source: {source.channel_name}")
+            return loaded_source
+            
+        except Exception as e:
+            self.logger.error(f"Failed to load file source {source.channel_name}: {e}")
+            return None
+    
+    async def _load_api_source(self, source: DataSource) -> DataSource:
+        """Load data from an API source."""
+        try:
+            self.logger.debug(f"Loading API source: {source.channel_name}")
+            
+            # Load data using API loader (returns tuple of DataFrame, DataSource)
+            data, loaded_source = self.api_loader.load_data(source.channel_name)
+            
+            if loaded_source is None:
+                self.logger.warning(f"Failed to load API source: {source.channel_name}")
+                return None
+            
+            self.logger.debug(f"Successfully loaded API source: {source.channel_name}")
+            return loaded_source
+            
+        except Exception as e:
+            self.logger.error(f"Failed to load API source {source.channel_name}: {e}")
+            return None
+    
+    async def _run_concurrent_analysis(self, 
+                                     data_sources: List[DataSource], 
+                                     analysis_types: List[str]) -> Dict[str, Any]:
+        """Run analysis on all data sources concurrently."""
+        try:
+            self.logger.info(f"Running concurrent analysis on {len(data_sources)} sources")
+            
+            # Combine all data from sources
+            combined_data = await self._combine_data_sources(data_sources)
+            
+            if combined_data.empty:
+                self.logger.warning("No data available for analysis")
+                return self._create_empty_analysis_results()
+            
+            self.logger.info(f"Combined data: {len(combined_data)} records")
+            
+            # Run analysis concurrently
+            analysis_tasks = []
+            
+            if 'filename' in analysis_types:
+                analysis_tasks.append(self._run_filename_analysis(combined_data))
+            
+            if 'filesize' in analysis_types:
+                analysis_tasks.append(self._run_filesize_analysis(combined_data))
+            
+            if 'message' in analysis_types:
+                analysis_tasks.append(self._run_message_analysis(combined_data))
+            
+            # Execute all analysis tasks concurrently
+            analysis_results = await asyncio.gather(*analysis_tasks, return_exceptions=True)
+            
+            # Organize results
+            results = {}
+            for i, result in enumerate(analysis_results):
+                if isinstance(result, Exception):
+                    self.logger.error(f"Analysis task {i} failed: {result}")
+                    continue
+                
+                analysis_type = analysis_types[i] if i < len(analysis_types) else f"analysis_{i}"
+                results[analysis_type] = result
+            
+            self.logger.info(f"Completed {len(results)} analysis types")
+            return results
+            
+        except Exception as e:
+            self.logger.error(f"Failed to run concurrent analysis: {e}")
+            raise
+    
+    async def _combine_data_sources(self, data_sources: List[DataSource]) -> pd.DataFrame:
+        """Combine data from multiple sources into a single DataFrame."""
+        try:
+            if not data_sources:
+                return pd.DataFrame()
+            
+            self.logger.info("Combining data from multiple sources")
+            
+            # Collect all DataFrames
+            dataframes = []
+            for source in data_sources:
+                if hasattr(source, 'data') and source.data is not None:
+                    dataframes.append(source.data)
+                    self.logger.debug(f"Added {len(source.data)} records from {source.channel_name}")
+            
+            if not dataframes:
+                self.logger.warning("No data found in any source")
+                return pd.DataFrame()
+            
+            # Combine all DataFrames
+            combined_df = pd.concat(dataframes, ignore_index=True)
+            
+            # Remove duplicates based on message_id and channel_username
+            if 'message_id' in combined_df.columns and 'channel_username' in combined_df.columns:
+                initial_count = len(combined_df)
+                combined_df = combined_df.drop_duplicates(subset=['message_id', 'channel_username'])
+                final_count = len(combined_df)
+                if initial_count != final_count:
+                    self.logger.info(f"Removed {initial_count - final_count} duplicate records")
+            
+            self.logger.info(f"Combined data: {len(combined_df)} unique records")
+            return combined_df
+            
+        except Exception as e:
+            self.logger.error(f"Failed to combine data sources: {e}")
+            raise
+    
+    async def _run_filename_analysis(self, data: pd.DataFrame) -> FilenameAnalysisResult:
+        """Run filename analysis on the data."""
+        try:
+            self.logger.info("Running filename analysis")
+            
+            # Filter data for files with names
+            file_data = data[data['file_name'].notna() & (data['file_name'] != '')]
+            
+            if file_data.empty:
+                self.logger.warning("No files with names found for filename analysis")
+                return FilenameAnalysisResult(
+                    total_files=0, unique_filenames=0, duplicate_filenames=0,
+                    duplicate_groups=[], filename_patterns={}, quality_metrics={}, recommendations=[]
+                )
+            
+            # Run analysis
+            result = self.filename_analyzer.analyze(file_data)
+            
+            self.logger.info(f"Filename analysis completed: {result.total_files} files analyzed")
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Filename analysis failed: {e}")
+            raise
+    
+    async def _run_filesize_analysis(self, data: pd.DataFrame) -> FilesizeAnalysisResult:
+        """Run filesize analysis on the data."""
+        try:
+            self.logger.info("Running filesize analysis")
+            
+            # Filter data for files with sizes
+            file_data = data[data['file_size'].notna() & (data['file_size'] > 0)]
+            
+            if file_data.empty:
+                self.logger.warning("No files with sizes found for filesize analysis")
+                return FilesizeAnalysisResult(
+                    total_files=0, total_size_bytes=0, unique_sizes=0, duplicate_sizes=0,
+                    duplicate_size_groups=[], size_distribution={}, size_statistics={}, potential_duplicates=[]
+                )
+            
+            # Run analysis
+            result = self.filesize_analyzer.analyze(file_data)
+            
+            self.logger.info(f"Filesize analysis completed: {result.total_files} files analyzed")
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Filesize analysis failed: {e}")
+            raise
+    
+    async def _run_message_analysis(self, data: pd.DataFrame) -> MessageAnalysisResult:
+        """Run message analysis on the data."""
+        try:
+            self.logger.info("Running message analysis")
+            
+            # Filter data for messages with text or media
+            message_data = data[
+                (data['text'].notna() & (data['text'] != '')) |
+                (data['media_type'].notna() & (data['media_type'] != 'text'))
+            ]
+            
+            if message_data.empty:
+                self.logger.warning("No messages found for message analysis")
+                return MessageAnalysisResult(
+                    total_messages=0, text_messages=0, media_messages=0,
+                    language_distribution={}, content_patterns={}, engagement_metrics={},
+                    temporal_patterns={}, quality_metrics={}
+                )
+            
+            # Run analysis
+            result = self.message_analyzer.analyze(message_data)
+            
+            self.logger.info(f"Message analysis completed: {result.total_messages} messages analyzed")
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Message analysis failed: {e}")
+            raise
+    
+    async def _generate_output_reports(self, 
+                                     analysis_results: Dict[str, Any], 
+                                     output_dir: str = None) -> Dict[str, str]:
+        """Generate output reports from analysis results."""
+        try:
+            self.logger.info("Generating output reports")
+            
+            # Extract results
+            filename_result = analysis_results.get('filename')
+            filesize_result = analysis_results.get('filesize')
+            message_result = analysis_results.get('message')
+            
+            if not any([filename_result, filesize_result, message_result]):
+                self.logger.warning("No analysis results available for report generation")
+                return {}
+            
+            # Create the output directory if it doesn't exist
+            if output_dir:
+                Path(output_dir).mkdir(parents=True, exist_ok=True)
+            
+            # Generate comprehensive report
+            comprehensive_path = self.output_manager.generate_analysis_report(
+                filename_result, filesize_result, message_result, [], 
+                str(Path(output_dir) / "comprehensive_report.json") if output_dir else None
+            )
+            
+            # Generate individual reports
+            individual_paths = self.output_manager.generate_individual_reports(
+                filename_result, filesize_result, message_result, output_dir
+            )
+            
+            # Combine all output paths
+            output_paths = {
+                'comprehensive': comprehensive_path,
+                **individual_paths
+            }
+            
+            self.logger.info(f"Generated {len(output_paths)} output reports")
+            return output_paths
+            
+        except Exception as e:
+            self.logger.error(f"Failed to generate output reports: {e}")
+            raise
+    
+    def _create_empty_analysis_result(self) -> Dict[str, Any]:
+        """Create an empty analysis result when no data is found."""
+        return {
+            'analysis_id': f"empty_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            'timestamp': datetime.now().isoformat(),
+            'data_sources': [],
+            'analysis_results': {},
+            'output_paths': {},
+            'performance_stats': self.performance_monitor.get_stats(),
+            'config': self.config.model_dump(),
+            'message': 'No data sources found for analysis'
+        }
+    
+    def _create_empty_analysis_results(self) -> Dict[str, Any]:
+        """Create empty analysis results when no data is available."""
+        return {
+            'filename': FilenameAnalysisResult(
+                total_files=0, unique_filenames=0, duplicate_filenames=0,
+                duplicate_groups=[], filename_patterns={}, quality_metrics={}, recommendations=[]
+            ),
+            'filesize': FilesizeAnalysisResult(
+                total_files=0, total_size_bytes=0, unique_sizes=0, duplicate_sizes=0,
+                duplicate_size_groups=[], size_distribution={}, size_statistics={}, potential_duplicates=[]
+            ),
+            'message': MessageAnalysisResult(
+                total_messages=0, text_messages=0, media_messages=0,
+                language_distribution={}, content_patterns={}, engagement_metrics={},
+                temporal_patterns={}, quality_metrics={}
+            )
+        }
+
 # Main entry point for CLI integration
 def create_analysis_config(**kwargs) -> AnalysisConfig:
     """Create analysis configuration from kwargs."""
     return AnalysisConfig(**kwargs)
 
-async def run_advanced_intermediate_analysis(config: AnalysisConfig) -> Dict[str, Any]:
-    """Main analysis orchestration function."""
-    logger = logging.getLogger(__name__)
-    
-    # Validate configuration
-    if not config.validate_config():
-        raise ValueError("Invalid configuration provided")
-    
-    logger.info("Starting advanced analysis...")
-    logger.info(f"Configuration: {config}")
-    
-    # Placeholder for full implementation
-    return {
-        "status": "success",
-        "message": "Analysis command foundation implemented",
-        "config": config.model_dump(),
-        "timestamp": datetime.now().isoformat()
-    }
+async def run_advanced_intermediate_analysis(config: AnalysisConfig, 
+                                           channels: List[str] = None,
+                                           output_dir: str = None,
+                                           analysis_types: List[str] = None) -> Dict[str, Any]:
+    """Main analysis orchestration function using the AnalysisOrchestrator."""
+    try:
+        setup_logging(config.verbose)
+        logger = logging.getLogger(__name__)
+        logger.info("Starting advanced intermediate analysis")
+        
+        # Initialize orchestrator
+        orchestrator = AnalysisOrchestrator(config)
+        
+        # Run comprehensive analysis
+        result = await orchestrator.run_comprehensive_analysis(
+            channels=channels,
+            output_dir=output_dir,
+            analysis_types=analysis_types
+        )
+        
+        logger.info("Advanced intermediate analysis completed successfully")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Advanced intermediate analysis failed: {e}")
+        raise
 
 # CLI Integration placeholder
 def analysis_command(channels: List[str] = None, output_dir: str = None, 
-                    enable_file_source: bool = True, enable_api_source: bool = True,
-                    enable_diff_analysis: bool = True, verbose: bool = False):
-    """CLI command for analysis."""
+                    analysis_types: List[str] = None, verbose: bool = False,
+                    chunk_size: int = DEFAULT_CHUNK_SIZE, memory_limit: int = DEFAULT_MEMORY_LIMIT,
+                    items_per_page: int = 100, retry_attempts: int = 3, retry_delay: float = 1.0):
+    """CLI command for analysis using the AnalysisOrchestrator."""
     try:
         # Create configuration
         config = create_analysis_config(
-            channels=channels or [],
-            output_dir=output_dir or ANALYSIS_BASE,
-            enable_file_source=enable_file_source,
-            enable_api_source=enable_api_source,
-            enable_diff_analysis=enable_diff_analysis,
-            verbose=verbose
+            verbose=verbose,
+            chunk_size=chunk_size,
+            memory_limit=memory_limit,
+            items_per_page=items_per_page,
+            retry_attempts=retry_attempts,
+            retry_delay=retry_delay
         )
+        
+        # Set default analysis types if not provided
+        if not analysis_types:
+            analysis_types = ['filename', 'filesize', 'message']
         
         # Run analysis - handle both sync and async contexts
         try:
@@ -2550,11 +2990,15 @@ def analysis_command(channels: List[str] = None, output_dir: str = None,
             # If we're in an async context, create a task
             import concurrent.futures
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(asyncio.run, run_advanced_intermediate_analysis(config))
+                future = executor.submit(asyncio.run, run_advanced_intermediate_analysis(
+                    config, channels=channels, output_dir=output_dir, analysis_types=analysis_types
+                ))
                 result = future.result()
         except RuntimeError:
             # No event loop running, safe to use asyncio.run
-            result = asyncio.run(run_advanced_intermediate_analysis(config))
+            result = asyncio.run(run_advanced_intermediate_analysis(
+                config, channels=channels, output_dir=output_dir, analysis_types=analysis_types
+            ))
         
         if verbose:
             print(f"Analysis completed: {result}")

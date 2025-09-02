@@ -821,7 +821,16 @@ class FileDataLoader(BaseDataLoader):
             if isinstance(data, dict) and 'messages' in data:
                 messages = data['messages']
             elif isinstance(data, list):
-                messages = data
+                # Check if it's a list of objects with messages
+                if len(data) > 0 and isinstance(data[0], dict) and 'messages' in data[0]:
+                    # Structure: [{metadata: {...}, messages: [...]}]
+                    messages = []
+                    for item in data:
+                        if 'messages' in item:
+                            messages.extend(item['messages'])
+                else:
+                    # Structure: [message1, message2, ...]
+                    messages = data
             else:
                 raise ValueError("Unexpected JSON structure")
             
@@ -1095,7 +1104,17 @@ class ApiDataLoader(BaseDataLoader):
             self.logger.info(f"Loading data from API for channel: {channel}")
             
             # Load data asynchronously
-            df = asyncio.run(self.load_data_async(channel))
+            # Check if we're already in an event loop
+            try:
+                loop = asyncio.get_running_loop()
+                # We're in an event loop, so we need to use a different approach
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(asyncio.run, self.load_data_async(channel))
+                    df = future.result()
+            except RuntimeError:
+                # No event loop running, we can use asyncio.run
+                df = asyncio.run(self.load_data_async(channel))
             
             if df.empty:
                 self.logger.warning(f"No data loaded for channel: {channel}")
@@ -2253,6 +2272,8 @@ class JsonOutputManager:
     def _prepare_filesize_report_data(self, result: FilesizeAnalysisResult) -> Dict[str, Any]:
         """Prepare filesize analysis data for JSON serialization."""
         try:
+            if result is None:
+                return {}
             data = result.model_dump()
             
             # Add additional metadata
@@ -2269,6 +2290,8 @@ class JsonOutputManager:
     def _prepare_message_report_data(self, result: MessageAnalysisResult) -> Dict[str, Any]:
         """Prepare message analysis data for JSON serialization."""
         try:
+            if result is None:
+                return {}
             data = result.model_dump()
             
             # Add additional metadata
@@ -2327,14 +2350,14 @@ class JsonOutputManager:
         """Generate comprehensive analysis summary."""
         try:
             summary = {
-                'total_files_analyzed': filename_result.total_files,
-                'total_messages_analyzed': message_result.total_messages,
-                'total_data_size_bytes': filesize_result.total_size_bytes,
-                'total_data_size_mb': round(filesize_result.total_size_bytes / (1024 * 1024), 2),
-                'duplicate_files_found': filename_result.duplicate_filenames,
-                'duplicate_sizes_found': filesize_result.duplicate_sizes,
-                'languages_detected': len(message_result.language_distribution),
-                'primary_language': max(message_result.language_distribution.items(), key=lambda x: x[1])[0] if message_result.language_distribution else 'unknown',
+                'total_files_analyzed': filename_result.total_files if filename_result else 0,
+                'total_messages_analyzed': message_result.total_messages if message_result else 0,
+                'total_data_size_bytes': filesize_result.total_size_bytes if filesize_result else 0,
+                'total_data_size_mb': round(filesize_result.total_size_bytes / (1024 * 1024), 2) if filesize_result else 0.0,
+                'duplicate_files_found': filename_result.duplicate_filenames if filename_result else 0,
+                'duplicate_sizes_found': filesize_result.duplicate_sizes if filesize_result else 0,
+                'languages_detected': len(message_result.language_distribution) if message_result else 0,
+                'primary_language': max(message_result.language_distribution.items(), key=lambda x: x[1])[0] if message_result and message_result.language_distribution else 'unknown',
                 'overall_quality_score': self._calculate_overall_quality_score(filename_result, filesize_result, message_result),
                 'analysis_completeness': self._calculate_analysis_completeness(filename_result, filesize_result, message_result)
             }
@@ -2453,12 +2476,12 @@ class JsonOutputManager:
                                         message_result: MessageAnalysisResult) -> float:
         """Calculate overall quality score from all analysis results."""
         try:
-            filename_quality = filename_result.quality_metrics.get('overall_quality', 0.0)
-            message_quality = message_result.quality_metrics.get('overall_quality', 0.0)
+            filename_quality = filename_result.quality_metrics.get('overall_quality', 0.0) if filename_result else 0.0
+            message_quality = message_result.quality_metrics.get('overall_quality', 0.0) if message_result else 0.0
             
             # Filesize quality based on distribution and duplicates
             filesize_quality = 1.0
-            if filesize_result.duplicate_sizes > 0:
+            if filesize_result and filesize_result.duplicate_sizes > 0:
                 duplicate_ratio = filesize_result.duplicate_sizes / filesize_result.total_files
                 filesize_quality = max(0.0, 1.0 - duplicate_ratio)
             
@@ -2485,17 +2508,17 @@ class JsonOutputManager:
             analyzed_items = 0
             
             # Filename analysis completeness
-            if filename_result.total_files > 0:
+            if filename_result and filename_result.total_files > 0:
                 total_items += filename_result.total_files
                 analyzed_items += filename_result.total_files
             
             # Filesize analysis completeness
-            if filesize_result.total_files > 0:
+            if filesize_result and filesize_result.total_files > 0:
                 total_items += filesize_result.total_files
                 analyzed_items += filesize_result.total_files
             
             # Message analysis completeness
-            if message_result.total_messages > 0:
+            if message_result and message_result.total_messages > 0:
                 total_items += message_result.total_messages
                 analyzed_items += message_result.total_messages
             
@@ -2555,10 +2578,19 @@ class AnalysisOrchestrator:
             output_paths = await self._generate_output_reports(analysis_results, output_dir)
             
             # Create final result
+            # Extract DataSource objects from tuples for the final result
+            data_source_objects = []
+            for source in data_sources:
+                if isinstance(source, tuple) and len(source) == 2:
+                    _, data_source = source
+                    data_source_objects.append(data_source)
+                else:
+                    data_source_objects.append(source)
+            
             final_result = {
                 'analysis_id': f"comprehensive_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
                 'timestamp': datetime.now().isoformat(),
-                'data_sources': [source.model_dump() for source in data_sources],
+                'data_sources': [source.model_dump() for source in data_source_objects],
                 'analysis_results': analysis_results,
                 'output_paths': output_paths,
                 'performance_stats': self.performance_monitor.get_stats(),
@@ -2576,7 +2608,7 @@ class AnalysisOrchestrator:
             if stats:
                 self.logger.info(f"Performance stats: {stats}")
     
-    async def _discover_and_load_data_sources(self, channels: List[str] = None) -> List[DataSource]:
+    async def _discover_and_load_data_sources(self, channels: List[str] = None) -> List[Any]:
         """Discover and load data sources concurrently."""
         try:
             self.logger.info("Discovering data sources")
@@ -2608,7 +2640,7 @@ class AnalysisOrchestrator:
             self.logger.error(f"Failed to discover and load data sources: {e}")
             raise
     
-    async def _load_data_sources_concurrently(self, sources: List[DataSource]) -> List[DataSource]:
+    async def _load_data_sources_concurrently(self, sources: List[DataSource]) -> List[Any]:
         """Load data from multiple sources concurrently."""
         try:
             if not sources:
@@ -2648,7 +2680,7 @@ class AnalysisOrchestrator:
             self.logger.error(f"Failed to load data sources concurrently: {e}")
             raise
     
-    async def _load_file_source(self, source: DataSource) -> DataSource:
+    async def _load_file_source(self, source: DataSource) -> Tuple[pd.DataFrame, DataSource]:
         """Load data from a file source."""
         try:
             self.logger.debug(f"Loading file source: {source.channel_name}")
@@ -2666,13 +2698,13 @@ class AnalysisOrchestrator:
                 return None
             
             self.logger.debug(f"Successfully loaded file source: {source.channel_name}")
-            return loaded_source
+            return (data, loaded_source)
             
         except Exception as e:
             self.logger.error(f"Failed to load file source {source.channel_name}: {e}")
             return None
     
-    async def _load_api_source(self, source: DataSource) -> DataSource:
+    async def _load_api_source(self, source: DataSource) -> Tuple[pd.DataFrame, DataSource]:
         """Load data from an API source."""
         try:
             self.logger.debug(f"Loading API source: {source.channel_name}")
@@ -2685,14 +2717,14 @@ class AnalysisOrchestrator:
                 return None
             
             self.logger.debug(f"Successfully loaded API source: {source.channel_name}")
-            return loaded_source
+            return (data, loaded_source)
             
         except Exception as e:
             self.logger.error(f"Failed to load API source {source.channel_name}: {e}")
             return None
     
     async def _run_concurrent_analysis(self, 
-                                     data_sources: List[DataSource], 
+                                     data_sources: List[Any], 
                                      analysis_types: List[str]) -> Dict[str, Any]:
         """Run analysis on all data sources concurrently."""
         try:
@@ -2739,7 +2771,7 @@ class AnalysisOrchestrator:
             self.logger.error(f"Failed to run concurrent analysis: {e}")
             raise
     
-    async def _combine_data_sources(self, data_sources: List[DataSource]) -> pd.DataFrame:
+    async def _combine_data_sources(self, data_sources: List[Any]) -> pd.DataFrame:
         """Combine data from multiple sources into a single DataFrame."""
         try:
             if not data_sources:
@@ -2749,10 +2781,22 @@ class AnalysisOrchestrator:
             
             # Collect all DataFrames
             dataframes = []
-            for source in data_sources:
-                if hasattr(source, 'data') and source.data is not None:
+            self.logger.debug(f"Processing {len(data_sources)} data sources for combination")
+            for i, source in enumerate(data_sources):
+                self.logger.debug(f"Source {i}: type={type(source)}, is_tuple={isinstance(source, tuple)}")
+                if isinstance(source, tuple) and len(source) == 2:
+                    # Handle (DataFrame, DataSource) tuples from loading process
+                    df, data_source = source
+                    self.logger.debug(f"Tuple source: df_type={type(df)}, df_empty={df.empty if df is not None else 'None'}, channel={data_source.channel_name}")
+                    if df is not None and not df.empty:
+                        dataframes.append(df)
+                        self.logger.debug(f"Added {len(df)} records from {data_source.channel_name}")
+                elif hasattr(source, 'data') and source.data is not None:
+                    # Fallback for direct DataSource objects with data attribute
                     dataframes.append(source.data)
                     self.logger.debug(f"Added {len(source.data)} records from {source.channel_name}")
+                else:
+                    self.logger.debug(f"Source {i} not processed: hasattr_data={hasattr(source, 'data')}, data_value={getattr(source, 'data', 'NO_DATA_ATTR')}")
             
             if not dataframes:
                 self.logger.warning("No data found in any source")

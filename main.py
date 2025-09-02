@@ -263,30 +263,33 @@ def combine_collections(channels, verbose):
 
 
 @cli.command(name="analysis")
-@click.option("--source", "-s", 
-              type=click.Choice(["file", "api", "diff"]), 
-              default="file", 
-              help="Data source: file, api, diff")
-@click.option("--source-path", "-p", 
-              type=click.Path(exists=True), 
-              help="Path to source files (for file source)")
 @click.option("--channels", "-c", 
               help="Comma-separated list of channel usernames to analyze")
+@click.option("--analysis-types", "-t",
+              help="Comma-separated list of analysis types: filename,filesize,message (default: all)")
 @click.option("--output-dir", "-o", 
               type=click.Path(), 
-              help="Output directory for analysis results")
+              help="Output directory for analysis results (default: analysis_output_<timestamp>)")
+@click.option("--chunk-size", 
+              type=int, 
+              default=10000,
+              help="Chunk size for processing large datasets (default: 10000)")
 @click.option("--verbose", "-v", 
               is_flag=True, 
               help="Enable verbose logging output")
 @click.help_option("-h", "--help")
-def analysis(source, source_path, channels, output_dir, verbose):
+def analysis(channels, analysis_types, output_dir, chunk_size, verbose):
     """Run comprehensive analysis on Telegram channel data.
     
+    This command analyzes collected Telegram channel data for filename patterns,
+    filesize distributions, and message content patterns.
+    
     Examples:
-        python main.py analysis                           # Analyze file data with default settings
-        python main.py analysis --source api              # Analyze API data
-        python main.py analysis --source file --source-path ./data  # Analyze specific file path
+        python main.py analysis                           # Analyze all data with default settings
         python main.py analysis --channels "@channel1,@channel2"    # Analyze specific channels
+        python main.py analysis --analysis-types filename,filesize  # Run specific analysis types
+        python main.py analysis --output-dir ./results    # Specify output directory
+        python main.py analysis --chunk-size 5000         # Use smaller chunks for large datasets
         python main.py analysis --verbose                 # Enable verbose logging
     """
     setup_logging(verbose)
@@ -297,34 +300,45 @@ def analysis(source, source_path, channels, output_dir, verbose):
     
     try:
         # Import analysis modules
-        from modules.analysis import create_analysis_config, run_comprehensive_analysis
+        from modules.analysis import create_analysis_config, AnalysisOrchestrator
         
         # Create configuration
         config_kwargs = {
-            "source_type": source,
-            "verbose": verbose
+            "verbose": verbose,
+            "chunk_size": chunk_size
         }
-        
-        if source_path:
-            config_kwargs["source_path"] = source_path
-        elif source == "file":
-            # Default to combined collections directory
-            config_kwargs["source_path"] = "reports/collections"
-        
-        if channels:
-            channel_list = [ch.strip() for ch in channels.split(",")]
-            config_kwargs["channel_whitelist"] = channel_list
-        
-        if output_dir:
-            config_kwargs["output_dir"] = output_dir
         
         # Create configuration
         config = create_analysis_config(**config_kwargs)
         logger.info(f"Analysis configuration: {config}")
         
+        # Create orchestrator
+        orchestrator = AnalysisOrchestrator(config)
+        
+        # Prepare analysis parameters
+        analysis_kwargs = {}
+        
+        if channels:
+            channel_list = [ch.strip() for ch in channels.split(",")]
+            analysis_kwargs["channels"] = channel_list
+        
+        # Set analysis types
+        if analysis_types:
+            analysis_types_list = [t.strip() for t in analysis_types.split(",")]
+            # Validate analysis types
+            valid_types = ["filename", "filesize", "message"]
+            invalid_types = [t for t in analysis_types_list if t not in valid_types]
+            if invalid_types:
+                logger.error(f"❌ Invalid analysis types: {invalid_types}. Valid types: {valid_types}")
+                return
+            analysis_kwargs["analysis_types"] = analysis_types_list
+        else:
+            # Default to all analysis types
+            analysis_kwargs["analysis_types"] = ["filename", "filesize", "message"]
+        
         # Run analysis
         logger.info("🚀 Starting comprehensive analysis...")
-        results = asyncio.run(run_comprehensive_analysis(config))
+        results = asyncio.run(orchestrator.run_comprehensive_analysis(**analysis_kwargs))
         
         if "error" in results:
             logger.error(f"❌ Analysis failed: {results['error']}")
@@ -332,16 +346,25 @@ def analysis(source, source_path, channels, output_dir, verbose):
         
         # Display summary
         logger.info("✅ Analysis completed successfully!")
-        logger.info(f"📊 Total records analyzed: {results.get('metadata', {}).get('total_records', 'N/A')}")
-        logger.info(f"📈 Channels analyzed: {results.get('metadata', {}).get('channels_analyzed', 'N/A')}")
-        logger.info(f"⏱️  Processing time: {results.get('metadata', {}).get('processing_time_seconds', 'N/A')} seconds")
+        logger.info(f"📊 Analysis ID: {results.get('analysis_id', 'N/A')}")
+        logger.info(f"📈 Data sources found: {len(results.get('data_sources', []))}")
+        logger.info(f"⏱️  Processing time: {results.get('performance_stats', {}).get('total_time_seconds', 'N/A')} seconds")
         
-        # Show analysis types completed
-        analysis_types = [k for k in results.keys() if k not in ['metadata', 'error']]
-        logger.info(f"🔍 Analysis types completed: {', '.join(analysis_types)}")
+        # Show analysis results
+        analysis_results = results.get('analysis_results', {})
+        if analysis_results:
+            logger.info("🔍 Analysis results:")
+            for analysis_type, result in analysis_results.items():
+                if hasattr(result, 'total_files') or hasattr(result, 'total_messages'):
+                    count = getattr(result, 'total_files', getattr(result, 'total_messages', 0))
+                    logger.info(f"   📊 {analysis_type}: {count} items analyzed")
         
-        # Show output location
-        logger.info(f"📁 Results saved to: {config.output_dir}")
+        # Show output paths
+        output_paths = results.get('output_paths', {})
+        if output_paths:
+            logger.info("📁 Output files created:")
+            for report_type, path in output_paths.items():
+                logger.info(f"   📄 {report_type}: {path}")
         
     except Exception as e:
         logger.error(f"❌ Analysis command failed: {e}")

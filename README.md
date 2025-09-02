@@ -17,7 +17,10 @@ python main.py import reports/collections/tg_channel_combined.json
 # 4. Generate reports
 python main.py report messages
 
-# 5. Create interactive dashboard
+# 5. Run advanced analysis
+python main.py analysis --channels "books" --verbose
+
+# 6. Create interactive dashboard
 python main.py dashboard
 
 # Get help for any command
@@ -159,7 +162,113 @@ python main.py report messages
 python main.py report channels
 ```
 
-### 5. Dashboard Command
+### 5. Analysis Command
+
+Performs comprehensive analysis of Telegram channel data including filename analysis, filesize analysis, and message content analysis with advanced pattern recognition and language detection.
+
+#### Basic Usage
+```bash
+python main.py analysis [OPTIONS]
+```
+
+#### Options
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--channels` | `-c` | Comma-separated list of channel usernames | All available channels |
+| `--output-dir` | `-o` | Output directory for analysis results | `reports/analysis` |
+| `--enable-file-source` | `-f` | Enable file-based data source | `True` |
+| `--enable-api-source` | `-a` | Enable API-based data source | `True` |
+| `--enable-diff-analysis` | `-d` | Enable diff analysis between sources | `True` |
+| `--verbose` | `-v` | Enable verbose logging output | `False` |
+| `--help` | `-h` | Show help message | - |
+
+#### Analysis Types
+
+**Filename Analysis:**
+- Duplicate filename detection
+- Filename pattern analysis (length, extensions, special characters)
+- Filename quality assessment
+
+**Filesize Analysis:**
+- Duplicate filesize detection
+- Filesize distribution analysis with size bins
+- Potential duplicate file identification
+
+**Message Analysis:**
+- Content statistics and engagement metrics
+- Pattern recognition (hashtags, mentions, URLs, emojis)
+- Creator analysis and activity patterns
+- Language detection using character frequency analysis
+
+#### Examples
+
+**Run analysis on specific channels:**
+```bash
+python main.py analysis -c "books,SherwinVakiliLibrary" -v
+```
+
+**Run analysis with custom output directory:**
+```bash
+python main.py analysis -c "books" -o "custom_analysis" -v
+```
+
+**Run analysis with only file source:**
+```bash
+python main.py analysis -c "books" --enable-api-source false -v
+```
+
+**Run analysis with diff analysis disabled:**
+```bash
+python main.py analysis -c "books" --enable-diff-analysis false -v
+```
+
+**Run analysis on all available channels:**
+```bash
+python main.py analysis -v
+```
+
+#### Output Structure
+
+Analysis results are saved as JSON files with the following structure:
+
+```json
+{
+  "source": "file",
+  "channel_name": "@books",
+  "analysis_timestamp": "2025-01-15T10:30:00",
+  "total_records_analyzed": 1000,
+  "filename_analysis": {
+    "duplicate_filename_detection": {
+      "total_files": 500,
+      "total_unique_filenames": 450,
+      "files_with_duplicate_names": 50,
+      "duplicate_ratio": 0.11,
+      "most_common_filenames": {...}
+    },
+    "filename_pattern_analysis": {
+      "length_statistics": {...},
+      "extension_distribution": {...},
+      "special_character_analysis": {...}
+    }
+  },
+  "filesize_analysis": {
+    "duplicate_filesize_detection": {...},
+    "filesize_distribution_analysis": {...}
+  },
+  "message_analysis": {
+    "content_statistics": {...},
+    "pattern_recognition": {...},
+    "creator_analysis": {...},
+    "language_analysis": {...}
+  },
+  "performance_metrics": {
+    "elapsed_time": 15.2,
+    "memory_usage_mb": 150.5
+  }
+}
+```
+
+### 6. Dashboard Command
 
 Creates interactive Plotly dashboards from channel reports and data.
 
@@ -195,7 +304,11 @@ reports/
 │       └── tg_SherwinVakiliLibrary_1_150300_combined.json
 ├── channels/                          # Channel reports and summaries
 ├── html/                             # Interactive dashboards and HTML reports
-└── analysis/                         # Analysis logs and reports
+└── analysis/                         # Advanced analysis results and reports
+    ├── filename_analysis/            # Filename analysis results
+    ├── filesize_analysis/            # Filesize analysis results
+    ├── message_analysis/             # Message content analysis results
+    └── combined_analysis/            # Combined analysis reports
 ```
 
 ### File Naming Convention
@@ -314,7 +427,15 @@ python main.py report stats
 # Reports are generated and saved to appropriate directories
 ```
 
-### Phase 5: Dashboard
+### Phase 5: Advanced Analysis
+```bash
+# Run comprehensive analysis on channel data
+python main.py analysis -c "books" -v
+
+# Analysis results are saved to reports/analysis/ with detailed JSON reports
+```
+
+### Phase 6: Dashboard
 ```bash
 # Create interactive visualizations
 python main.py dashboard
@@ -344,6 +465,13 @@ python main.py dashboard
 - **Multiple report types**: Generate different types of analysis
 - **Review outputs**: Check generated reports for insights
 - **Organize results**: Keep reports organized by date/channel
+
+### Analysis Phase
+- **Start with specific channels**: Use `-c` flag to analyze specific channels first
+- **Use verbose logging**: Enable `-v` flag to monitor analysis progress
+- **Review analysis results**: Check JSON outputs for insights and patterns
+- **Compare sources**: Use diff analysis to compare file vs API data
+- **Monitor performance**: Check memory usage and execution time metrics
 
 ### Dashboard Phase
 - **Interactive analysis**: Use dashboards for data exploration
@@ -395,6 +523,7 @@ python main.py collect --help
 python main.py combine --help
 python main.py import --help
 python main.py report --help
+python main.py analysis --help
 python main.py dashboard --help
 
 # Verbose logging for debugging
@@ -446,6 +575,20 @@ python main.py collect -c "channel" -v
 📊 Generating message analysis reports...
 📁 Reports saved to: reports/channels/
 ✅ Report generation completed!
+```
+
+### Analysis Output
+```
+🔍 Starting advanced analysis for channel: @books
+📊 Loading data from file source...
+📈 Running filename analysis...
+📈 Running filesize analysis...
+📈 Running message analysis...
+📁 Analysis results saved to: reports/analysis/
+✅ Analysis completed successfully!
+📊 Total records analyzed: 1000
+⏱️  Execution time: 15.2 seconds
+💾 Memory usage: 150.5 MB
 ```
 
 ### Dashboard Output

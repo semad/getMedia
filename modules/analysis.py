@@ -1305,6 +1305,781 @@ class ApiDataLoader(BaseDataLoader):
             self.logger.warning(f"Failed to calculate quality score: {e}")
             return 0.5  # Default medium quality
 
+# Analysis Engines - Core Analysis Functionality
+class FilenameAnalyzer:
+    """Analyzes filename patterns, duplicates, and quality metrics."""
+    
+    def __init__(self, config: AnalysisConfig):
+        self.config = config
+        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+        self.performance_monitor = PerformanceMonitor()
+    
+    def analyze(self, df: pd.DataFrame) -> FilenameAnalysisResult:
+        """Perform comprehensive filename analysis."""
+        try:
+            self.performance_monitor.start()
+            
+            if df.empty:
+                self.logger.warning("Empty DataFrame provided for filename analysis")
+                return FilenameAnalysisResult(
+                    total_files=0,
+                    unique_filenames=0,
+                    duplicate_filenames=0,
+                    duplicate_groups=[],
+                    filename_patterns={},
+                    quality_metrics={},
+                    recommendations=[]
+                )
+            
+            # Filter for files with filenames
+            file_df = df[df['file_name'].notna() & (df['file_name'] != '')].copy()
+            
+            if file_df.empty:
+                self.logger.warning("No files with filenames found for analysis")
+                return FilenameAnalysisResult(
+                    total_files=0,
+                    unique_filenames=0,
+                    duplicate_filenames=0,
+                    duplicate_groups=[],
+                    filename_patterns={},
+                    quality_metrics={},
+                    recommendations=[]
+                )
+            
+            self.logger.info(f"Analyzing {len(file_df)} files with filenames")
+            
+            # Perform analysis
+            total_files = len(file_df)
+            unique_filenames = file_df['file_name'].nunique()
+            duplicate_groups = self._find_duplicate_filenames(file_df)
+            duplicate_filenames = sum(group['count'] for group in duplicate_groups if group['count'] > 1)
+            filename_patterns = self._analyze_filename_patterns(file_df)
+            quality_metrics = self._calculate_filename_quality_metrics(file_df)
+            recommendations = self._generate_filename_recommendations(file_df, quality_metrics)
+            
+            result = FilenameAnalysisResult(
+                total_files=total_files,
+                unique_filenames=unique_filenames,
+                duplicate_filenames=duplicate_filenames,
+                duplicate_groups=duplicate_groups,
+                filename_patterns=filename_patterns,
+                quality_metrics=quality_metrics,
+                recommendations=recommendations
+            )
+            
+            self.logger.info(f"Filename analysis completed: {total_files} files, {unique_filenames} unique, {duplicate_filenames} duplicates")
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Filename analysis failed: {e}")
+            raise
+        finally:
+            stats = self.performance_monitor.get_stats()
+            if stats:
+                self.logger.info(f"Performance stats: {stats}")
+    
+    def _find_duplicate_filenames(self, df: pd.DataFrame) -> List[Dict[str, Any]]:
+        """Find duplicate filenames and group them."""
+        try:
+            filename_counts = df['file_name'].value_counts()
+            duplicate_groups = []
+            
+            for filename, count in filename_counts.items():
+                if count > 1:
+                    # Get additional info about duplicates
+                    duplicate_files = df[df['file_name'] == filename]
+                    file_sizes = duplicate_files['file_size'].dropna().tolist()
+                    channels = duplicate_files['channel_username'].unique().tolist()
+                    
+                    group_info = {
+                        'filename': filename,
+                        'count': int(count),
+                        'file_sizes': file_sizes,
+                        'channels': channels,
+                        'size_variation': len(set(file_sizes)) > 1 if file_sizes else False
+                    }
+                    duplicate_groups.append(group_info)
+            
+            # Sort by count (descending)
+            duplicate_groups.sort(key=lambda x: x['count'], reverse=True)
+            return duplicate_groups
+            
+        except Exception as e:
+            self.logger.error(f"Failed to find duplicate filenames: {e}")
+            return []
+    
+    def _analyze_filename_patterns(self, df: pd.DataFrame) -> Dict[str, int]:
+        """Analyze filename patterns and extensions."""
+        try:
+            patterns = {}
+            
+            # Filename lengths
+            lengths = df['file_name'].str.len()
+            patterns['avg_length'] = int(lengths.mean())
+            patterns['min_length'] = int(lengths.min())
+            patterns['max_length'] = int(lengths.max())
+            
+            # Special characters
+            special_chars = df['file_name'].str.count(r'[^a-zA-Z0-9._-]')
+            patterns['files_with_special_chars'] = int((special_chars > 0).sum())
+            patterns['avg_special_chars'] = int(special_chars.mean())
+            
+            # Total files with extensions
+            extensions = df['file_name'].str.extract(r'\.([^.]+)$')[0].dropna()
+            patterns['files_with_extensions'] = len(extensions)
+            
+            # Total files with prefixes
+            prefixes = df['file_name'].str.extract(r'^([a-zA-Z]+)')[0].dropna()
+            patterns['files_with_prefixes'] = len(prefixes)
+            
+            return patterns
+            
+        except Exception as e:
+            self.logger.error(f"Failed to analyze filename patterns: {e}")
+            return {}
+    
+    def _calculate_filename_quality_metrics(self, df: pd.DataFrame) -> Dict[str, float]:
+        """Calculate filename quality metrics."""
+        try:
+            metrics = {}
+            
+            # Completeness
+            total_files = len(df)
+            files_with_names = df['file_name'].notna().sum()
+            metrics['completeness'] = files_with_names / total_files if total_files > 0 else 0.0
+            
+            # Uniqueness
+            unique_names = df['file_name'].nunique()
+            metrics['uniqueness'] = unique_names / total_files if total_files > 0 else 0.0
+            
+            # Length quality (optimal range: 10-50 characters)
+            lengths = df['file_name'].str.len()
+            optimal_length = ((lengths >= 10) & (lengths <= 50)).sum()
+            metrics['length_quality'] = optimal_length / total_files if total_files > 0 else 0.0
+            
+            # Special character usage (lower is better)
+            special_chars = df['file_name'].str.count(r'[^a-zA-Z0-9._-]')
+            clean_names = (special_chars == 0).sum()
+            metrics['cleanliness'] = clean_names / total_files if total_files > 0 else 0.0
+            
+            # Descriptive quality (has meaningful parts)
+            has_meaningful_parts = df['file_name'].str.contains(r'[a-zA-Z]{3,}', na=False).sum()
+            metrics['descriptiveness'] = has_meaningful_parts / total_files if total_files > 0 else 0.0
+            
+            # Overall quality score
+            metrics['overall_quality'] = (
+                metrics['completeness'] * 0.2 +
+                metrics['uniqueness'] * 0.3 +
+                metrics['length_quality'] * 0.2 +
+                metrics['cleanliness'] * 0.15 +
+                metrics['descriptiveness'] * 0.15
+            )
+            
+            return metrics
+            
+        except Exception as e:
+            self.logger.error(f"Failed to calculate filename quality metrics: {e}")
+            return {}
+    
+    def _generate_filename_recommendations(self, df: pd.DataFrame, quality_metrics: Dict[str, float]) -> List[str]:
+        """Generate recommendations for filename improvements."""
+        try:
+            recommendations = []
+            
+            # Check completeness
+            if quality_metrics.get('completeness', 0) < 0.95:
+                recommendations.append("Some files are missing filenames - ensure all files have proper names")
+            
+            # Check uniqueness
+            if quality_metrics.get('uniqueness', 0) < 0.8:
+                recommendations.append("High number of duplicate filenames detected - consider adding timestamps or unique identifiers")
+            
+            # Check length quality
+            if quality_metrics.get('length_quality', 0) < 0.7:
+                recommendations.append("Many filenames are too short or too long - aim for 10-50 characters")
+            
+            # Check cleanliness
+            if quality_metrics.get('cleanliness', 0) < 0.8:
+                recommendations.append("Some filenames contain special characters - use only alphanumeric characters, dots, hyphens, and underscores")
+            
+            # Check descriptiveness
+            if quality_metrics.get('descriptiveness', 0) < 0.7:
+                recommendations.append("Some filenames lack descriptive content - include meaningful words to describe the file content")
+            
+            # Overall quality
+            if quality_metrics.get('overall_quality', 0) < 0.6:
+                recommendations.append("Overall filename quality is low - consider implementing a filename standardization policy")
+            
+            return recommendations
+            
+        except Exception as e:
+            self.logger.error(f"Failed to generate filename recommendations: {e}")
+            return []
+
+
+class FilesizeAnalyzer:
+    """Analyzes file sizes, distributions, and potential duplicates."""
+    
+    def __init__(self, config: AnalysisConfig):
+        self.config = config
+        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+        self.performance_monitor = PerformanceMonitor()
+    
+    def analyze(self, df: pd.DataFrame) -> FilesizeAnalysisResult:
+        """Perform comprehensive filesize analysis."""
+        try:
+            self.performance_monitor.start()
+            
+            if df.empty:
+                self.logger.warning("Empty DataFrame provided for filesize analysis")
+                return FilesizeAnalysisResult(
+                    total_files=0,
+                    total_size_bytes=0,
+                    unique_sizes=0,
+                    duplicate_sizes=0,
+                    duplicate_size_groups=[],
+                    size_distribution={},
+                    size_statistics={},
+                    potential_duplicates=[]
+                )
+            
+            # Filter for files with sizes
+            file_df = df[df['file_size'].notna() & (df['file_size'] > 0)].copy()
+            
+            if file_df.empty:
+                self.logger.warning("No files with sizes found for analysis")
+                return FilesizeAnalysisResult(
+                    total_files=0,
+                    total_size_bytes=0,
+                    unique_sizes=0,
+                    duplicate_sizes=0,
+                    duplicate_size_groups=[],
+                    size_distribution={},
+                    size_statistics={},
+                    potential_duplicates=[]
+                )
+            
+            self.logger.info(f"Analyzing {len(file_df)} files with sizes")
+            
+            # Perform analysis
+            total_files = len(file_df)
+            total_size_bytes = int(file_df['file_size'].sum())
+            unique_sizes = file_df['file_size'].nunique()
+            duplicate_size_groups = self._find_duplicate_sizes(file_df)
+            duplicate_sizes = sum(group['count'] for group in duplicate_size_groups if group['count'] > 1)
+            size_distribution = self._analyze_size_distribution(file_df)
+            size_statistics = self._calculate_size_statistics(file_df)
+            potential_duplicates = self._find_potential_duplicates(file_df)
+            
+            result = FilesizeAnalysisResult(
+                total_files=total_files,
+                total_size_bytes=total_size_bytes,
+                unique_sizes=unique_sizes,
+                duplicate_sizes=duplicate_sizes,
+                duplicate_size_groups=duplicate_size_groups,
+                size_distribution=size_distribution,
+                size_statistics=size_statistics,
+                potential_duplicates=potential_duplicates
+            )
+            
+            self.logger.info(f"Filesize analysis completed: {total_files} files, {total_size_bytes} bytes total, {unique_sizes} unique sizes")
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Filesize analysis failed: {e}")
+            raise
+        finally:
+            stats = self.performance_monitor.get_stats()
+            if stats:
+                self.logger.info(f"Performance stats: {stats}")
+    
+    def _find_duplicate_sizes(self, df: pd.DataFrame) -> List[Dict[str, Any]]:
+        """Find files with duplicate sizes."""
+        try:
+            size_counts = df['file_size'].value_counts()
+            duplicate_groups = []
+            
+            for size, count in size_counts.items():
+                if count > 1:
+                    # Get additional info about duplicates
+                    duplicate_files = df[df['file_size'] == size]
+                    filenames = duplicate_files['file_name'].dropna().tolist()
+                    channels = duplicate_files['channel_username'].unique().tolist()
+                    
+                    group_info = {
+                        'size_bytes': int(size),
+                        'count': int(count),
+                        'filenames': filenames,
+                        'channels': channels,
+                        'size_mb': round(size / (1024 * 1024), 2)
+                    }
+                    duplicate_groups.append(group_info)
+            
+            # Sort by count (descending)
+            duplicate_groups.sort(key=lambda x: x['count'], reverse=True)
+            return duplicate_groups
+            
+        except Exception as e:
+            self.logger.error(f"Failed to find duplicate sizes: {e}")
+            return []
+    
+    def _analyze_size_distribution(self, df: pd.DataFrame) -> Dict[str, int]:
+        """Analyze file size distribution in bins."""
+        try:
+            distribution = {}
+            
+            # Define size bins
+            size_bins = {
+                'tiny': (0, 1024),  # < 1KB
+                'small': (1024, 1024 * 1024),  # 1KB - 1MB
+                'medium': (1024 * 1024, 10 * 1024 * 1024),  # 1MB - 10MB
+                'large': (10 * 1024 * 1024, 100 * 1024 * 1024),  # 10MB - 100MB
+                'huge': (100 * 1024 * 1024, float('inf'))  # > 100MB
+            }
+            
+            for bin_name, (min_size, max_size) in size_bins.items():
+                count = ((df['file_size'] >= min_size) & (df['file_size'] < max_size)).sum()
+                distribution[bin_name] = int(count)
+            
+            return distribution
+            
+        except Exception as e:
+            self.logger.error(f"Failed to analyze size distribution: {e}")
+            return {}
+    
+    def _calculate_size_statistics(self, df: pd.DataFrame) -> Dict[str, float]:
+        """Calculate statistical measures for file sizes."""
+        try:
+            sizes = df['file_size']
+            statistics = {}
+            
+            # Basic statistics
+            statistics['mean'] = float(sizes.mean())
+            statistics['median'] = float(sizes.median())
+            statistics['std'] = float(sizes.std())
+            statistics['min'] = float(sizes.min())
+            statistics['max'] = float(sizes.max())
+            
+            # Percentiles
+            statistics['p25'] = float(sizes.quantile(0.25))
+            statistics['p75'] = float(sizes.quantile(0.75))
+            statistics['p90'] = float(sizes.quantile(0.90))
+            statistics['p95'] = float(sizes.quantile(0.95))
+            statistics['p99'] = float(sizes.quantile(0.99))
+            
+            # Size in MB for readability
+            statistics['mean_mb'] = round(statistics['mean'] / (1024 * 1024), 2)
+            statistics['median_mb'] = round(statistics['median'] / (1024 * 1024), 2)
+            statistics['max_mb'] = round(statistics['max'] / (1024 * 1024), 2)
+            
+            return statistics
+            
+        except Exception as e:
+            self.logger.error(f"Failed to calculate size statistics: {e}")
+            return {}
+    
+    def _find_potential_duplicates(self, df: pd.DataFrame) -> List[Dict[str, Any]]:
+        """Find files that might be duplicates based on size and other factors."""
+        try:
+            potential_duplicates = []
+            
+            # Group by size and find groups with multiple files
+            size_groups = df.groupby('file_size')
+            
+            for size, group in size_groups:
+                if len(group) > 1:
+                    # Check if files have similar names or are from same channel
+                    files_info = []
+                    for _, file_row in group.iterrows():
+                        file_info = {
+                            'message_id': int(file_row['message_id']),
+                            'filename': file_row.get('file_name', ''),
+                            'channel': file_row.get('channel_username', ''),
+                            'date': file_row.get('date', ''),
+                            'mime_type': file_row.get('mime_type', '')
+                        }
+                        files_info.append(file_info)
+                    
+                    # Calculate similarity score
+                    similarity_score = self._calculate_similarity_score(files_info)
+                    
+                    if similarity_score > 0.3:  # Threshold for potential duplicates
+                        potential_duplicates.append({
+                            'size_bytes': int(size),
+                            'size_mb': round(size / (1024 * 1024), 2),
+                            'file_count': len(files_info),
+                            'files': files_info,
+                            'similarity_score': similarity_score
+                        })
+            
+            # Sort by similarity score (descending)
+            potential_duplicates.sort(key=lambda x: x['similarity_score'], reverse=True)
+            return potential_duplicates[:20]  # Return top 20 potential duplicates
+            
+        except Exception as e:
+            self.logger.error(f"Failed to find potential duplicates: {e}")
+            return []
+    
+    def _calculate_similarity_score(self, files_info: List[Dict[str, Any]]) -> float:
+        """Calculate similarity score for files with same size."""
+        try:
+            if len(files_info) < 2:
+                return 0.0
+            
+            score = 0.0
+            total_comparisons = 0
+            
+            # Compare each pair of files
+            for i in range(len(files_info)):
+                for j in range(i + 1, len(files_info)):
+                    file1, file2 = files_info[i], files_info[j]
+                    pair_score = 0.0
+                    
+                    # Same channel
+                    if file1['channel'] == file2['channel']:
+                        pair_score += 0.3
+                    
+                    # Similar filenames
+                    if file1['filename'] and file2['filename']:
+                        filename_similarity = self._calculate_filename_similarity(
+                            file1['filename'], file2['filename']
+                        )
+                        pair_score += filename_similarity * 0.4
+                    
+                    # Same MIME type
+                    if file1['mime_type'] == file2['mime_type'] and file1['mime_type']:
+                        pair_score += 0.3
+                    
+                    score += pair_score
+                    total_comparisons += 1
+            
+            return score / total_comparisons if total_comparisons > 0 else 0.0
+            
+        except Exception as e:
+            self.logger.error(f"Failed to calculate similarity score: {e}")
+            return 0.0
+    
+    def _calculate_filename_similarity(self, filename1: str, filename2: str) -> float:
+        """Calculate similarity between two filenames."""
+        try:
+            if not filename1 or not filename2:
+                return 0.0
+            
+            # Simple similarity based on common characters
+            set1 = set(filename1.lower())
+            set2 = set(filename2.lower())
+            
+            intersection = len(set1.intersection(set2))
+            union = len(set1.union(set2))
+            
+            return intersection / union if union > 0 else 0.0
+            
+        except Exception as e:
+            self.logger.error(f"Failed to calculate filename similarity: {e}")
+            return 0.0
+
+
+class MessageAnalyzer:
+    """Analyzes message content, patterns, and language detection."""
+    
+    def __init__(self, config: AnalysisConfig):
+        self.config = config
+        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+        self.performance_monitor = PerformanceMonitor()
+    
+    def analyze(self, df: pd.DataFrame) -> MessageAnalysisResult:
+        """Perform comprehensive message analysis."""
+        try:
+            self.performance_monitor.start()
+            
+            if df.empty:
+                self.logger.warning("Empty DataFrame provided for message analysis")
+                return MessageAnalysisResult(
+                    total_messages=0,
+                    text_messages=0,
+                    media_messages=0,
+                    language_distribution={},
+                    content_patterns={},
+                    engagement_metrics={},
+                    temporal_patterns={},
+                    quality_metrics={}
+                )
+            
+            self.logger.info(f"Analyzing {len(df)} messages")
+            
+            # Perform analysis
+            total_messages = len(df)
+            text_messages = len(df[df['media_type'] == 'text'])
+            media_messages = len(df[df['media_type'] != 'text'])
+            language_distribution = self._analyze_language_distribution(df)
+            content_patterns = self._analyze_content_patterns(df)
+            engagement_metrics = self._calculate_engagement_metrics(df)
+            temporal_patterns = self._analyze_temporal_patterns(df)
+            quality_metrics = self._calculate_message_quality_metrics(df)
+            
+            result = MessageAnalysisResult(
+                total_messages=total_messages,
+                text_messages=text_messages,
+                media_messages=media_messages,
+                language_distribution=language_distribution,
+                content_patterns=content_patterns,
+                engagement_metrics=engagement_metrics,
+                temporal_patterns=temporal_patterns,
+                quality_metrics=quality_metrics
+            )
+            
+            self.logger.info(f"Message analysis completed: {total_messages} messages, {text_messages} text, {media_messages} media")
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Message analysis failed: {e}")
+            raise
+        finally:
+            stats = self.performance_monitor.get_stats()
+            if stats:
+                self.logger.info(f"Performance stats: {stats}")
+    
+    def _analyze_language_distribution(self, df: pd.DataFrame) -> Dict[str, int]:
+        """Analyze language distribution in messages."""
+        try:
+            # Filter for text messages
+            text_df = df[df['text'].notna() & (df['text'] != '')].copy()
+            
+            if text_df.empty:
+                return {}
+            
+            # Simple language detection based on character frequency
+            language_counts = {}
+            
+            # Process in chunks for memory efficiency
+            chunk_size = min(1000, len(text_df))
+            for i in range(0, len(text_df), chunk_size):
+                chunk = text_df.iloc[i:i + chunk_size]
+                chunk_languages = self._detect_languages_chunk(chunk['text'])
+                
+                for lang, count in chunk_languages.items():
+                    language_counts[lang] = language_counts.get(lang, 0) + count
+            
+            return language_counts
+            
+        except Exception as e:
+            self.logger.error(f"Failed to analyze language distribution: {e}")
+            return {}
+    
+    def _detect_languages_chunk(self, texts: pd.Series) -> Dict[str, int]:
+        """Detect languages in a chunk of texts."""
+        try:
+            language_counts = {}
+            
+            for text in texts:
+                if pd.isna(text) or not text:
+                    continue
+                
+                # Simple language detection based on character frequency
+                language = self._detect_language_simple(text)
+                language_counts[language] = language_counts.get(language, 0) + 1
+            
+            return language_counts
+            
+        except Exception as e:
+            self.logger.error(f"Failed to detect languages in chunk: {e}")
+            return {}
+    
+    def _detect_language_simple(self, text: str) -> str:
+        """Simple language detection based on character frequency."""
+        try:
+            if not text or len(text) < 10:
+                return 'unknown'
+            
+            # Count different character types
+            latin_chars = sum(1 for c in text if c.isalpha() and ord(c) < 128)
+            cyrillic_chars = sum(1 for c in text if '\u0400' <= c <= '\u04FF')
+            arabic_chars = sum(1 for c in text if '\u0600' <= c <= '\u06FF')
+            chinese_chars = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
+            
+            total_chars = len([c for c in text if c.isalpha()])
+            
+            if total_chars == 0:
+                return 'unknown'
+            
+            # Determine language based on character distribution
+            if cyrillic_chars / total_chars > 0.3:
+                return 'russian'
+            elif arabic_chars / total_chars > 0.3:
+                return 'arabic'
+            elif chinese_chars / total_chars > 0.3:
+                return 'chinese'
+            elif latin_chars / total_chars > 0.7:
+                return 'english'
+            else:
+                return 'mixed'
+                
+        except Exception as e:
+            self.logger.error(f"Failed to detect language: {e}")
+            return 'unknown'
+    
+    def _analyze_content_patterns(self, df: pd.DataFrame) -> Dict[str, int]:
+        """Analyze content patterns in messages."""
+        try:
+            patterns = {}
+            
+            # Filter for text messages
+            text_df = df[df['text'].notna() & (df['text'] != '')].copy()
+            
+            if text_df.empty:
+                return patterns
+            
+            # Hashtags
+            hashtags = text_df['text'].str.count(r'#\w+').sum()
+            patterns['hashtags'] = int(hashtags)
+            
+            # Mentions
+            mentions = text_df['text'].str.count(r'@\w+').sum()
+            patterns['mentions'] = int(mentions)
+            
+            # URLs
+            urls = text_df['text'].str.count(r'https?://\S+').sum()
+            patterns['urls'] = int(urls)
+            
+            # Emojis (simple detection)
+            emojis = text_df['text'].str.count(r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF]').sum()
+            patterns['emojis'] = int(emojis)
+            
+            # Questions
+            questions = text_df['text'].str.count(r'\?').sum()
+            patterns['questions'] = int(questions)
+            
+            # Exclamations
+            exclamations = text_df['text'].str.count(r'!').sum()
+            patterns['exclamations'] = int(exclamations)
+            
+            # Average message length
+            avg_length = text_df['text'].str.len().mean()
+            patterns['avg_message_length'] = int(round(avg_length))
+            
+            return patterns
+            
+        except Exception as e:
+            self.logger.error(f"Failed to analyze content patterns: {e}")
+            return {}
+    
+    def _calculate_engagement_metrics(self, df: pd.DataFrame) -> Dict[str, float]:
+        """Calculate engagement metrics for messages."""
+        try:
+            metrics = {}
+            
+            # Views
+            views = df['views'].dropna()
+            if not views.empty:
+                metrics['avg_views'] = float(views.mean())
+                metrics['median_views'] = float(views.median())
+                metrics['max_views'] = float(views.max())
+            
+            # Forwards
+            forwards = df['forwards'].dropna()
+            if not forwards.empty:
+                metrics['avg_forwards'] = float(forwards.mean())
+                metrics['median_forwards'] = float(forwards.median())
+                metrics['max_forwards'] = float(forwards.max())
+            
+            # Replies
+            replies = df['replies'].dropna()
+            if not replies.empty:
+                metrics['avg_replies'] = float(replies.mean())
+                metrics['median_replies'] = float(replies.median())
+                metrics['max_replies'] = float(replies.max())
+            
+            # Engagement rate (forwards + replies) / views
+            if not views.empty and not (forwards.empty and replies.empty):
+                total_engagement = (forwards.fillna(0) + replies.fillna(0)).sum()
+                total_views = views.sum()
+                if total_views > 0:
+                    metrics['engagement_rate'] = float(total_engagement / total_views)
+            
+            return metrics
+            
+        except Exception as e:
+            self.logger.error(f"Failed to calculate engagement metrics: {e}")
+            return {}
+    
+    def _analyze_temporal_patterns(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """Analyze temporal patterns in messages."""
+        try:
+            patterns = {}
+            
+            # Ensure date column is datetime
+            if 'date' in df.columns:
+                df_with_dates = df[df['date'].notna()].copy()
+                if not df_with_dates.empty:
+                    df_with_dates['date'] = pd.to_datetime(df_with_dates['date'])
+                    
+                    # Hourly patterns
+                    df_with_dates['hour'] = df_with_dates['date'].dt.hour
+                    hourly_counts = df_with_dates['hour'].value_counts().sort_index()
+                    patterns['hourly'] = hourly_counts.to_dict()
+                    
+                    # Daily patterns
+                    df_with_dates['day_of_week'] = df_with_dates['date'].dt.day_name()
+                    daily_counts = df_with_dates['day_of_week'].value_counts()
+                    patterns['daily'] = daily_counts.to_dict()
+                    
+                    # Monthly patterns
+                    df_with_dates['month'] = df_with_dates['date'].dt.month
+                    monthly_counts = df_with_dates['month'].value_counts().sort_index()
+                    patterns['monthly'] = monthly_counts.to_dict()
+            
+            return patterns
+            
+        except Exception as e:
+            self.logger.error(f"Failed to analyze temporal patterns: {e}")
+            return {}
+    
+    def _calculate_message_quality_metrics(self, df: pd.DataFrame) -> Dict[str, float]:
+        """Calculate message quality metrics."""
+        try:
+            metrics = {}
+            
+            # Completeness
+            total_messages = len(df)
+            messages_with_text = df['text'].notna().sum()
+            metrics['text_completeness'] = messages_with_text / total_messages if total_messages > 0 else 0.0
+            
+            # Media completeness
+            media_messages = df[df['media_type'] != 'text']
+            media_with_files = media_messages['file_name'].notna().sum()
+            metrics['media_completeness'] = media_with_files / len(media_messages) if len(media_messages) > 0 else 0.0
+            
+            # Engagement completeness
+            messages_with_views = df['views'].notna().sum()
+            metrics['engagement_completeness'] = messages_with_views / total_messages if total_messages > 0 else 0.0
+            
+            # Content quality (based on text length and patterns)
+            text_df = df[df['text'].notna() & (df['text'] != '')]
+            if not text_df.empty:
+                avg_length = text_df['text'].str.len().mean()
+                metrics['avg_content_length'] = float(avg_length)
+                
+                # Quality score based on length (optimal: 50-500 characters)
+                optimal_length = ((text_df['text'].str.len() >= 50) & (text_df['text'].str.len() <= 500)).sum()
+                metrics['content_quality'] = optimal_length / len(text_df)
+            else:
+                metrics['avg_content_length'] = 0.0
+                metrics['content_quality'] = 0.0
+            
+            # Overall quality
+            metrics['overall_quality'] = (
+                metrics['text_completeness'] * 0.3 +
+                metrics['media_completeness'] * 0.2 +
+                metrics['engagement_completeness'] * 0.2 +
+                metrics['content_quality'] * 0.3
+            )
+            
+            return metrics
+            
+        except Exception as e:
+            self.logger.error(f"Failed to calculate message quality metrics: {e}")
+            return {}
+
 # Main entry point for CLI integration
 def create_analysis_config(**kwargs) -> AnalysisConfig:
     """Create analysis configuration from kwargs."""

@@ -107,6 +107,19 @@ The analysis command MUST support multiple data sources:
 - **REQ-006.2**: Include detailed metadata and processing statistics
 - **REQ-006.3**: Provide actionable insights for media library optimization
 - **REQ-006.4**: Support both individual channel and summary reports
+- **REQ-006.5**: **Individual Channel Directory Structure**: Create separate folders for each channel when analyzing all channels
+  - Each channel gets its own directory: `reports/analysis/file_messages/{channel_name}/`
+  - Single channel analysis: `reports/analysis/file_messages/books/`
+  - Multiple channel analysis: `reports/analysis/file_messages/combined_X_channels/`
+  - All channels analysis: Individual folders for each discovered channel
+- **REQ-006.6**: **Channel-Specific File Naming**: Use channel names in output file names
+  - Comprehensive report: `{channel_name}_analysis.json`
+  - Individual reports: `filename_analysis.json`, `filesize_analysis.json`, `message_analysis.json`
+  - Summary report: `analysis_summary.json`
+- **REQ-006.7**: **Config.py Compliance**: All output paths must follow patterns defined in `config.py`
+  - Use `FILE_MESSAGES_DIR` for base directory
+  - Use `ANALYSIS_FILE_PATTERN` and `ANALYSIS_SUMMARY_PATTERN` for file naming
+  - Ensure directory structure matches configuration requirements
 
 #### **REQ-007: Error Handling Requirements**
 - **REQ-007.1**: Continue processing with partial data when possible
@@ -401,9 +414,108 @@ The analysis command first determines what data is available using concrete metr
 3. **Analysis Execution**: Processor selection, data preparation, and result collection
 4. **Output Generation**: JSON formatting, file organization, and metadata creation
 
+### Individual Channel Report Generation
+
+The analysis system implements a sophisticated report generation strategy that creates individual folders for each channel when analyzing all channels:
+
+#### **Report Generation Logic**
+1. **Channel Discovery**: Identify all unique channels from discovered data sources
+2. **Channel Deduplication**: Remove duplicate channel entries (same channel from multiple sources)
+3. **Individual Report Creation**: Generate separate reports for each unique channel
+4. **Directory Structure Creation**: Create channel-specific directories following `config.py` patterns
+
+#### **Channel Processing Flow**
+```
+Data Sources → Channel Discovery → Channel Deduplication → Individual Report Generation
+     ↓              ↓                    ↓                        ↓
+8 sources    → 5 unique channels  →  Remove duplicates  →  5 channel folders
+```
+
+#### **Report Generation Methods**
+- **`_generate_individual_channel_reports`**: Main method for creating individual channel reports
+- **`_get_output_paths`**: Generates channel-specific output paths following `config.py` patterns
+- **Channel-specific directory creation**: Each channel gets its own folder with all analysis types
+
+#### **Output File Types per Channel**
+Each channel directory contains:
+- **Comprehensive Report**: `{channel_name}_analysis.json` - Complete analysis results
+- **Filename Analysis**: `filename_analysis.json` - Filename patterns and duplicates
+- **Filesize Analysis**: `filesize_analysis.json` - File size distributions and duplicates
+- **Message Analysis**: `message_analysis.json` - Message content and engagement analysis
+- **Summary Report**: `analysis_summary.json` - High-level metrics and insights
+
 ## Output Structure
 
 ### Directory Organization
+
+The analysis command generates output in a structured directory hierarchy that follows the `config.py` patterns and creates individual folders for each channel.
+
+#### **Individual Channel Directory Structure**
+When analyzing all channels (no specific channels provided), the system creates separate folders for each discovered channel:
+
+```
+reports/analysis/file_messages/
+├── books/                           # @books channel
+│   ├── books_analysis.json         # Comprehensive analysis report
+│   ├── filename_analysis.json      # Filename analysis results
+│   ├── filesize_analysis.json      # Filesize analysis results
+│   ├── message_analysis.json       # Message analysis results
+│   └── analysis_summary.json       # Summary report
+├── books_magazine/                  # @books_magazine channel
+│   ├── books_magazine_analysis.json
+│   ├── filename_analysis.json
+│   ├── filesize_analysis.json
+│   ├── message_analysis.json
+│   └── analysis_summary.json
+├── Free/                           # @Free channel
+│   ├── Free_analysis.json
+│   ├── filename_analysis.json
+│   ├── filesize_analysis.json
+│   ├── message_analysis.json
+│   └── analysis_summary.json
+├── Free_Books_life/                # @Free_Books_life channel
+│   ├── Free_Books_life_analysis.json
+│   ├── filename_analysis.json
+│   ├── filesize_analysis.json
+│   ├── message_analysis.json
+│   └── analysis_summary.json
+└── SherwinVakiliLibrary/           # @SherwinVakiliLibrary channel
+    ├── SherwinVakiliLibrary_analysis.json
+    ├── filename_analysis.json
+    ├── filesize_analysis.json
+    ├── message_analysis.json
+    └── analysis_summary.json
+```
+
+#### **Single Channel Analysis**
+When analyzing a specific channel, files are created in that channel's directory:
+
+```bash
+# Command: python main.py analysis --channels @books
+reports/analysis/file_messages/books/
+├── books_analysis.json
+├── filename_analysis.json
+├── filesize_analysis.json
+├── message_analysis.json
+└── analysis_summary.json
+```
+
+#### **Multiple Channel Analysis**
+When analyzing multiple specific channels, files are created in a combined directory:
+
+```bash
+# Command: python main.py analysis --channels @books,@Free
+reports/analysis/file_messages/combined_2_channels/
+├── combined_2_channels_analysis.json
+├── filename_analysis.json
+├── filesize_analysis.json
+├── message_analysis.json
+└── analysis_summary.json
+```
+
+#### **Legacy Structure (Deprecated)**
+The old structure is no longer used but documented for reference:
+
 ```
 reports/analysis/
 ├── messages/
@@ -782,11 +894,27 @@ The analysis module will use configuration constants defined in `config.py`:
 - **DEFAULT_SESSION_COOLDOWN**: 30 (seconds between API sessions)
 
 ### Output Configuration
-The analysis system generates reports in the following structure:
-- **Base Directory**: `reports/analysis/`
-- **Message Reports**: `reports/analysis/messages/`
-- **Media Reports**: `reports/analysis/media/`
-- **Diff Reports**: `reports/analysis/diff/`
+The analysis system generates reports in the following structure following `config.py` patterns:
+
+#### **Base Configuration**
+- **Base Directory**: `reports/analysis/` (from `ANALYSIS_BASE`)
+- **File Messages Directory**: `reports/analysis/file_messages/` (from `FILE_MESSAGES_DIR`)
+- **Files Channels Directory**: `reports/analysis/files_channels/` (from `FILES_CHANNELS_DIR`)
+
+#### **File Naming Patterns**
+- **Analysis File Pattern**: `{channel}_analysis.json` (from `ANALYSIS_FILE_PATTERN`)
+- **Summary File Pattern**: `analysis_summary.json` (from `ANALYSIS_SUMMARY_PATTERN`)
+
+#### **Directory Structure Rules**
+- **Single Channel**: `reports/analysis/file_messages/{channel_name}/`
+- **Multiple Channels**: `reports/analysis/file_messages/combined_X_channels/`
+- **All Channels**: Individual folders for each discovered channel
+- **Channel Name Processing**: Remove '@' prefix from channel names for directory names
+
+#### **Legacy Structure (Deprecated)**
+- **Message Reports**: `reports/analysis/messages/` (no longer used)
+- **Media Reports**: `reports/analysis/media/` (no longer used)
+- **Diff Reports**: `reports/analysis/diff/` (no longer used)
 
 ## Error Handling and Validation
 

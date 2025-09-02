@@ -39,6 +39,8 @@ from config import (
     ANALYSIS_BASE,
     FILE_MESSAGES_DIR,
     FILES_CHANNELS_DIR,
+    DB_MESSAGES_DIR,
+    DB_CHANNELS_DIR,
     ANALYSIS_FILE_PATTERN,
     ANALYSIS_SUMMARY_PATTERN
 )
@@ -196,6 +198,8 @@ class AnalysisConfig(BaseModel):
     ANALYSIS_BASE,
     FILE_MESSAGES_DIR,
     FILES_CHANNELS_DIR,
+    DB_MESSAGES_DIR,
+    DB_CHANNELS_DIR,
     ANALYSIS_FILE_PATTERN,
     ANALYSIS_SUMMARY_PATTERN
 )
@@ -2141,27 +2145,33 @@ class JsonOutputManager:
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         self.performance_monitor = PerformanceMonitor()
     
-    def _get_output_paths(self, channels: List[str] = None) -> Dict[str, str]:
+    def _get_output_paths(self, channels: List[str] = None, source_type: str = "file") -> Dict[str, str]:
         """Generate output paths according to config.py structure."""
         try:
+            # Choose the appropriate base directory based on source type
+            if source_type == "api" or source_type == "database":
+                base_dir = DB_MESSAGES_DIR
+            else:
+                base_dir = FILE_MESSAGES_DIR
+            
             # Ensure analysis directories exist
-            Path(FILE_MESSAGES_DIR).mkdir(parents=True, exist_ok=True)
+            Path(base_dir).mkdir(parents=True, exist_ok=True)
             
             # If specific channels provided, use them
             if channels and len(channels) > 0:
                 if len(channels) == 1:
                     channel_name = channels[0].replace('@', '')
-                    # Create channel-specific directory: analysis/file_messages/books/
-                    channel_dir = Path(FILE_MESSAGES_DIR) / channel_name
+                    # Create channel-specific directory: analysis/db_messages/books/ or analysis/file_messages/books/
+                    channel_dir = Path(base_dir) / channel_name
                 else:
                     channel_name = f"combined_{len(channels)}_channels"
-                    # Create combined directory: analysis/file_messages/combined_X_channels/
-                    channel_dir = Path(FILE_MESSAGES_DIR) / channel_name
+                    # Create combined directory: analysis/db_messages/combined_X_channels/ or analysis/file_messages/combined_X_channels/
+                    channel_dir = Path(base_dir) / channel_name
             else:
                 # For "all channels" analysis, we'll create individual folders per channel
                 # This will be handled by the orchestrator calling this method for each channel
                 channel_name = "all_channels"
-                channel_dir = Path(FILE_MESSAGES_DIR) / channel_name
+                channel_dir = Path(base_dir) / channel_name
             
             # Ensure channel-specific directory exists
             channel_dir.mkdir(parents=True, exist_ok=True)
@@ -2197,9 +2207,22 @@ class JsonOutputManager:
         try:
             self.performance_monitor.start()
             
+            # Determine source type from data sources
+            source_type = "file"  # default
+            if data_sources:
+                # Check if any data source is from API
+                # data_sources contains tuples of (dataframe, DataSource)
+                has_api_source = any(
+                    (isinstance(source, tuple) and len(source) > 1 and source[1].source_type == "api") or
+                    (hasattr(source, 'source_type') and source.source_type == "api")
+                    for source in data_sources
+                )
+                if has_api_source:
+                    source_type = "api"
+            
             # Create output path if not provided
             if not output_path:
-                paths = self._get_output_paths(channels)
+                paths = self._get_output_paths(channels, source_type)
                 output_path = paths['analysis_file']
             
             self.logger.info(f"Generating analysis report: {output_path}")
@@ -2234,19 +2257,20 @@ class JsonOutputManager:
             if stats:
                 self.logger.info(f"Performance stats: {stats}")
     
-    def generate_individual_reports(self,
+    def generate_individual_reports(self, 
                                   filename_result: FilenameAnalysisResult,
                                   filesize_result: FilesizeAnalysisResult,
                                   message_result: MessageAnalysisResult,
                                   output_dir: str = None,
-                                  channels: List[str] = None) -> Dict[str, str]:
+                                  channels: List[str] = None,
+                                  source_type: str = "file") -> Dict[str, str]:
         """Generate individual analysis reports for each analysis type."""
         try:
             self.performance_monitor.start()
             
             # Create output directory if not provided
             if not output_dir:
-                paths = self._get_output_paths(channels)
+                paths = self._get_output_paths(channels, source_type)
                 output_dir = paths['channels_dir']
             
             Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -2645,7 +2669,7 @@ class AnalysisOrchestrator:
             # Generate output reports
             if channels and len(channels) > 0:
                 # Specific channels provided - generate combined report
-                output_paths = await self._generate_output_reports(analysis_results, output_dir, channels)
+                output_paths = await self._generate_output_reports(analysis_results, output_dir, channels, data_sources)
             else:
                 # No specific channels - generate individual reports for each discovered channel
                 output_paths = await self._generate_individual_channel_reports(analysis_results, output_dir, data_sources)
@@ -2686,16 +2710,25 @@ class AnalysisOrchestrator:
         try:
             self.logger.info("Discovering data sources")
             
-            # Discover file sources
-            file_sources = self.file_loader.discover_sources()
-            self.logger.info(f"Discovered {len(file_sources)} file sources")
+            all_sources = []
             
-            # Discover API sources
-            api_sources = self.api_loader.discover_sources()
-            self.logger.info(f"Discovered {len(api_sources)} API sources")
+            # Discover file sources (if enabled)
+            if self.config.enable_file_source:
+                file_sources = self.file_loader.discover_sources()
+                self.logger.info(f"Discovered {len(file_sources)} file sources")
+                all_sources.extend(file_sources)
+            else:
+                self.logger.info("File sources disabled")
+            
+            # Discover API sources (if enabled)
+            if self.config.enable_api_source:
+                api_sources = self.api_loader.discover_sources()
+                self.logger.info(f"Discovered {len(api_sources)} API sources")
+                all_sources.extend(api_sources)
+            else:
+                self.logger.info("API sources disabled")
             
             # Filter by channels if specified
-            all_sources = file_sources + api_sources
             if channels:
                 filtered_sources = []
                 for source in all_sources:
@@ -2975,7 +3008,8 @@ class AnalysisOrchestrator:
     async def _generate_output_reports(self, 
                                      analysis_results: Dict[str, Any], 
                                      output_dir: str = None,
-                                     channels: List[str] = None) -> Dict[str, str]:
+                                     channels: List[str] = None,
+                                     data_sources: List[Any] = None) -> Dict[str, str]:
         """Generate output reports from analysis results."""
         try:
             self.logger.info("Generating output reports")
@@ -3000,9 +3034,22 @@ class AnalysisOrchestrator:
                 channels
             )
             
+            # Determine source type from data sources
+            source_type = "file"  # default
+            if data_sources:
+                # Check if any data source is from API
+                # data_sources contains tuples of (dataframe, DataSource)
+                has_api_source = any(
+                    (isinstance(source, tuple) and len(source) > 1 and source[1].source_type == "api") or
+                    (hasattr(source, 'source_type') and source.source_type == "api")
+                    for source in data_sources
+                )
+                if has_api_source:
+                    source_type = "api"
+            
             # Generate individual reports
             individual_paths = self.output_manager.generate_individual_reports(
-                filename_result, filesize_result, message_result, output_dir, channels
+                filename_result, filesize_result, message_result, output_dir, channels, source_type
             )
             
             # Combine all output paths
@@ -3052,12 +3099,19 @@ class AnalysisOrchestrator:
             
             all_output_paths = {}
             
+            # Determine source type from data sources (once for all channels)
+            source_type = "file"  # default
+            if data_sources:
+                has_api_source = any(source.source_type == "api" for source in data_sources)
+                if has_api_source:
+                    source_type = "api"
+            
             # Generate reports for each unique channel
             for channel_name in unique_channels:
                 self.logger.info(f"Generating reports for channel: {channel_name}")
                 
                 # Create channel-specific paths
-                channel_paths = self.output_manager._get_output_paths([channel_name])
+                channel_paths = self.output_manager._get_output_paths([channel_name], source_type)
                 
                 # Generate comprehensive report for this channel
                 comprehensive_path = self.output_manager.generate_analysis_report(
@@ -3069,7 +3123,7 @@ class AnalysisOrchestrator:
                 # Generate individual reports for this channel
                 individual_paths = self.output_manager.generate_individual_reports(
                     filename_result, filesize_result, message_result, 
-                    channel_paths['channels_dir'], [channel_name]
+                    channel_paths['channels_dir'], [channel_name], source_type
                 )
                 
                 # Store paths with channel prefix

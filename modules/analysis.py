@@ -199,7 +199,7 @@ class AnalysisConfig(BaseModel):
             logger.error(f"Configuration validation error: {e}")
             return False
 
-# Placeholder for remaining classes - will be implemented in subsequent phases
+# Data Models (Pydantic) - Complete Implementation
 class DataSource(BaseModel):
     """Represents a data source for analysis with comprehensive metadata."""
     source_type: str = Field(..., pattern="^(file|api|dual)$")
@@ -213,6 +213,213 @@ class DataSource(BaseModel):
         default_factory=dict, 
         description="Additional metadata about the source"
     )
+    
+    @field_validator('channel_name')
+    @classmethod
+    def validate_channel_name(cls, v):
+        if not v.startswith('@'):
+            raise ValueError("Channel name must start with '@'")
+        return v
+    
+    @field_validator('quality_score')
+    @classmethod
+    def validate_quality_score(cls, v):
+        if not 0.0 <= v <= 1.0:
+            raise ValueError("Quality score must be between 0.0 and 1.0")
+        return v
+
+class MessageRecord(BaseModel):
+    """Represents a single message record with comprehensive validation."""
+    message_id: int = Field(..., ge=1, description="Unique message identifier")
+    channel_username: str = Field(..., min_length=1, max_length=100)
+    date: datetime = Field(..., description="Message timestamp")
+    text: Optional[str] = Field(None, max_length=4096, description="Message text content")
+    media_type: Optional[str] = Field(None, pattern="^(text|photo|document|video|audio|voice|sticker|animation|video_note|contact|location|venue|poll|web_page|unsupported)$")
+    file_name: Optional[str] = Field(None, max_length=255, description="Original filename")
+    file_size: Optional[int] = Field(None, ge=0, description="File size in bytes")
+    mime_type: Optional[str] = Field(None, max_length=100, description="MIME type")
+    views: Optional[int] = Field(None, ge=0, description="View count")
+    forwards: Optional[int] = Field(None, ge=0, description="Forward count")
+    replies: Optional[int] = Field(None, ge=0, description="Reply count")
+    reactions: Optional[Dict[str, int]] = Field(None, description="Reaction counts")
+    edit_date: Optional[datetime] = Field(None, description="Last edit timestamp")
+    reply_to_message_id: Optional[int] = Field(None, ge=1, description="Replied message ID")
+    is_forwarded: bool = Field(False, description="Whether message is forwarded")
+    is_pinned: bool = Field(False, description="Whether message is pinned")
+    is_deleted: bool = Field(False, description="Whether message is deleted")
+    
+    @field_validator('channel_username')
+    @classmethod
+    def validate_channel_username(cls, v):
+        if not v.startswith('@'):
+            raise ValueError("Channel username must start with '@'")
+        return v
+    
+    @field_validator('date')
+    @classmethod
+    def validate_date(cls, v):
+        if isinstance(v, str):
+            try:
+                return datetime.fromisoformat(v.replace('Z', '+00:00'))
+            except ValueError:
+                raise ValueError("Invalid date format")
+        return v
+    
+    @field_validator('edit_date')
+    @classmethod
+    def validate_edit_date(cls, v):
+        if v is not None and isinstance(v, str):
+            try:
+                return datetime.fromisoformat(v.replace('Z', '+00:00'))
+            except ValueError:
+                raise ValueError("Invalid edit date format")
+        return v
+
+class FilenameAnalysisResult(BaseModel):
+    """Results from filename analysis with comprehensive metrics."""
+    total_files: int = Field(ge=0, description="Total number of files analyzed")
+    unique_filenames: int = Field(ge=0, description="Number of unique filenames")
+    duplicate_filenames: int = Field(ge=0, description="Number of duplicate filenames")
+    duplicate_groups: List[Dict[str, Any]] = Field(
+        default_factory=list, 
+        description="Groups of duplicate filenames with counts"
+    )
+    filename_patterns: Dict[str, int] = Field(
+        default_factory=dict, 
+        description="Pattern analysis (extensions, lengths, etc.)"
+    )
+    quality_metrics: Dict[str, float] = Field(
+        default_factory=dict, 
+        description="Filename quality metrics"
+    )
+    recommendations: List[str] = Field(
+        default_factory=list, 
+        description="Recommendations for filename improvements"
+    )
+    
+    @field_validator('duplicate_groups')
+    @classmethod
+    def validate_duplicate_groups(cls, v):
+        for group in v:
+            if not isinstance(group, dict) or 'filename' not in group or 'count' not in group:
+                raise ValueError("Duplicate groups must have 'filename' and 'count' keys")
+        return v
+
+class FilesizeAnalysisResult(BaseModel):
+    """Results from filesize analysis with distribution metrics."""
+    total_files: int = Field(ge=0, description="Total number of files analyzed")
+    total_size_bytes: int = Field(ge=0, description="Total size of all files in bytes")
+    unique_sizes: int = Field(ge=0, description="Number of unique file sizes")
+    duplicate_sizes: int = Field(ge=0, description="Number of duplicate file sizes")
+    duplicate_size_groups: List[Dict[str, Any]] = Field(
+        default_factory=list, 
+        description="Groups of files with same size"
+    )
+    size_distribution: Dict[str, int] = Field(
+        default_factory=dict, 
+        description="Distribution of files by size bins"
+    )
+    size_statistics: Dict[str, float] = Field(
+        default_factory=dict, 
+        description="Statistical measures (mean, median, std, etc.)"
+    )
+    potential_duplicates: List[Dict[str, Any]] = Field(
+        default_factory=list, 
+        description="Files that might be duplicates based on size"
+    )
+    
+    @field_validator('duplicate_size_groups')
+    @classmethod
+    def validate_duplicate_size_groups(cls, v):
+        for group in v:
+            if not isinstance(group, dict) or 'size_bytes' not in group or 'count' not in group:
+                raise ValueError("Duplicate size groups must have 'size_bytes' and 'count' keys")
+        return v
+
+class MessageAnalysisResult(BaseModel):
+    """Results from message content analysis with language and pattern detection."""
+    total_messages: int = Field(ge=0, description="Total number of messages analyzed")
+    text_messages: int = Field(ge=0, description="Number of text messages")
+    media_messages: int = Field(ge=0, description="Number of media messages")
+    language_distribution: Dict[str, int] = Field(
+        default_factory=dict, 
+        description="Distribution of messages by detected language"
+    )
+    content_patterns: Dict[str, int] = Field(
+        default_factory=dict, 
+        description="Pattern analysis (hashtags, mentions, URLs, etc.)"
+    )
+    engagement_metrics: Dict[str, float] = Field(
+        default_factory=dict, 
+        description="Engagement statistics (views, forwards, replies)"
+    )
+    temporal_patterns: Dict[str, Any] = Field(
+        default_factory=dict, 
+        description="Time-based patterns (hourly, daily, weekly)"
+    )
+    quality_metrics: Dict[str, float] = Field(
+        default_factory=dict, 
+        description="Content quality metrics"
+    )
+    
+    @field_validator('language_distribution')
+    @classmethod
+    def validate_language_distribution(cls, v):
+        for lang, count in v.items():
+            if not isinstance(count, int) or count < 0:
+                raise ValueError("Language distribution counts must be non-negative integers")
+        return v
+
+class AnalysisResult(BaseModel):
+    """Complete analysis result with all analysis types and metadata."""
+    analysis_id: str = Field(..., min_length=1, description="Unique analysis identifier")
+    timestamp: datetime = Field(..., description="Analysis execution timestamp")
+    config: AnalysisConfig = Field(..., description="Configuration used for analysis")
+    data_sources: List[DataSource] = Field(
+        default_factory=list, 
+        description="Data sources used in analysis"
+    )
+    filename_analysis: Optional[FilenameAnalysisResult] = Field(
+        None, 
+        description="Filename analysis results"
+    )
+    filesize_analysis: Optional[FilesizeAnalysisResult] = Field(
+        None, 
+        description="Filesize analysis results"
+    )
+    message_analysis: Optional[MessageAnalysisResult] = Field(
+        None, 
+        description="Message analysis results"
+    )
+    performance_metrics: Dict[str, Any] = Field(
+        default_factory=dict, 
+        description="Performance and execution metrics"
+    )
+    errors: List[str] = Field(
+        default_factory=list, 
+        description="Any errors encountered during analysis"
+    )
+    warnings: List[str] = Field(
+        default_factory=list, 
+        description="Warnings generated during analysis"
+    )
+    
+    @field_validator('analysis_id')
+    @classmethod
+    def validate_analysis_id(cls, v):
+        if not re.match(r'^[a-zA-Z0-9_-]+$', v):
+            raise ValueError("Analysis ID must contain only alphanumeric characters, hyphens, and underscores")
+        return v
+    
+    @field_validator('timestamp')
+    @classmethod
+    def validate_timestamp(cls, v):
+        if isinstance(v, str):
+            try:
+                return datetime.fromisoformat(v.replace('Z', '+00:00'))
+            except ValueError:
+                raise ValueError("Invalid timestamp format")
+        return v
 
 # Main entry point for CLI integration
 def create_analysis_config(**kwargs) -> AnalysisConfig:

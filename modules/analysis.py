@@ -29,6 +29,7 @@ from datetime import datetime, timedelta
 from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor
 import json
+import sys
 
 from pydantic import BaseModel, Field, field_validator, ValidationError
 from config import API_ENDPOINTS, COMBINED_COLLECTION_GLOB, COLLECTIONS_DIR, ANALYSIS_BASE
@@ -402,6 +403,14 @@ class AnalysisResult(BaseModel):
     warnings: List[str] = Field(
         default_factory=list, 
         description="Warnings generated during analysis"
+    )
+    summary: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Summary of analysis results"
+    )
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional metadata for the analysis"
     )
     
     @field_validator('analysis_id')
@@ -2079,6 +2088,420 @@ class MessageAnalyzer:
         except Exception as e:
             self.logger.error(f"Failed to calculate message quality metrics: {e}")
             return {}
+
+# Output Management - JSON Output with Pandas
+class JsonOutputManager:
+    """Manages JSON output generation using pandas for all JSON operations."""
+    
+    def __init__(self, config: AnalysisConfig):
+        self.config = config
+        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+        self.performance_monitor = PerformanceMonitor()
+    
+    def generate_analysis_report(self, 
+                               filename_result: FilenameAnalysisResult,
+                               filesize_result: FilesizeAnalysisResult,
+                               message_result: MessageAnalysisResult,
+                               data_sources: List[DataSource],
+                               output_path: str = None) -> str:
+        """Generate comprehensive analysis report in JSON format."""
+        try:
+            self.performance_monitor.start()
+            
+            # Create output path if not provided
+            if not output_path:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                output_path = f"analysis_report_{timestamp}.json"
+            
+            self.logger.info(f"Generating analysis report: {output_path}")
+            
+            # Create comprehensive analysis result
+            analysis_result = AnalysisResult(
+                analysis_id=f"analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                timestamp=datetime.now(),
+                config=self.config,
+                data_sources=data_sources,
+                filename_analysis=filename_result,
+                filesize_analysis=filesize_result,
+                message_analysis=message_result,
+                summary=self._generate_summary(filename_result, filesize_result, message_result),
+                metadata=self._generate_metadata()
+            )
+            
+            # Convert to dictionary for JSON serialization
+            report_data = self._prepare_report_data(analysis_result)
+            
+            # Write JSON using pandas
+            self._write_json_with_pandas(report_data, output_path)
+            
+            self.logger.info(f"Analysis report generated successfully: {output_path}")
+            return output_path
+            
+        except Exception as e:
+            self.logger.error(f"Failed to generate analysis report: {e}")
+            raise
+        finally:
+            stats = self.performance_monitor.get_stats()
+            if stats:
+                self.logger.info(f"Performance stats: {stats}")
+    
+    def generate_individual_reports(self,
+                                  filename_result: FilenameAnalysisResult,
+                                  filesize_result: FilesizeAnalysisResult,
+                                  message_result: MessageAnalysisResult,
+                                  output_dir: str = None) -> Dict[str, str]:
+        """Generate individual analysis reports for each analysis type."""
+        try:
+            self.performance_monitor.start()
+            
+            # Create output directory if not provided
+            if not output_dir:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                output_dir = f"analysis_output_{timestamp}"
+            
+            Path(output_dir).mkdir(parents=True, exist_ok=True)
+            
+            self.logger.info(f"Generating individual reports in: {output_dir}")
+            
+            report_paths = {}
+            
+            # Generate filename analysis report
+            filename_path = Path(output_dir) / "filename_analysis.json"
+            filename_data = self._prepare_filename_report_data(filename_result)
+            self._write_json_with_pandas(filename_data, str(filename_path))
+            report_paths['filename'] = str(filename_path)
+            
+            # Generate filesize analysis report
+            filesize_path = Path(output_dir) / "filesize_analysis.json"
+            filesize_data = self._prepare_filesize_report_data(filesize_result)
+            self._write_json_with_pandas(filesize_data, str(filesize_path))
+            report_paths['filesize'] = str(filesize_path)
+            
+            # Generate message analysis report
+            message_path = Path(output_dir) / "message_analysis.json"
+            message_data = self._prepare_message_report_data(message_result)
+            self._write_json_with_pandas(message_data, str(message_path))
+            report_paths['message'] = str(message_path)
+            
+            # Generate summary report
+            summary_path = Path(output_dir) / "analysis_summary.json"
+            summary_data = self._prepare_summary_report_data(filename_result, filesize_result, message_result)
+            self._write_json_with_pandas(summary_data, str(summary_path))
+            report_paths['summary'] = str(summary_path)
+            
+            self.logger.info(f"Individual reports generated successfully in: {output_dir}")
+            return report_paths
+            
+        except Exception as e:
+            self.logger.error(f"Failed to generate individual reports: {e}")
+            raise
+        finally:
+            stats = self.performance_monitor.get_stats()
+            if stats:
+                self.logger.info(f"Performance stats: {stats}")
+    
+    def _prepare_report_data(self, analysis_result: AnalysisResult) -> Dict[str, Any]:
+        """Prepare analysis result data for JSON serialization."""
+        try:
+            # Convert Pydantic model to dictionary
+            report_data = analysis_result.model_dump()
+            
+            # Convert datetime objects to ISO strings
+            if 'timestamp' in report_data:
+                report_data['timestamp'] = report_data['timestamp'].isoformat()
+            
+            # Convert data sources
+            if 'data_sources' in report_data:
+                for source in report_data['data_sources']:
+                    if 'date_range' in source and source['date_range']:
+                        # Convert tuple to list for modification
+                        date_range = list(source['date_range'])
+                        if date_range[0]:
+                            date_range[0] = date_range[0].isoformat()
+                        if date_range[1]:
+                            date_range[1] = date_range[1].isoformat()
+                        source['date_range'] = date_range
+            
+            return report_data
+            
+        except Exception as e:
+            self.logger.error(f"Failed to prepare report data: {e}")
+            raise
+    
+    def _prepare_filename_report_data(self, result: FilenameAnalysisResult) -> Dict[str, Any]:
+        """Prepare filename analysis data for JSON serialization."""
+        try:
+            data = result.model_dump()
+            
+            # Add additional metadata
+            data['report_type'] = 'filename_analysis'
+            data['generated_at'] = datetime.now().isoformat()
+            data['analysis_version'] = '1.0'
+            
+            return data
+            
+        except Exception as e:
+            self.logger.error(f"Failed to prepare filename report data: {e}")
+            raise
+    
+    def _prepare_filesize_report_data(self, result: FilesizeAnalysisResult) -> Dict[str, Any]:
+        """Prepare filesize analysis data for JSON serialization."""
+        try:
+            data = result.model_dump()
+            
+            # Add additional metadata
+            data['report_type'] = 'filesize_analysis'
+            data['generated_at'] = datetime.now().isoformat()
+            data['analysis_version'] = '1.0'
+            
+            return data
+            
+        except Exception as e:
+            self.logger.error(f"Failed to prepare filesize report data: {e}")
+            raise
+    
+    def _prepare_message_report_data(self, result: MessageAnalysisResult) -> Dict[str, Any]:
+        """Prepare message analysis data for JSON serialization."""
+        try:
+            data = result.model_dump()
+            
+            # Add additional metadata
+            data['report_type'] = 'message_analysis'
+            data['generated_at'] = datetime.now().isoformat()
+            data['analysis_version'] = '1.0'
+            
+            return data
+            
+        except Exception as e:
+            self.logger.error(f"Failed to prepare message report data: {e}")
+            raise
+    
+    def _prepare_summary_report_data(self, 
+                                   filename_result: FilenameAnalysisResult,
+                                   filesize_result: FilesizeAnalysisResult,
+                                   message_result: MessageAnalysisResult) -> Dict[str, Any]:
+        """Prepare summary report data for JSON serialization."""
+        try:
+            summary_data = {
+                'report_type': 'analysis_summary',
+                'generated_at': datetime.now().isoformat(),
+                'analysis_version': '1.0',
+                'summary': self._generate_summary(filename_result, filesize_result, message_result),
+                'key_metrics': self._generate_key_metrics(filename_result, filesize_result, message_result),
+                'recommendations': self._generate_recommendations(filename_result, filesize_result, message_result),
+                'metadata': self._generate_metadata()
+            }
+            
+            return summary_data
+            
+        except Exception as e:
+            self.logger.error(f"Failed to prepare summary report data: {e}")
+            raise
+    
+    def _write_json_with_pandas(self, data: Dict[str, Any], output_path: str) -> None:
+        """Write JSON data using pandas for consistency."""
+        try:
+            # Convert data to DataFrame for pandas JSON operations
+            # Create a single-row DataFrame with the data
+            df = pd.DataFrame([data])
+            
+            # Use pandas to write JSON
+            df.to_json(output_path, orient='records', indent=2, date_format='iso')
+            
+            self.logger.debug(f"JSON written successfully: {output_path}")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to write JSON with pandas: {e}")
+            raise
+    
+    def _generate_summary(self, 
+                         filename_result: FilenameAnalysisResult,
+                         filesize_result: FilesizeAnalysisResult,
+                         message_result: MessageAnalysisResult) -> Dict[str, Any]:
+        """Generate comprehensive analysis summary."""
+        try:
+            summary = {
+                'total_files_analyzed': filename_result.total_files,
+                'total_messages_analyzed': message_result.total_messages,
+                'total_data_size_bytes': filesize_result.total_size_bytes,
+                'total_data_size_mb': round(filesize_result.total_size_bytes / (1024 * 1024), 2),
+                'duplicate_files_found': filename_result.duplicate_filenames,
+                'duplicate_sizes_found': filesize_result.duplicate_sizes,
+                'languages_detected': len(message_result.language_distribution),
+                'primary_language': max(message_result.language_distribution.items(), key=lambda x: x[1])[0] if message_result.language_distribution else 'unknown',
+                'overall_quality_score': self._calculate_overall_quality_score(filename_result, filesize_result, message_result),
+                'analysis_completeness': self._calculate_analysis_completeness(filename_result, filesize_result, message_result)
+            }
+            
+            return summary
+            
+        except Exception as e:
+            self.logger.error(f"Failed to generate summary: {e}")
+            return {}
+    
+    def _generate_key_metrics(self, 
+                             filename_result: FilenameAnalysisResult,
+                             filesize_result: FilesizeAnalysisResult,
+                             message_result: MessageAnalysisResult) -> Dict[str, Any]:
+        """Generate key metrics for the analysis."""
+        try:
+            metrics = {
+                'filename_metrics': {
+                    'unique_filenames': filename_result.unique_filenames,
+                    'duplicate_filenames': filename_result.duplicate_filenames,
+                    'quality_score': filename_result.quality_metrics.get('overall_quality', 0.0),
+                    'avg_filename_length': filename_result.filename_patterns.get('avg_length', 0),
+                    'files_with_special_chars': filename_result.filename_patterns.get('files_with_special_chars', 0)
+                },
+                'filesize_metrics': {
+                    'total_size_mb': round(filesize_result.total_size_bytes / (1024 * 1024), 2),
+                    'avg_file_size_mb': round(filesize_result.size_statistics.get('mean_mb', 0), 2),
+                    'median_file_size_mb': round(filesize_result.size_statistics.get('median_mb', 0), 2),
+                    'largest_file_mb': round(filesize_result.size_statistics.get('max_mb', 0), 2),
+                    'size_distribution': filesize_result.size_distribution
+                },
+                'message_metrics': {
+                    'total_messages': message_result.total_messages,
+                    'text_messages': message_result.text_messages,
+                    'media_messages': message_result.media_messages,
+                    'avg_views': round(message_result.engagement_metrics.get('avg_views', 0), 2),
+                    'avg_forwards': round(message_result.engagement_metrics.get('avg_forwards', 0), 2),
+                    'avg_replies': round(message_result.engagement_metrics.get('avg_replies', 0), 2),
+                    'engagement_rate': round(message_result.engagement_metrics.get('engagement_rate', 0), 4)
+                }
+            }
+            
+            return metrics
+            
+        except Exception as e:
+            self.logger.error(f"Failed to generate key metrics: {e}")
+            return {}
+    
+    def _generate_recommendations(self, 
+                                 filename_result: FilenameAnalysisResult,
+                                 filesize_result: FilesizeAnalysisResult,
+                                 message_result: MessageAnalysisResult) -> List[str]:
+        """Generate actionable recommendations based on analysis results."""
+        try:
+            recommendations = []
+            
+            # Filename recommendations
+            if filename_result.recommendations:
+                recommendations.extend([f"Filename: {rec}" for rec in filename_result.recommendations])
+            
+            # Filesize recommendations
+            if filesize_result.duplicate_sizes > 0:
+                recommendations.append(f"Filesize: {filesize_result.duplicate_sizes} files have duplicate sizes - consider checking for actual duplicates")
+            
+            if filesize_result.size_statistics.get('max_mb', 0) > 100:
+                recommendations.append("Filesize: Some files are very large (>100MB) - consider compression or archiving")
+            
+            # Message recommendations
+            if message_result.quality_metrics.get('text_completeness', 0) < 0.9:
+                recommendations.append("Message: Some messages are missing text content - ensure all messages have proper content")
+            
+            if message_result.engagement_metrics.get('engagement_rate', 0) < 0.01:
+                recommendations.append("Message: Low engagement rate detected - consider improving content quality or timing")
+            
+            # Overall recommendations
+            overall_quality = self._calculate_overall_quality_score(filename_result, filesize_result, message_result)
+            if overall_quality < 0.7:
+                recommendations.append("Overall: Data quality is below optimal - consider implementing data quality improvements")
+            
+            return recommendations
+            
+        except Exception as e:
+            self.logger.error(f"Failed to generate recommendations: {e}")
+            return []
+    
+    def _generate_metadata(self) -> Dict[str, Any]:
+        """Generate metadata for the analysis report."""
+        try:
+            metadata = {
+                'analysis_version': '1.0',
+                'generated_at': datetime.now().isoformat(),
+                'config': {
+                    'verbose': self.config.verbose,
+                    'chunk_size': self.config.chunk_size,
+                    'memory_limit': self.config.memory_limit,
+                    'items_per_page': self.config.items_per_page,
+                    'retry_attempts': self.config.retry_attempts,
+                    'retry_delay': self.config.retry_delay
+                },
+                'system_info': {
+                    'python_version': sys.version,
+                    'pandas_version': pd.__version__,
+                    'platform': sys.platform
+                }
+            }
+            
+            return metadata
+            
+        except Exception as e:
+            self.logger.error(f"Failed to generate metadata: {e}")
+            return {}
+    
+    def _calculate_overall_quality_score(self, 
+                                        filename_result: FilenameAnalysisResult,
+                                        filesize_result: FilesizeAnalysisResult,
+                                        message_result: MessageAnalysisResult) -> float:
+        """Calculate overall quality score from all analysis results."""
+        try:
+            filename_quality = filename_result.quality_metrics.get('overall_quality', 0.0)
+            message_quality = message_result.quality_metrics.get('overall_quality', 0.0)
+            
+            # Filesize quality based on distribution and duplicates
+            filesize_quality = 1.0
+            if filesize_result.duplicate_sizes > 0:
+                duplicate_ratio = filesize_result.duplicate_sizes / filesize_result.total_files
+                filesize_quality = max(0.0, 1.0 - duplicate_ratio)
+            
+            # Weighted average
+            overall_quality = (
+                filename_quality * 0.4 +
+                filesize_quality * 0.3 +
+                message_quality * 0.3
+            )
+            
+            return round(overall_quality, 3)
+            
+        except Exception as e:
+            self.logger.error(f"Failed to calculate overall quality score: {e}")
+            return 0.0
+    
+    def _calculate_analysis_completeness(self, 
+                                        filename_result: FilenameAnalysisResult,
+                                        filesize_result: FilesizeAnalysisResult,
+                                        message_result: MessageAnalysisResult) -> float:
+        """Calculate analysis completeness score."""
+        try:
+            total_items = 0
+            analyzed_items = 0
+            
+            # Filename analysis completeness
+            if filename_result.total_files > 0:
+                total_items += filename_result.total_files
+                analyzed_items += filename_result.total_files
+            
+            # Filesize analysis completeness
+            if filesize_result.total_files > 0:
+                total_items += filesize_result.total_files
+                analyzed_items += filesize_result.total_files
+            
+            # Message analysis completeness
+            if message_result.total_messages > 0:
+                total_items += message_result.total_messages
+                analyzed_items += message_result.total_messages
+            
+            if total_items == 0:
+                return 0.0
+            
+            completeness = analyzed_items / total_items
+            return round(completeness, 3)
+            
+        except Exception as e:
+            self.logger.error(f"Failed to calculate analysis completeness: {e}")
+            return 0.0
 
 # Main entry point for CLI integration
 def create_analysis_config(**kwargs) -> AnalysisConfig:

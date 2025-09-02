@@ -7,12 +7,11 @@ This document provides detailed implementation specifications for the `analysis`
 ## Implementation Requirements
 
 ### Technology Stack
-- **pandas**: >=1.5.0 (primary data processing)
-- **numpy**: >=1.21.0 (numerical operations)
+- **pandas**: >=1.5.0 (primary data processing and JSON operations)
 - **pydantic**: >=2.0.0 (data validation and models)
-- **aiohttp**: >=3.8.0 (async HTTP client)
-- **langdetect**: >=1.0.9 (language detection)
-- **emoji**: >=2.0.0 (emoji analysis)
+- **pathlib**: Built-in (file path operations)
+- **typing**: Built-in (type hints)
+- **datetime**: Built-in (date/time operations)
 
 ### Architecture Constraints
 1. **Single Module**: All code in `modules/analysis.py` (600-800 lines)
@@ -32,19 +31,11 @@ Single module containing all analysis functionality
 
 # Imports
 import pandas as pd
-import numpy as np
-import asyncio
-import aiohttp
-import re
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Any, Tuple
 from datetime import datetime
-from collections import Counter
-from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, validator
-from langdetect import detect, LangDetectException
-import emoji
 
 # Configuration Constants
 # Data Models (Pydantic)

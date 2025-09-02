@@ -32,7 +32,16 @@ import json
 import sys
 
 from pydantic import BaseModel, Field, field_validator, ValidationError
-from config import API_ENDPOINTS, COMBINED_COLLECTION_GLOB, COLLECTIONS_DIR, ANALYSIS_BASE
+from config import (
+    API_ENDPOINTS, 
+    COMBINED_COLLECTION_GLOB, 
+    COLLECTIONS_DIR, 
+    ANALYSIS_BASE,
+    FILE_MESSAGES_DIR,
+    FILES_CHANNELS_DIR,
+    ANALYSIS_FILE_PATTERN,
+    ANALYSIS_SUMMARY_PATTERN
+)
 
 # Constants
 DEFAULT_CHUNK_SIZE = 10000
@@ -180,7 +189,16 @@ class AnalysisConfig(BaseModel):
             
             # Validate config.py imports
             try:
-                from config import API_ENDPOINTS, COMBINED_COLLECTION_GLOB, COLLECTIONS_DIR, ANALYSIS_BASE
+                from config import (
+    API_ENDPOINTS, 
+    COMBINED_COLLECTION_GLOB, 
+    COLLECTIONS_DIR, 
+    ANALYSIS_BASE,
+    FILE_MESSAGES_DIR,
+    FILES_CHANNELS_DIR,
+    ANALYSIS_FILE_PATTERN,
+    ANALYSIS_SUMMARY_PATTERN
+)
                 if not API_ENDPOINTS or not isinstance(API_ENDPOINTS, dict):
                     logger.error("API_ENDPOINTS not properly configured")
                     return False
@@ -2123,20 +2141,65 @@ class JsonOutputManager:
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         self.performance_monitor = PerformanceMonitor()
     
+    def _get_output_paths(self, channels: List[str] = None) -> Dict[str, str]:
+        """Generate output paths according to config.py structure."""
+        try:
+            # Ensure analysis directories exist
+            Path(FILE_MESSAGES_DIR).mkdir(parents=True, exist_ok=True)
+            
+            # If multiple channels, use a combined name
+            if channels and len(channels) > 0:
+                if len(channels) == 1:
+                    channel_name = channels[0].replace('@', '')
+                    # Create channel-specific directory: analysis/file_messages/books/
+                    channel_dir = Path(FILE_MESSAGES_DIR) / channel_name
+                else:
+                    channel_name = f"combined_{len(channels)}_channels"
+                    # Create combined directory: analysis/file_messages/combined_X_channels/
+                    channel_dir = Path(FILE_MESSAGES_DIR) / channel_name
+            else:
+                channel_name = "all_channels"
+                # Create all channels directory: analysis/file_messages/all_channels/
+                channel_dir = Path(FILE_MESSAGES_DIR) / channel_name
+            
+            # Ensure channel-specific directory exists
+            channel_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Generate paths according to config.py patterns
+            analysis_file = ANALYSIS_FILE_PATTERN.format(channel=channel_name)
+            summary_file = ANALYSIS_SUMMARY_PATTERN.format(channel=channel_name)
+            
+            return {
+                'analysis_file': str(channel_dir / analysis_file),
+                'summary_file': str(channel_dir / summary_file),
+                'channels_dir': str(channel_dir)
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Failed to generate output paths: {e}")
+            # Fallback to timestamp-based naming
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            return {
+                'analysis_file': f"analysis_report_{timestamp}.json",
+                'summary_file': f"analysis_summary_{timestamp}.txt",
+                'channels_dir': f"analysis_output_{timestamp}"
+            }
+
     def generate_analysis_report(self, 
                                filename_result: FilenameAnalysisResult,
                                filesize_result: FilesizeAnalysisResult,
                                message_result: MessageAnalysisResult,
                                data_sources: List[DataSource],
-                               output_path: str = None) -> str:
+                               output_path: str = None,
+                               channels: List[str] = None) -> str:
         """Generate comprehensive analysis report in JSON format."""
         try:
             self.performance_monitor.start()
             
             # Create output path if not provided
             if not output_path:
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                output_path = f"analysis_report_{timestamp}.json"
+                paths = self._get_output_paths(channels)
+                output_path = paths['analysis_file']
             
             self.logger.info(f"Generating analysis report: {output_path}")
             
@@ -2174,15 +2237,16 @@ class JsonOutputManager:
                                   filename_result: FilenameAnalysisResult,
                                   filesize_result: FilesizeAnalysisResult,
                                   message_result: MessageAnalysisResult,
-                                  output_dir: str = None) -> Dict[str, str]:
+                                  output_dir: str = None,
+                                  channels: List[str] = None) -> Dict[str, str]:
         """Generate individual analysis reports for each analysis type."""
         try:
             self.performance_monitor.start()
             
             # Create output directory if not provided
             if not output_dir:
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                output_dir = f"analysis_output_{timestamp}"
+                paths = self._get_output_paths(channels)
+                output_dir = paths['channels_dir']
             
             Path(output_dir).mkdir(parents=True, exist_ok=True)
             
@@ -2575,7 +2639,7 @@ class AnalysisOrchestrator:
             analysis_results = await self._run_concurrent_analysis(data_sources, analysis_types)
             
             # Generate output reports
-            output_paths = await self._generate_output_reports(analysis_results, output_dir)
+            output_paths = await self._generate_output_reports(analysis_results, output_dir, channels)
             
             # Create final result
             # Extract DataSource objects from tuples for the final result
@@ -2901,7 +2965,8 @@ class AnalysisOrchestrator:
     
     async def _generate_output_reports(self, 
                                      analysis_results: Dict[str, Any], 
-                                     output_dir: str = None) -> Dict[str, str]:
+                                     output_dir: str = None,
+                                     channels: List[str] = None) -> Dict[str, str]:
         """Generate output reports from analysis results."""
         try:
             self.logger.info("Generating output reports")
@@ -2922,12 +2987,13 @@ class AnalysisOrchestrator:
             # Generate comprehensive report
             comprehensive_path = self.output_manager.generate_analysis_report(
                 filename_result, filesize_result, message_result, [], 
-                str(Path(output_dir) / "comprehensive_report.json") if output_dir else None
+                str(Path(output_dir) / "comprehensive_report.json") if output_dir else None,
+                channels
             )
             
             # Generate individual reports
             individual_paths = self.output_manager.generate_individual_reports(
-                filename_result, filesize_result, message_result, output_dir
+                filename_result, filesize_result, message_result, output_dir, channels
             )
             
             # Combine all output paths

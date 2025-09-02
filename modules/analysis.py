@@ -2147,7 +2147,7 @@ class JsonOutputManager:
             # Ensure analysis directories exist
             Path(FILE_MESSAGES_DIR).mkdir(parents=True, exist_ok=True)
             
-            # If multiple channels, use a combined name
+            # If specific channels provided, use them
             if channels and len(channels) > 0:
                 if len(channels) == 1:
                     channel_name = channels[0].replace('@', '')
@@ -2158,8 +2158,9 @@ class JsonOutputManager:
                     # Create combined directory: analysis/file_messages/combined_X_channels/
                     channel_dir = Path(FILE_MESSAGES_DIR) / channel_name
             else:
+                # For "all channels" analysis, we'll create individual folders per channel
+                # This will be handled by the orchestrator calling this method for each channel
                 channel_name = "all_channels"
-                # Create all channels directory: analysis/file_messages/all_channels/
                 channel_dir = Path(FILE_MESSAGES_DIR) / channel_name
             
             # Ensure channel-specific directory exists
@@ -2639,7 +2640,12 @@ class AnalysisOrchestrator:
             analysis_results = await self._run_concurrent_analysis(data_sources, analysis_types)
             
             # Generate output reports
-            output_paths = await self._generate_output_reports(analysis_results, output_dir, channels)
+            if channels and len(channels) > 0:
+                # Specific channels provided - generate combined report
+                output_paths = await self._generate_output_reports(analysis_results, output_dir, channels)
+            else:
+                # No specific channels - generate individual reports for each discovered channel
+                output_paths = await self._generate_individual_channel_reports(analysis_results, output_dir, data_sources)
             
             # Create final result
             # Extract DataSource objects from tuples for the final result
@@ -3007,6 +3013,72 @@ class AnalysisOrchestrator:
             
         except Exception as e:
             self.logger.error(f"Failed to generate output reports: {e}")
+            raise
+    
+    async def _generate_individual_channel_reports(self, 
+                                                 analysis_results: Dict[str, Any], 
+                                                 output_dir: str = None,
+                                                 data_sources: List[Any] = None) -> Dict[str, str]:
+        """Generate individual reports for each discovered channel."""
+        try:
+            self.logger.info("Generating individual channel reports")
+            
+            # Extract results
+            filename_result = analysis_results.get('filename')
+            filesize_result = analysis_results.get('filesize')
+            message_result = analysis_results.get('message')
+            
+            if not any([filename_result, filesize_result, message_result]):
+                self.logger.warning("No analysis results available for report generation")
+                return {}
+            
+            # Create the output directory if it doesn't exist
+            if output_dir:
+                Path(output_dir).mkdir(parents=True, exist_ok=True)
+            
+            # Get unique channel names from data sources
+            unique_channels = set()
+            for source in data_sources:
+                if isinstance(source, tuple) and len(source) == 2:
+                    _, data_source = source
+                    unique_channels.add(data_source.channel_name)
+                elif hasattr(source, 'channel_name'):
+                    unique_channels.add(source.channel_name)
+            
+            self.logger.info(f"Generating reports for {len(unique_channels)} unique channels: {list(unique_channels)}")
+            
+            all_output_paths = {}
+            
+            # Generate reports for each unique channel
+            for channel_name in unique_channels:
+                self.logger.info(f"Generating reports for channel: {channel_name}")
+                
+                # Create channel-specific paths
+                channel_paths = self.output_manager._get_output_paths([channel_name])
+                
+                # Generate comprehensive report for this channel
+                comprehensive_path = self.output_manager.generate_analysis_report(
+                    filename_result, filesize_result, message_result, [], 
+                    channel_paths['analysis_file'],
+                    [channel_name]
+                )
+                
+                # Generate individual reports for this channel
+                individual_paths = self.output_manager.generate_individual_reports(
+                    filename_result, filesize_result, message_result, 
+                    channel_paths['channels_dir'], [channel_name]
+                )
+                
+                # Store paths with channel prefix
+                all_output_paths[f"{channel_name}_comprehensive"] = comprehensive_path
+                for report_type, path in individual_paths.items():
+                    all_output_paths[f"{channel_name}_{report_type}"] = path
+            
+            self.logger.info(f"Generated {len(all_output_paths)} individual channel reports")
+            return all_output_paths
+            
+        except Exception as e:
+            self.logger.error(f"Failed to generate individual channel reports: {e}")
             raise
     
     def _create_empty_analysis_result(self) -> Dict[str, Any]:

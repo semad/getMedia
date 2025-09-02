@@ -31,6 +31,9 @@ Single module containing all analysis functionality
 
 # Imports
 import pandas as pd
+import logging
+import asyncio
+import aiohttp
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Any, Tuple
 from datetime import datetime
@@ -68,6 +71,26 @@ class AnalysisConfig(BaseModel):
         if v and not all(ch.startswith('@') for ch in v):
             raise ValueError("Channel names must start with '@'")
         return v
+    
+    def validate_config(self) -> bool:
+        """Validate configuration parameters."""
+        try:
+            # Check if at least one data source is enabled
+            if not self.enable_file_source and not self.enable_api_source:
+                return False
+            
+            # Check if diff analysis is enabled with both sources
+            if self.enable_diff_analysis and not (self.enable_file_source and self.enable_api_source):
+                return False
+            
+            # Validate output directory
+            output_path = Path(self.output_dir)
+            if not output_path.parent.exists():
+                return False
+            
+            return True
+        except Exception:
+            return False
 
 class DataSource(BaseModel):
     """Represents a data source for analysis."""
@@ -244,8 +267,11 @@ class FileDataLoader(BaseDataLoader):
                 )
                 sources.append(source)
                 
-            except Exception as e:
+            except (FileNotFoundError, pd.errors.EmptyDataError, pd.errors.ParserError, ValueError) as e:
                 self.logger.error(f"Error processing file {file_path}: {e}")
+                continue
+            except Exception as e:
+                self.logger.error(f"Unexpected error processing file {file_path}: {e}")
                 continue
         
         return sources
@@ -254,8 +280,21 @@ class FileDataLoader(BaseDataLoader):
         """Load data from file source using pandas JSON operations."""
         file_path = Path(source.metadata['file_path'])
         
+        # Validate file exists
+        if not file_path.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+        
+        # Validate file is not empty
+        if file_path.stat().st_size == 0:
+            raise ValueError(f"File is empty: {file_path}")
+        
         # Load JSON data using pandas
-        data = pd.read_json(file_path, lines=False)
+        try:
+            data = pd.read_json(file_path, lines=False)
+        except pd.errors.EmptyDataError:
+            raise ValueError(f"No data found in file: {file_path}")
+        except pd.errors.ParserError as e:
+            raise ValueError(f"Invalid JSON format in file {file_path}: {e}")
         
         # Extract messages from nested structure using pandas
         if 'messages' in data.columns:
@@ -263,9 +302,8 @@ class FileDataLoader(BaseDataLoader):
             messages_df = data.explode('messages')
             messages_df = messages_df.dropna(subset=['messages'])
             
-            # Convert messages to DataFrame using pandas
-            messages_list = messages_df['messages'].tolist()
-            df = pd.DataFrame(messages_list)
+            # Use pd.json_normalize for efficient conversion
+            df = pd.json_normalize(messages_df['messages'])
             
             # Add source column
             df['source'] = 'file'
@@ -286,9 +324,8 @@ class FileDataLoader(BaseDataLoader):
             messages_df = data.explode('messages')
             messages_df = messages_df.dropna(subset=['messages'])
             
-            # Convert messages to DataFrame and extract dates
-            messages_list = messages_df['messages'].tolist()
-            messages_df = pd.DataFrame(messages_list)
+            # Use pd.json_normalize for efficient conversion
+            messages_df = pd.json_normalize(messages_df['messages'])
             
             if 'date' in messages_df.columns:
                 dates = pd.to_datetime(messages_df['date'], errors='coerce')
@@ -309,14 +346,13 @@ class FileDataLoader(BaseDataLoader):
             messages_df = data.explode('messages')
             messages_df = messages_df.dropna(subset=['messages'])
             
-            # Convert messages to DataFrame
-            messages_list = messages_df['messages'].tolist()
-            messages_df = pd.DataFrame(messages_list)
+            # Use pd.json_normalize for efficient conversion
+            messages_df = pd.json_normalize(messages_df['messages'])
             
             if messages_df.empty:
                 return 0.0
             
-            # Check for required fields using pandas
+            # Check for required fields using pandas vectorized operations
             required_fields = ['message_id', 'channel_username', 'date']
             complete_messages = 0
             
@@ -326,6 +362,200 @@ class FileDataLoader(BaseDataLoader):
             
             total_messages = len(messages_df)
             return complete_messages / (total_messages * len(required_fields)) if total_messages > 0 else 0.0
+        
+        return 0.0
+```
+
+### API Data Loader
+
+```python
+class ApiDataLoader(BaseDataLoader):
+    """Loads data from API endpoints using aiohttp."""
+    
+    def __init__(self, config: AnalysisConfig):
+        super().__init__(config)
+        self.base_url = config.api_base_url
+        self.timeout = aiohttp.ClientTimeout(total=config.api_timeout)
+        self.endpoints = {
+            'channels': '/api/channels',
+            'messages': '/api/messages'
+        }
+    
+    async def discover_sources(self) -> List[DataSource]:
+        """Discover available API data sources."""
+        sources = []
+        
+        try:
+            async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                # Get available channels
+                async with session.get(f"{self.base_url}{self.endpoints['channels']}") as response:
+                    if response.status == 200:
+                        channels_data = await response.json()
+                        
+                        for channel in channels_data.get('channels', []):
+                            channel_name = channel.get('username', 'unknown')
+                            
+                            # Get message count for this channel
+                            message_count = await self._get_message_count(session, channel_name)
+                            
+                            if message_count > 0:
+                                # Calculate date range and quality score
+                                date_range = await self._get_date_range(session, channel_name)
+                                quality_score = await self._get_quality_score(session, channel_name)
+                                
+                                source = DataSource(
+                                    source_type="api",
+                                    channel_name=channel_name,
+                                    total_records=message_count,
+                                    date_range=date_range,
+                                    quality_score=quality_score,
+                                    metadata={
+                                        'api_url': f"{self.base_url}{self.endpoints['messages']}",
+                                        'channel_id': channel.get('id'),
+                                        'discovered_at': datetime.now().isoformat()
+                                    }
+                                )
+                                sources.append(source)
+                    else:
+                        self.logger.error(f"Failed to fetch channels: {response.status}")
+                        
+        except aiohttp.ClientError as e:
+            self.logger.error(f"API connection error: {e}")
+        except asyncio.TimeoutError:
+            self.logger.error("API request timeout")
+        except Exception as e:
+            self.logger.error(f"Unexpected error discovering API sources: {e}")
+        
+        return sources
+    
+    async def load_data(self, source: DataSource) -> pd.DataFrame:
+        """Load data from API source using pagination."""
+        all_messages = []
+        page = 1
+        
+        try:
+            async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                while True:
+                    params = {
+                        'channel': source.channel_name,
+                        'page': page,
+                        'items_per_page': self.config.items_per_page
+                    }
+                    
+                    async with session.get(
+                        f"{self.base_url}{self.endpoints['messages']}",
+                        params=params
+                    ) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            messages = data.get('messages', [])
+                            
+                            if not messages:
+                                break
+                            
+                            # Add source information to each message
+                            for msg in messages:
+                                msg['source'] = 'api'
+                            
+                            all_messages.extend(messages)
+                            page += 1
+                            
+                            # Check if we've reached the end
+                            if len(messages) < self.config.items_per_page:
+                                break
+                        else:
+                            self.logger.error(f"Failed to fetch messages: {response.status}")
+                            break
+                            
+        except aiohttp.ClientError as e:
+            self.logger.error(f"API connection error: {e}")
+        except asyncio.TimeoutError:
+            self.logger.error("API request timeout")
+        except Exception as e:
+            self.logger.error(f"Unexpected error loading API data: {e}")
+        
+        # Convert to DataFrame
+        df = pd.DataFrame(all_messages)
+        return self._normalize_dataframe(df)
+    
+    async def _get_message_count(self, session: aiohttp.ClientSession, channel_username: str) -> int:
+        """Get message count for a channel."""
+        try:
+            params = {'channel': channel_username, 'page': 1, 'items_per_page': 1}
+            async with session.get(
+                f"{self.base_url}{self.endpoints['messages']}",
+                params=params
+            ) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data.get('total_count', 0)
+        except Exception as e:
+            self.logger.error(f"Error getting message count for {channel_username}: {e}")
+        return 0
+    
+    async def _get_date_range(self, session: aiohttp.ClientSession, channel_username: str) -> Tuple[Optional[datetime], Optional[datetime]]:
+        """Get date range for a channel."""
+        try:
+            # Get first and last messages
+            params_first = {'channel': channel_username, 'page': 1, 'items_per_page': 1, 'order': 'asc'}
+            params_last = {'channel': channel_username, 'page': 1, 'items_per_page': 1, 'order': 'desc'}
+            
+            async with session.get(
+                f"{self.base_url}{self.endpoints['messages']}",
+                params=params_first
+            ) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    messages = data.get('messages', [])
+                    
+                    if messages:
+                        first_date = pd.to_datetime(messages[0].get('date'), errors='coerce')
+                        
+                        # Get last message
+                        async with session.get(
+                            f"{self.base_url}{self.endpoints['messages']}",
+                            params=params_last
+                        ) as response2:
+                            if response2.status == 200:
+                                data2 = await response2.json()
+                                messages2 = data2.get('messages', [])
+                                
+                                if messages2:
+                                    last_date = pd.to_datetime(messages2[0].get('date'), errors='coerce')
+                                    return (first_date, last_date)
+                                    
+        except Exception as e:
+            self.logger.error(f"Error getting date range for {channel_username}: {e}")
+        
+        return (None, None)
+    
+    async def _get_quality_score(self, session: aiohttp.ClientSession, channel_username: str) -> float:
+        """Get data quality score for a channel."""
+        try:
+            params = {'channel': channel_username, 'page': 1, 'items_per_page': 100}
+            async with session.get(
+                f"{self.base_url}{self.endpoints['messages']}",
+                params=params
+            ) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    messages = data.get('messages', [])
+                    
+                    if not messages:
+                        return 0.0
+                    
+                    # Check for required fields
+                    required_fields = ['message_id', 'channel_username', 'date']
+                    complete_messages = 0
+                    
+                    for msg in messages:
+                        if all(field in msg and msg[field] for field in required_fields):
+                            complete_messages += 1
+                    
+                    return complete_messages / len(messages) if messages else 0.0
+                    
+        except Exception as e:
+            self.logger.error(f"Error getting quality score for {channel_username}: {e}")
         
         return 0.0
 ```
@@ -509,25 +739,234 @@ class FilesizeAnalyzer:
         )
         size_distribution = size_bins.value_counts().to_dict()
         
-        # Potential duplicates by size using pandas groupby
+        # Potential duplicates by size using pandas groupby with filtering
         size_groups = df.groupby('file_size')
-        potential_duplicates = []
         
-        for size, group in size_groups:
-            if len(group) > 1:  # Multiple files with same size
-                filenames = group['file_name'].tolist()
-                potential_duplicates.append({
+        # Filter groups with more than one file and convert to list efficiently
+        duplicate_groups = size_groups.filter(lambda x: len(x) > 1)
+        
+        if not duplicate_groups.empty:
+            # Group by size again and aggregate filenames
+            potential_duplicates = (
+                duplicate_groups.groupby('file_size')['file_name']
+                .apply(list)
+                .reset_index()
+                .rename(columns={'file_name': 'files'})
+            )
+            
+            # Convert to list of dicts and sort by size
+            potential_duplicates = [
+                {
                     "size_bytes": int(size),
-                    "files": filenames
-                })
-        
-        # Sort by size and limit to top 10
-        potential_duplicates.sort(key=lambda x: x['size_bytes'], reverse=True)
-        potential_duplicates = potential_duplicates[:10]
+                    "files": files
+                }
+                for size, files in zip(potential_duplicates['file_size'], potential_duplicates['files'])
+            ]
+            
+            # Sort by size and limit to top 10
+            potential_duplicates.sort(key=lambda x: x['size_bytes'], reverse=True)
+            potential_duplicates = potential_duplicates[:10]
+        else:
+            potential_duplicates = []
         
         return {
             "size_frequency_distribution": size_distribution,
             "potential_duplicates_by_size": potential_duplicates
+        }
+```
+
+### Message Analyzer
+
+```python
+class MessageAnalyzer:
+    """Analyzes message content, patterns, and creators using pandas."""
+    
+    def __init__(self, config: AnalysisConfig):
+        self.config = config
+        self.logger = logging.getLogger(__name__)
+    
+    def analyze(self, df: pd.DataFrame, source: DataSource) -> MessageAnalysisResult:
+        """Perform comprehensive message analysis using pandas operations."""
+        if df.empty:
+            return MessageAnalysisResult(
+                content_statistics={},
+                pattern_recognition={},
+                creator_analysis={},
+                language_analysis={}
+            )
+        
+        return MessageAnalysisResult(
+            content_statistics=self._analyze_content_statistics(df),
+            pattern_recognition=self._analyze_patterns(df),
+            creator_analysis=self._analyze_creators(df),
+            language_analysis=self._analyze_language(df)
+        )
+    
+    def _analyze_content_statistics(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """Analyze content statistics using pandas operations."""
+        # Text content analysis
+        text_df = df[df['text'].notna() & (df['text'] != '')]
+        
+        if text_df.empty:
+            return {
+                "total_messages": len(df),
+                "messages_with_text": 0,
+                "text_length_stats": {"count": 0},
+                "media_messages": len(df[df['media_type'].notna()]),
+                "forwarded_messages": len(df[df['is_forwarded'] == True]) if 'is_forwarded' in df.columns else 0
+            }
+        
+        # Text length statistics using pandas
+        text_lengths = text_df['text'].str.len()
+        text_length_stats = {
+            "count": len(text_lengths),
+            "min": int(text_lengths.min()),
+            "max": int(text_lengths.max()),
+            "mean": round(text_lengths.mean(), 2),
+            "median": int(text_lengths.median())
+        }
+        
+        return {
+            "total_messages": len(df),
+            "messages_with_text": len(text_df),
+            "text_length_stats": text_length_stats,
+            "media_messages": len(df[df['media_type'].notna()]),
+            "forwarded_messages": len(df[df['is_forwarded'] == True]) if 'is_forwarded' in df.columns else 0
+        }
+    
+    def _analyze_patterns(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """Analyze message patterns using pandas string operations."""
+        text_df = df[df['text'].notna() & (df['text'] != '')]
+        
+        if text_df.empty:
+            return {
+                "hashtag_analysis": {"total_hashtags": 0, "unique_hashtags": 0, "most_common": []},
+                "mention_analysis": {"total_mentions": 0, "unique_mentions": 0, "most_common": []},
+                "url_analysis": {"messages_with_urls": 0, "total_urls": 0}
+            }
+        
+        # Hashtag analysis using pandas
+        hashtag_pattern = r'#\w+'
+        hashtags = text_df['text'].str.extractall(f'({hashtag_pattern})')[0]
+        hashtag_counts = hashtags.value_counts()
+        
+        # Mention analysis using pandas
+        mention_pattern = r'@\w+'
+        mentions = text_df['text'].str.extractall(f'({mention_pattern})')[0]
+        mention_counts = mentions.value_counts()
+        
+        # URL analysis using pandas
+        url_pattern = r'https?://\S+'
+        urls = text_df['text'].str.extractall(f'({url_pattern})')[0]
+        messages_with_urls = text_df['text'].str.contains(url_pattern, regex=True).sum()
+        
+        return {
+            "hashtag_analysis": {
+                "total_hashtags": len(hashtags),
+                "unique_hashtags": len(hashtag_counts),
+                "most_common": [
+                    {"hashtag": tag, "count": count}
+                    for tag, count in hashtag_counts.head(10).items()
+                ]
+            },
+            "mention_analysis": {
+                "total_mentions": len(mentions),
+                "unique_mentions": len(mention_counts),
+                "most_common": [
+                    {"mention": mention, "count": count}
+                    for mention, count in mention_counts.head(10).items()
+                ]
+            },
+            "url_analysis": {
+                "messages_with_urls": int(messages_with_urls),
+                "total_urls": len(urls)
+            }
+        }
+    
+    def _analyze_creators(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """Analyze message creators using pandas operations."""
+        # Filter messages with creator information
+        creator_df = df[df['creator_username'].notna()]
+        
+        if creator_df.empty:
+            return {
+                "total_creators": 0,
+                "most_active_creators": [],
+                "creator_message_stats": {}
+            }
+        
+        # Creator analysis using pandas
+        creator_counts = creator_df['creator_username'].value_counts()
+        creator_message_stats = {
+            "total_creators": len(creator_counts),
+            "total_messages": len(creator_df),
+            "avg_messages_per_creator": round(len(creator_df) / len(creator_counts), 2)
+        }
+        
+        # Most active creators
+        most_active = [
+            {
+                "username": username,
+                "message_count": count,
+                "percentage": round((count / len(creator_df)) * 100, 2)
+            }
+            for username, count in creator_counts.head(10).items()
+        ]
+        
+        return {
+            "total_creators": len(creator_counts),
+            "most_active_creators": most_active,
+            "creator_message_stats": creator_message_stats
+        }
+    
+    def _analyze_language(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """Analyze language distribution using pandas operations."""
+        text_df = df[df['text'].notna() & (df['text'] != '')]
+        
+        if text_df.empty:
+            return {
+                "language_distribution": {},
+                "total_messages_analyzed": 0,
+                "language_diversity": 0
+            }
+        
+        # Simple language detection based on character patterns
+        # This is a simplified approach - in production, you'd use a proper language detection library
+        
+        # Detect languages based on character sets
+        def detect_language_simple(text):
+            if not text:
+                return 'unknown'
+            
+            # Simple heuristics
+            if any(ord(char) > 127 for char in text[:100]):  # Non-ASCII characters
+                return 'non_english'
+            elif any(char in text for char in ['ä', 'ö', 'ü', 'ß']):
+                return 'german'
+            elif any(char in text for char in ['é', 'è', 'à', 'ç']):
+                return 'french'
+            elif any(char in text for char in ['ñ', 'á', 'é', 'í', 'ó', 'ú']):
+                return 'spanish'
+            else:
+                return 'english'
+        
+        # Apply language detection using pandas
+        languages = text_df['text'].apply(detect_language_simple)
+        language_counts = languages.value_counts()
+        
+        # Calculate language diversity (number of unique languages)
+        language_diversity = len(language_counts)
+        
+        # Convert to percentage distribution
+        language_distribution = {
+            lang: round((count / len(languages)) * 100, 2)
+            for lang, count in language_counts.items()
+        }
+        
+        return {
+            "language_distribution": language_distribution,
+            "total_messages_analyzed": len(languages),
+            "language_diversity": language_diversity
         }
 ```
 
@@ -541,6 +980,10 @@ def create_analysis_config(**kwargs) -> AnalysisConfig:
 async def run_advanced_intermediate_analysis(config: AnalysisConfig) -> Dict[str, Any]:
     """Main analysis orchestration function."""
     logger = logging.getLogger(__name__)
+    
+    # Validate configuration
+    if not config.validate_config():
+        raise ValueError("Invalid configuration provided")
     
     try:
         # Initialize data loaders
@@ -566,35 +1009,59 @@ async def run_advanced_intermediate_analysis(config: AnalysisConfig) -> Dict[str
         
         results = {}
         
-        # Process each source
-        for source in sources:
+        # Process each source concurrently
+        async def process_source(source: DataSource) -> Tuple[str, Dict[str, Any]]:
+            """Process a single data source."""
             logger.info(f"Processing source: {source.channel_name}")
             
-            # Load data
-            if source.source_type == "file":
-                df = await file_loader.load_data(source)
-            elif source.source_type == "api":
-                df = await api_loader.load_data(source)
-            else:
+            try:
+                # Load data
+                if source.source_type == "file":
+                    df = await file_loader.load_data(source)
+                elif source.source_type == "api":
+                    df = await api_loader.load_data(source)
+                else:
+                    return source.channel_name, {"error": f"Unknown source type: {source.source_type}"}
+                
+                # Run analysis
+                filename_analyzer = FilenameAnalyzer(config)
+                filesize_analyzer = FilesizeAnalyzer(config)
+                message_analyzer = MessageAnalyzer(config)
+                
+                filename_result = filename_analyzer.analyze(df, source)
+                filesize_result = filesize_analyzer.analyze(df, source)
+                message_result = message_analyzer.analyze(df, source)
+                
+                # Store results
+                result = {
+                    "filename_analysis": filename_result.dict(),
+                    "filesize_analysis": filesize_result.dict(),
+                    "message_analysis": message_result.dict(),
+                    "metadata": {
+                        "source_type": source.source_type,
+                        "total_records": len(df),
+                        "processed_at": datetime.now().isoformat()
+                    }
+                }
+                
+                return source.channel_name, result
+                
+            except Exception as e:
+                logger.error(f"Error processing source {source.channel_name}: {e}")
+                return source.channel_name, {"error": str(e)}
+        
+        # Process sources concurrently
+        tasks = [process_source(source) for source in sources]
+        source_results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Collect results
+        for result in source_results:
+            if isinstance(result, Exception):
+                logger.error(f"Task failed with exception: {result}")
                 continue
             
-            # Run analysis
-            filename_analyzer = FilenameAnalyzer(config)
-            filesize_analyzer = FilesizeAnalyzer(config)
-            
-            filename_result = filename_analyzer.analyze(df, source)
-            filesize_result = filesize_analyzer.analyze(df, source)
-            
-            # Store results
-            results[source.channel_name] = {
-                "filename_analysis": filename_result.dict(),
-                "filesize_analysis": filesize_result.dict(),
-                "metadata": {
-                    "source_type": source.source_type,
-                    "total_records": len(df),
-                    "processed_at": datetime.now().isoformat()
-                }
-            }
+            channel_name, result_data = result
+            results[channel_name] = result_data
         
         return results
         
@@ -620,11 +1087,8 @@ class JsonOutputManager:
         """Save analysis results to JSON file using pandas."""
         output_path = self.output_dir / f"{filename}.json"
         
-        # Convert results to DataFrame for processing
-        results_df = pd.DataFrame([results])
-        
-        # Use pandas to_json for output
-        results_df.to_json(
+        # Use pandas to_json directly with the results dict
+        pd.Series([results]).to_json(
             output_path,
             orient='records',
             indent=2,
@@ -667,14 +1131,11 @@ class JsonOutputManager:
         if previous_results.empty:
             return {"comparison": "No previous results available"}
         
-        # Convert current results to DataFrame
-        current_df = pd.DataFrame([current_results])
-        
-        # Perform comparison using pandas operations
+        # Perform comparison using pandas operations without unnecessary DataFrame creation
         comparison = {
-            "current_count": len(current_df),
+            "current_count": 1,  # Single result being compared
             "previous_count": len(previous_results),
-            "difference": len(current_df) - len(previous_results),
+            "difference": 1 - len(previous_results),
             "timestamp": datetime.now().isoformat()
         }
         
@@ -744,19 +1205,343 @@ def load_config_from_json(filename: str = "analysis_config.json") -> AnalysisCon
 ## Testing Strategy
 
 ### Unit Tests
-- Test individual analyzers with mock data
-- Validate pydantic models with various inputs
-- Test pandas operations with edge cases
+
+```python
+import pytest
+import pandas as pd
+from datetime import datetime
+from pathlib import Path
+
+class TestAnalysisConfig:
+    """Test AnalysisConfig validation."""
+    
+    def test_valid_config(self):
+        """Test valid configuration."""
+        config = AnalysisConfig(
+            enable_file_source=True,
+            enable_api_source=False,
+            channels=['@test_channel'],
+            output_dir="test_output"
+        )
+        assert config.validate_config() == True
+    
+    def test_invalid_config_no_sources(self):
+        """Test configuration with no data sources enabled."""
+        config = AnalysisConfig(
+            enable_file_source=False,
+            enable_api_source=False
+        )
+        assert config.validate_config() == False
+    
+    def test_invalid_channels(self):
+        """Test invalid channel names."""
+        with pytest.raises(ValueError):
+            AnalysisConfig(channels=['invalid_channel'])
+
+class TestFilenameAnalyzer:
+    """Test FilenameAnalyzer functionality."""
+    
+    def test_empty_dataframe(self):
+        """Test analyzer with empty DataFrame."""
+        config = AnalysisConfig()
+        analyzer = FilenameAnalyzer(config)
+        df = pd.DataFrame()
+        
+        result = analyzer.analyze(df, None)
+        assert result.duplicate_filename_detection['total_files'] == 0
+    
+    def test_duplicate_filenames(self):
+        """Test duplicate filename detection."""
+        config = AnalysisConfig()
+        analyzer = FilenameAnalyzer(config)
+        
+        df = pd.DataFrame({
+            'file_name': ['test.pdf', 'test.pdf', 'other.pdf', 'test.pdf'],
+            'file_size': [1000, 1000, 2000, 1000]
+        })
+        
+        result = analyzer.analyze(df, None)
+        assert result.duplicate_filename_detection['files_with_duplicate_names'] == 3
+        assert result.duplicate_filename_detection['duplicate_ratio'] == 0.75
+    
+    def test_filename_patterns(self):
+        """Test filename pattern analysis."""
+        config = AnalysisConfig()
+        analyzer = FilenameAnalyzer(config)
+        
+        df = pd.DataFrame({
+            'file_name': ['test file.pdf', 'test@file.pdf', 'normal.pdf'],
+            'file_size': [1000, 2000, 3000]
+        })
+        
+        result = analyzer.analyze(df, None)
+        assert result.filename_pattern_analysis['files_with_spaces'] == 1
+        assert result.filename_pattern_analysis['files_with_special_chars'] == 1
+
+class TestFilesizeAnalyzer:
+    """Test FilesizeAnalyzer functionality."""
+    
+    def test_filesize_distribution(self):
+        """Test filesize distribution analysis."""
+        config = AnalysisConfig()
+        analyzer = FilesizeAnalyzer(config)
+        
+        df = pd.DataFrame({
+            'file_name': ['small.pdf', 'medium.pdf', 'large.pdf'],
+            'file_size': [500000, 3000000, 15000000]  # 0.5MB, 3MB, 15MB
+        })
+        
+        result = analyzer.analyze(df, None)
+        distribution = result.filesize_distribution_analysis['size_frequency_distribution']
+        assert '0-1MB' in distribution
+        assert '1-5MB' in distribution
+        assert '10MB+' in distribution
+
+class TestMessageAnalyzer:
+    """Test MessageAnalyzer functionality."""
+    
+    def test_content_statistics(self):
+        """Test content statistics analysis."""
+        config = AnalysisConfig()
+        analyzer = MessageAnalyzer(config)
+        
+        df = pd.DataFrame({
+            'text': ['Hello world', 'Another message', None, ''],
+            'media_type': [None, 'photo', None, 'video'],
+            'is_forwarded': [False, True, False, False]
+        })
+        
+        result = analyzer.analyze(df, None)
+        assert result.content_statistics['total_messages'] == 4
+        assert result.content_statistics['messages_with_text'] == 2
+        assert result.content_statistics['media_messages'] == 2
+        assert result.content_statistics['forwarded_messages'] == 1
+    
+    def test_pattern_recognition(self):
+        """Test pattern recognition analysis."""
+        config = AnalysisConfig()
+        analyzer = MessageAnalyzer(config)
+        
+        df = pd.DataFrame({
+            'text': ['Check out #python and @user', 'Visit https://example.com', '#python is great']
+        })
+        
+        result = analyzer.analyze(df, None)
+        assert result.pattern_recognition['hashtag_analysis']['total_hashtags'] == 2
+        assert result.pattern_recognition['mention_analysis']['total_mentions'] == 1
+        assert result.pattern_recognition['url_analysis']['total_urls'] == 1
+
+class TestDataLoaders:
+    """Test data loader functionality."""
+    
+    def test_file_loader_validation(self):
+        """Test file loader input validation."""
+        config = AnalysisConfig()
+        loader = FileDataLoader(config)
+        
+        # Test with non-existent file
+        source = DataSource(
+            source_type="file",
+            channel_name="test",
+            total_records=0,
+            date_range=(None, None),
+            quality_score=0.0,
+            metadata={'file_path': '/non/existent/file.json'}
+        )
+        
+        with pytest.raises(FileNotFoundError):
+            asyncio.run(loader.load_data(source))
+    
+    def test_api_loader_error_handling(self):
+        """Test API loader error handling."""
+        config = AnalysisConfig(api_base_url="http://invalid-url")
+        loader = ApiDataLoader(config)
+        
+        # Should return empty list on connection error
+        sources = asyncio.run(loader.discover_sources())
+        assert sources == []
 
 ### Integration Tests
-- Test full pipeline with sample data
-- Validate output format and structure
-- Test error handling and recovery
+
+```python
+class TestFullPipeline:
+    """Test complete analysis pipeline."""
+    
+    def test_end_to_end_analysis(self):
+        """Test complete analysis workflow."""
+        # Create test data
+        test_data = {
+            'messages': [
+                {
+                    'message_id': 1,
+                    'channel_username': '@test',
+                    'date': '2024-01-01T00:00:00',
+                    'text': 'Test message #python',
+                    'file_name': 'test.pdf',
+                    'file_size': 1000
+                }
+            ]
+        }
+        
+        # Save test data
+        test_file = Path('test_data.json')
+        pd.DataFrame([test_data]).to_json(test_file, orient='records')
+        
+        try:
+            # Run analysis
+            config = AnalysisConfig(
+                enable_file_source=True,
+                enable_api_source=False,
+                output_dir="test_output"
+            )
+            
+            result = asyncio.run(run_advanced_intermediate_analysis(config))
+            
+            # Validate results
+            assert '@test' in result
+            assert 'filename_analysis' in result['@test']
+            assert 'filesize_analysis' in result['@test']
+            assert 'message_analysis' in result['@test']
+            
+        finally:
+            # Cleanup
+            if test_file.exists():
+                test_file.unlink()
 
 ### Performance Tests
-- Test with large datasets (100k+ records)
-- Measure memory usage and processing time
-- Validate performance requirements
+
+```python
+class TestPerformance:
+    """Test performance with large datasets."""
+    
+    def test_large_dataset_processing(self):
+        """Test processing of large datasets."""
+        # Create large test dataset
+        large_data = []
+        for i in range(10000):
+            large_data.append({
+                'message_id': i,
+                'channel_username': '@test',
+                'date': f'2024-01-01T00:00:00',
+                'text': f'Message {i} #test',
+                'file_name': f'file_{i % 100}.pdf',  # 100 unique filenames
+                'file_size': 1000 + (i % 1000) * 1000
+            })
+        
+        df = pd.DataFrame(large_data)
+        
+        # Test analyzers
+        config = AnalysisConfig()
+        filename_analyzer = FilenameAnalyzer(config)
+        filesize_analyzer = FilesizeAnalyzer(config)
+        message_analyzer = MessageAnalyzer(config)
+        
+        # Measure performance
+        import time
+        start_time = time.time()
+        
+        filename_result = filename_analyzer.analyze(df, None)
+        filesize_result = filesize_analyzer.analyze(df, None)
+        message_result = message_analyzer.analyze(df, None)
+        
+        end_time = time.time()
+        processing_time = end_time - start_time
+        
+        # Should complete within reasonable time (adjust threshold as needed)
+        assert processing_time < 10.0  # 10 seconds for 10k records
+        
+        # Validate results
+        assert filename_result.duplicate_filename_detection['total_files'] == 10000
+        assert filesize_result.duplicate_filesize_detection['total_files'] == 10000
+        assert message_result.content_statistics['total_messages'] == 10000
+
+### Edge Case Tests
+
+```python
+class TestEdgeCases:
+    """Test edge cases and error conditions."""
+    
+    def test_malformed_json(self):
+        """Test handling of malformed JSON files."""
+        config = AnalysisConfig()
+        loader = FileDataLoader(config)
+        
+        # Create malformed JSON file
+        malformed_file = Path('malformed.json')
+        malformed_file.write_text('{"invalid": json}')
+        
+        try:
+            source = DataSource(
+                source_type="file",
+                channel_name="test",
+                total_records=0,
+                date_range=(None, None),
+                quality_score=0.0,
+                metadata={'file_path': str(malformed_file)}
+            )
+            
+            with pytest.raises(ValueError, match="Invalid JSON format"):
+                asyncio.run(loader.load_data(source))
+                
+        finally:
+            if malformed_file.exists():
+                malformed_file.unlink()
+    
+    def test_empty_json_file(self):
+        """Test handling of empty JSON files."""
+        config = AnalysisConfig()
+        loader = FileDataLoader(config)
+        
+        # Create empty JSON file
+        empty_file = Path('empty.json')
+        empty_file.write_text('')
+        
+        try:
+            source = DataSource(
+                source_type="file",
+                channel_name="test",
+                total_records=0,
+                date_range=(None, None),
+                quality_score=0.0,
+                metadata={'file_path': str(empty_file)}
+            )
+            
+            with pytest.raises(ValueError, match="File is empty"):
+                asyncio.run(loader.load_data(source))
+                
+        finally:
+            if empty_file.exists():
+                empty_file.unlink()
+    
+    def test_missing_columns(self):
+        """Test handling of DataFrames with missing columns."""
+        config = AnalysisConfig()
+        analyzer = FilenameAnalyzer(config)
+        
+        # DataFrame with missing file_name column
+        df = pd.DataFrame({
+            'other_column': ['value1', 'value2']
+        })
+        
+        result = analyzer.analyze(df, None)
+        assert result.duplicate_filename_detection['total_files'] == 0
+```
+
+### Test Configuration
+
+```python
+# pytest.ini
+[tool:pytest]
+testpaths = tests
+python_files = test_*.py
+python_classes = Test*
+python_functions = test_*
+addopts = -v --tb=short --strict-markers
+markers =
+    slow: marks tests as slow (deselect with '-m "not slow"')
+    integration: marks tests as integration tests
+    performance: marks tests as performance tests
+```
 
 ## Conclusion
 

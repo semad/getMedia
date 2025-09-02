@@ -606,6 +606,328 @@ class BaseDataLoader:
         else:
             self.logger.warning("No performance stats available")
 
+# Data Loaders - File-based Data Loading
+class FileDataLoader(BaseDataLoader):
+    """File-based data loader with chunked processing and memory optimization."""
+    
+    def __init__(self, config: AnalysisConfig):
+        super().__init__(config)
+        self.required_columns = [
+            'message_id', 'channel_username', 'date', 'text', 'media_type',
+            'file_name', 'file_size', 'mime_type', 'views', 'forwards', 'replies'
+        ]
+    
+    def discover_sources(self) -> List[DataSource]:
+        """Discover available data sources from file system."""
+        try:
+            self.start_performance_monitoring()
+            sources = []
+            
+            # Get collections directory from config
+            collections_dir = Path(COLLECTIONS_DIR)
+            if not collections_dir.exists():
+                self.logger.warning(f"Collections directory not found: {collections_dir}")
+                return sources
+            
+            # Find JSON files matching the pattern
+            pattern = COMBINED_COLLECTION_GLOB
+            json_files = list(collections_dir.glob(pattern))
+            
+            if not json_files:
+                self.logger.warning(f"No files found matching pattern: {pattern}")
+                return sources
+            
+            self.logger.info(f"Found {len(json_files)} potential data sources")
+            
+            # Analyze each file to create DataSource objects
+            for file_path in json_files:
+                try:
+                    source = self._analyze_file_source(file_path)
+                    if source:
+                        sources.append(source)
+                        self.logger.debug(f"Added source: {source.channel_name} ({source.total_records} records)")
+                except Exception as e:
+                    self.logger.warning(f"Failed to analyze file {file_path}: {e}")
+                    continue
+            
+            self.logger.info(f"Successfully discovered {len(sources)} data sources")
+            return sources
+            
+        except Exception as e:
+            self._handle_loading_error(e, "discover_sources")
+            return []
+        finally:
+            self.log_performance_stats()
+    
+    def _analyze_file_source(self, file_path: Path) -> Optional[DataSource]:
+        """Analyze a single file to create a DataSource object."""
+        try:
+            # Quick analysis without loading full data
+            with open(file_path, 'r', encoding='utf-8') as f:
+                # Read first few lines to get metadata
+                first_line = f.readline()
+                if not first_line.strip():
+                    return None
+                
+                # Try to parse as JSON to get structure
+                f.seek(0)
+                try:
+                    # Read a small sample to analyze structure
+                    sample_data = f.read(1024)  # Read first 1KB
+                    if 'metadata' in sample_data and 'messages' in sample_data:
+                        # This looks like our expected format
+                        pass
+                    else:
+                        self.logger.warning(f"Unexpected file format: {file_path}")
+                        return None
+                except Exception:
+                    return None
+            
+            # Get file stats
+            file_stats = file_path.stat()
+            file_size_mb = file_size_mb = file_stats.st_size / (1024 * 1024)
+            
+            # Estimate record count based on file size (rough estimate)
+            estimated_records = max(1, int(file_size_mb * 100))  # ~100 records per MB
+            
+            # Extract channel name from filename
+            channel_name = self._extract_channel_name(file_path.name)
+            
+            # Create metadata
+            metadata = {
+                'file_path': str(file_path),
+                'file_size_mb': round(file_size_mb, 2),
+                'last_modified': datetime.fromtimestamp(file_stats.st_mtime).isoformat(),
+                'estimated_records': estimated_records
+            }
+            
+            # Create DataSource
+            return self._create_data_source(
+                source_type="file",
+                channel_name=channel_name,
+                total_records=estimated_records,
+                date_range=(None, None),  # Will be updated when data is loaded
+                quality_score=0.9,  # Assume good quality for now
+                metadata=metadata
+            )
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to analyze file source {file_path}: {e}")
+            return None
+    
+    def _extract_channel_name(self, filename: str) -> str:
+        """Extract channel name from filename."""
+        try:
+            # Remove extension
+            name_without_ext = filename.replace('.json', '')
+            
+            # Handle combined files (e.g., tg_books_1_482_combined.json)
+            if '_combined' in name_without_ext:
+                name_without_ext = name_without_ext.replace('_combined', '')
+            
+            # Split by underscores and find channel name
+            parts = name_without_ext.split('_')
+            if len(parts) >= 2:
+                # Assume format: tg_channelname_...
+                channel_name = parts[1]
+                return f"@{channel_name}"
+            else:
+                return f"@{name_without_ext}"
+                
+        except Exception:
+            return "@unknown_channel"
+    
+    def load_data(self, source_path: str = None) -> Tuple[pd.DataFrame, DataSource]:
+        """Load data from file with chunked processing for large files."""
+        try:
+            self.start_performance_monitoring()
+            
+            if source_path:
+                file_path = Path(source_path)
+            else:
+                # Use first available source
+                sources = self.discover_sources()
+                if not sources:
+                    raise FileNotFoundError("No data sources available")
+                file_path = Path(sources[0].metadata['file_path'])
+            
+            if not file_path.exists():
+                raise FileNotFoundError(f"File not found: {file_path}")
+            
+            self.logger.info(f"Loading data from: {file_path}")
+            
+            # Check file size to determine loading strategy
+            file_size_mb = file_path.stat().st_size / (1024 * 1024)
+            
+            if file_size_mb > 100:  # Large file (>100MB)
+                self.logger.info(f"Large file detected ({file_size_mb:.1f}MB), using chunked loading")
+                df = self._load_large_file_chunked(file_path)
+            else:
+                self.logger.info(f"Loading file normally ({file_size_mb:.1f}MB)")
+                df = self._load_file_normal(file_path)
+            
+            # Validate the loaded data
+            if not self._validate_dataframe(df, self.required_columns):
+                raise ValueError("Loaded data failed validation")
+            
+            # Optimize memory usage
+            df = self._optimize_dataframe_memory(df)
+            
+            # Create updated DataSource with actual data info
+            actual_records = len(df)
+            date_range = self._get_date_range(df)
+            quality_score = self._calculate_quality_score(df)
+            
+            source = self._create_data_source(
+                source_type="file",
+                channel_name=self._extract_channel_name(file_path.name),
+                total_records=actual_records,
+                date_range=date_range,
+                quality_score=quality_score,
+                metadata={
+                    'file_path': str(file_path),
+                    'file_size_mb': round(file_size_mb, 2),
+                    'actual_records': actual_records,
+                    'loading_method': 'chunked' if file_size_mb > 100 else 'normal'
+                }
+            )
+            
+            self.logger.info(f"Successfully loaded {actual_records} records from {file_path.name}")
+            return df, source
+            
+        except Exception as e:
+            self._handle_loading_error(e, f"load_data({source_path})")
+            return pd.DataFrame(), None
+        finally:
+            self.log_performance_stats()
+    
+    def _load_file_normal(self, file_path: Path) -> pd.DataFrame:
+        """Load file using standard pandas JSON reading."""
+        try:
+            # Read JSON file directly
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # Handle nested structure if present
+            if isinstance(data, dict) and 'messages' in data:
+                messages = data['messages']
+            elif isinstance(data, list):
+                messages = data
+            else:
+                raise ValueError("Unexpected JSON structure")
+            
+            # Convert to DataFrame
+            if messages:
+                df = pd.DataFrame(messages)
+            else:
+                df = pd.DataFrame()
+            
+            # Convert date column if present
+            if 'date' in df.columns:
+                df['date'] = pd.to_datetime(df['date'], errors='coerce')
+            
+            return df
+            
+        except Exception as e:
+            self.logger.error(f"Failed to load file normally: {e}")
+            raise
+    
+    def _load_large_file_chunked(self, file_path: Path) -> pd.DataFrame:
+        """Load large file using chunked processing."""
+        try:
+            chunks = []
+            chunk_size = self.config.chunk_size
+            
+            self.logger.info(f"Loading file in chunks of {chunk_size} records")
+            
+            # Read file in chunks
+            with open(file_path, 'r', encoding='utf-8') as f:
+                # Read the file and parse JSON
+                data = json.load(f)
+                
+                # Handle nested structure
+                if isinstance(data, dict) and 'messages' in data:
+                    messages = data['messages']
+                elif isinstance(data, list):
+                    messages = data
+                else:
+                    raise ValueError("Unexpected JSON structure")
+                
+                # Process in chunks
+                for i in range(0, len(messages), chunk_size):
+                    chunk_data = messages[i:i + chunk_size]
+                    chunk_df = pd.DataFrame(chunk_data)
+                    
+                    # Convert date column if present
+                    if 'date' in chunk_df.columns:
+                        chunk_df['date'] = pd.to_datetime(chunk_df['date'], errors='coerce')
+                    
+                    chunks.append(chunk_df)
+                    
+                    # Log progress
+                    if (i // chunk_size) % 10 == 0:  # Log every 10 chunks
+                        self.logger.info(f"Processed {i + len(chunk_data)}/{len(messages)} records")
+                    
+                    # Memory management
+                    if len(chunks) * chunk_size > self.config.memory_limit:
+                        self.logger.warning("Memory limit approaching, processing existing chunks")
+                        break
+            
+            # Combine all chunks
+            if chunks:
+                df = pd.concat(chunks, ignore_index=True)
+                self.logger.info(f"Combined {len(chunks)} chunks into DataFrame with {len(df)} records")
+                return df
+            else:
+                return pd.DataFrame()
+                
+        except Exception as e:
+            self.logger.error(f"Failed to load file in chunks: {e}")
+            raise
+    
+    def _get_date_range(self, df: pd.DataFrame) -> Tuple[Optional[datetime], Optional[datetime]]:
+        """Extract date range from DataFrame."""
+        try:
+            if 'date' in df.columns and not df['date'].isna().all():
+                min_date = df['date'].min()
+                max_date = df['date'].max()
+                return (min_date, max_date)
+            return (None, None)
+        except Exception as e:
+            self.logger.warning(f"Failed to extract date range: {e}")
+            return (None, None)
+    
+    def _calculate_quality_score(self, df: pd.DataFrame) -> float:
+        """Calculate data quality score based on completeness and validity."""
+        try:
+            if df.empty:
+                return 0.0
+            
+            total_cells = len(df) * len(df.columns)
+            if total_cells == 0:
+                return 0.0
+            
+            # Count non-null values
+            non_null_cells = df.count().sum()
+            completeness_score = non_null_cells / total_cells
+            
+            # Check for critical columns
+            critical_columns = ['message_id', 'channel_username', 'date']
+            critical_completeness = 0.0
+            for col in critical_columns:
+                if col in df.columns:
+                    critical_completeness += (df[col].count() / len(df))
+            critical_completeness /= len(critical_columns)
+            
+            # Combine scores (weight critical columns more)
+            quality_score = (completeness_score * 0.6) + (critical_completeness * 0.4)
+            
+            return min(1.0, max(0.0, quality_score))
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to calculate quality score: {e}")
+            return 0.5  # Default medium quality
+
 # Main entry point for CLI integration
 def create_analysis_config(**kwargs) -> AnalysisConfig:
     """Create analysis configuration from kwargs."""

@@ -27,15 +27,12 @@ from config import (
     DEFAULT_RATE_LIMIT,
     DEFAULT_SESSION_COOLDOWN,
     DEFAULT_SESSION_NAME,
-    COLLECTIONS_DIR,
-    FILES_CHANNELS_DIR,
 )
 from modules.combine_processor import ( auto_detect_channels_from_raw_advanced,
     combine_existing_collections,
 )
 from modules.models import ChannelConfig, RateLimitConfig
-from modules.file_report_processor import process_channel_reports, display_results_summary
-from modules.db_report_processor import DatabaseReportProcessor, display_db_results_summary
+
 from modules.telegram_collector import TelegramCollector, export_messages_to_file
 
 
@@ -322,61 +319,5 @@ def import_file(import_file, verbose):
 
             logger.error(f"Traceback: {traceback.format_exc()}")
 
-
-@cli.command(name="report")
-@click.option("--file-messages", "-f", is_flag=True, help="Generate message analysis reports from combined files")
-@click.option( "--db-messages", "-d", is_flag=True, help="Generate message analysis reports from database API endpoints",)
-@click.option("--summary", "-s", is_flag=True, help="Generate summary files only (JSON + text)")
-@click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging output")
-@click.help_option("-h", "--help")
-def report(verbose: bool, file_messages: bool, db_messages: bool, summary: bool) -> None:
-    """Generate reports for Telegram data analysis.
-
-    This command can generate different types of reports:
-    - Message analysis reports (when --file-messages flag is used)
-    - Message analysis reports (when --db-messages flag is used)
-
-    Examples:
-        python main.py report --file-messages              # Generate message analysis reports from combined files
-        python main.py report --db-messages              # Generate message analysis reports from database API endpoints
-    """
-    # Setup logging
-    setup_logging(verbose)
-    logger = logging.getLogger(__name__)
-    if verbose:
-        logger.info("Verbose logging enabled")
-
-    try:
-        if file_messages:
-            logger.info("📊 Generating message analysis reports from combined files...")
-            # Process channel reports using the file processor
-            results = process_channel_reports(
-                COLLECTIONS_DIR, FILES_CHANNELS_DIR
-            )
-            # Display results summary
-            display_results_summary(results)
-        elif db_messages:
-            logger.info("📊 Generating message analysis reports from database API endpoints...")
-            # Import and use the database report processor
-            async def process_db_reports():
-                async with DatabaseReportProcessor() as db_processor:
-                    return await db_processor.process_channel_reports_from_db(
-                        channels=None,  # Auto-detect channels
-                        output_dir="reports/analysis/db_messages/channels",
-                        verbose=verbose
-                    )
-            
-            # Run the async function
-            results = asyncio.run(process_db_reports())
-            display_db_results_summary(results)
-        else:
-            logger.info("No analysis type specified. Use --file-messages or --db-messages to generate reports.")
-            return
-    except Exception as e:
-        logger.error(f"❌ Report generation failed: {e}")
-        if verbose:
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-        raise
 if __name__ == "__main__":
     cli()

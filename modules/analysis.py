@@ -421,6 +421,191 @@ class AnalysisResult(BaseModel):
                 raise ValueError("Invalid timestamp format")
         return v
 
+# Base Classes - Data Loading Foundation
+class BaseDataLoader:
+    """Base class for all data loaders with common functionality."""
+    
+    def __init__(self, config: AnalysisConfig):
+        self.config = config
+        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+        self.performance_monitor = PerformanceMonitor()
+    
+    def _optimize_dataframe_memory(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Optimize DataFrame memory usage by converting data types."""
+        try:
+            # Convert object columns to category if they have low cardinality
+            for col in df.select_dtypes(include=['object']).columns:
+                if df[col].nunique() / len(df) < 0.5:  # Less than 50% unique values
+                    df[col] = df[col].astype('category')
+            
+            # Convert integer columns to smaller types
+            for col in df.select_dtypes(include=['int64']).columns:
+                if df[col].min() >= 0:
+                    if df[col].max() < 255:
+                        df[col] = df[col].astype('uint8')
+                    elif df[col].max() < 65535:
+                        df[col] = df[col].astype('uint16')
+                    elif df[col].max() < 4294967295:
+                        df[col] = df[col].astype('uint32')
+                else:
+                    if df[col].min() > -128 and df[col].max() < 127:
+                        df[col] = df[col].astype('int8')
+                    elif df[col].min() > -32768 and df[col].max() < 32767:
+                        df[col] = df[col].astype('int16')
+                    elif df[col].min() > -2147483648 and df[col].max() < 2147483647:
+                        df[col] = df[col].astype('int32')
+            
+            # Convert float columns to smaller types
+            for col in df.select_dtypes(include=['float64']).columns:
+                df[col] = pd.to_numeric(df[col], downcast='float')
+            
+            self.logger.debug(f"Memory optimization completed. Memory usage reduced.")
+            return df
+            
+        except Exception as e:
+            self.logger.warning(f"Memory optimization failed: {e}")
+            return df
+    
+    def _validate_dataframe(self, df: pd.DataFrame, required_columns: List[str]) -> bool:
+        """Validate DataFrame structure and content."""
+        try:
+            # Check if DataFrame is empty
+            if df.empty:
+                self.logger.warning("DataFrame is empty")
+                return False
+            
+            # Check required columns
+            missing_columns = set(required_columns) - set(df.columns)
+            if missing_columns:
+                self.logger.error(f"Missing required columns: {missing_columns}")
+                return False
+            
+            # Check for null values in critical columns
+            critical_columns = ['message_id', 'channel_username', 'date']
+            for col in critical_columns:
+                if col in df.columns and df[col].isnull().any():
+                    self.logger.warning(f"Null values found in critical column: {col}")
+            
+            # Validate data types
+            if 'message_id' in df.columns:
+                if not pd.api.types.is_integer_dtype(df['message_id']):
+                    self.logger.warning("message_id column is not integer type")
+            
+            if 'date' in df.columns:
+                if not pd.api.types.is_datetime64_any_dtype(df['date']):
+                    self.logger.warning("date column is not datetime type")
+            
+            self.logger.debug("DataFrame validation completed successfully")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"DataFrame validation failed: {e}")
+            return False
+    
+    def _handle_loading_error(self, error: Exception, context: str) -> None:
+        """Handle loading errors with appropriate logging and recovery."""
+        error_msg = f"Error in {context}: {str(error)}"
+        self.logger.error(error_msg)
+        
+        # Log additional context for debugging
+        if self.config.verbose:
+            import traceback
+            self.logger.debug(f"Full traceback: {traceback.format_exc()}")
+        
+        # Handle specific error types
+        if isinstance(error, FileNotFoundError):
+            self.logger.error("File not found - check file path and permissions")
+        elif isinstance(error, pd.errors.EmptyDataError):
+            self.logger.error("Data file is empty or corrupted")
+        elif isinstance(error, pd.errors.ParserError):
+            self.logger.error("Data parsing error - check file format")
+        elif isinstance(error, ValidationError):
+            self.logger.error("Data validation error - check data structure")
+        elif isinstance(error, MemoryError):
+            self.logger.error("Memory error - consider reducing chunk size or memory limit")
+        else:
+            self.logger.error(f"Unexpected error type: {type(error).__name__}")
+    
+    def _convert_to_message_records(self, df: pd.DataFrame) -> List[MessageRecord]:
+        """Convert DataFrame to list of MessageRecord objects."""
+        try:
+            records = []
+            for _, row in df.iterrows():
+                try:
+                    # Handle date conversion
+                    date_value = row.get('date')
+                    if pd.isna(date_value):
+                        continue
+                    
+                    if isinstance(date_value, str):
+                        date_value = pd.to_datetime(date_value)
+                    
+                    # Create MessageRecord with proper NaN handling
+                    record = MessageRecord(
+                        message_id=int(row.get('message_id', 0)),
+                        channel_username=str(row.get('channel_username', '')),
+                        date=date_value,
+                        text=row.get('text') if pd.notna(row.get('text')) else None,
+                        media_type=row.get('media_type') if pd.notna(row.get('media_type')) else None,
+                        file_name=row.get('file_name') if pd.notna(row.get('file_name')) else None,
+                        file_size=int(row.get('file_size')) if pd.notna(row.get('file_size')) else None,
+                        mime_type=row.get('mime_type') if pd.notna(row.get('mime_type')) else None,
+                        views=int(row.get('views')) if pd.notna(row.get('views')) else None,
+                        forwards=int(row.get('forwards')) if pd.notna(row.get('forwards')) else None,
+                        replies=int(row.get('replies')) if pd.notna(row.get('replies')) else None,
+                        reactions=row.get('reactions') if pd.notna(row.get('reactions')) else None,
+                        edit_date=row.get('edit_date') if pd.notna(row.get('edit_date')) else None,
+                        reply_to_message_id=int(row.get('reply_to_message_id')) if pd.notna(row.get('reply_to_message_id')) else None,
+                        is_forwarded=bool(row.get('is_forwarded', False)),
+                        is_pinned=bool(row.get('is_pinned', False)),
+                        is_deleted=bool(row.get('is_deleted', False))
+                    )
+                    records.append(record)
+                    
+                except Exception as e:
+                    self.logger.warning(f"Failed to convert row to MessageRecord: {e}")
+                    continue
+            
+            self.logger.info(f"Converted {len(records)} records to MessageRecord objects")
+            return records
+            
+        except Exception as e:
+            self.logger.error(f"Failed to convert DataFrame to MessageRecord objects: {e}")
+            return []
+    
+    def _create_data_source(self, source_type: str, channel_name: str, 
+                           total_records: int, date_range: Tuple[Optional[datetime], Optional[datetime]],
+                           quality_score: float = 1.0, metadata: Dict[str, Any] = None) -> DataSource:
+        """Create a DataSource object with validation."""
+        try:
+            return DataSource(
+                source_type=source_type,
+                channel_name=channel_name,
+                total_records=total_records,
+                date_range=date_range,
+                quality_score=quality_score,
+                metadata=metadata or {}
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to create DataSource: {e}")
+            raise
+    
+    def get_performance_stats(self) -> Dict[str, Any]:
+        """Get performance statistics from the monitor."""
+        return self.performance_monitor.get_stats()
+    
+    def start_performance_monitoring(self) -> None:
+        """Start performance monitoring."""
+        self.performance_monitor.start()
+    
+    def log_performance_stats(self) -> None:
+        """Log current performance statistics."""
+        stats = self.get_performance_stats()
+        if stats:
+            self.logger.info(f"Performance stats: {stats}")
+        else:
+            self.logger.warning("No performance stats available")
+
 # Main entry point for CLI integration
 def create_analysis_config(**kwargs) -> AnalysisConfig:
     """Create analysis configuration from kwargs."""

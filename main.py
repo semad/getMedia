@@ -262,6 +262,94 @@ def combine_collections(channels, verbose):
     logger.info("🎯 Combine operation completed!")
 
 
+@cli.command(name="analysis")
+@click.option("--source", "-s", 
+              type=click.Choice(["file", "api", "diff"]), 
+              default="file", 
+              help="Data source: file, api, diff")
+@click.option("--source-path", "-p", 
+              type=click.Path(exists=True), 
+              help="Path to source files (for file source)")
+@click.option("--channels", "-c", 
+              help="Comma-separated list of channel usernames to analyze")
+@click.option("--output-dir", "-o", 
+              type=click.Path(), 
+              help="Output directory for analysis results")
+@click.option("--verbose", "-v", 
+              is_flag=True, 
+              help="Enable verbose logging output")
+@click.help_option("-h", "--help")
+def analysis(source, source_path, channels, output_dir, verbose):
+    """Run comprehensive analysis on Telegram channel data.
+    
+    Examples:
+        python main.py analysis                           # Analyze file data with default settings
+        python main.py analysis --source api              # Analyze API data
+        python main.py analysis --source file --source-path ./data  # Analyze specific file path
+        python main.py analysis --channels "@channel1,@channel2"    # Analyze specific channels
+        python main.py analysis --verbose                 # Enable verbose logging
+    """
+    setup_logging(verbose)
+    logger = logging.getLogger(__name__)
+    
+    if verbose:
+        logger.info("Verbose logging enabled")
+    
+    try:
+        # Import analysis modules
+        from modules.analysis import create_analysis_config, run_comprehensive_analysis
+        
+        # Create configuration
+        config_kwargs = {
+            "source_type": source,
+            "verbose": verbose
+        }
+        
+        if source_path:
+            config_kwargs["source_path"] = source_path
+        elif source == "file":
+            # Default to combined collections directory
+            config_kwargs["source_path"] = "reports/collections"
+        
+        if channels:
+            channel_list = [ch.strip() for ch in channels.split(",")]
+            config_kwargs["channel_whitelist"] = channel_list
+        
+        if output_dir:
+            config_kwargs["output_dir"] = output_dir
+        
+        # Create configuration
+        config = create_analysis_config(**config_kwargs)
+        logger.info(f"Analysis configuration: {config}")
+        
+        # Run analysis
+        logger.info("🚀 Starting comprehensive analysis...")
+        results = asyncio.run(run_comprehensive_analysis(config))
+        
+        if "error" in results:
+            logger.error(f"❌ Analysis failed: {results['error']}")
+            return
+        
+        # Display summary
+        logger.info("✅ Analysis completed successfully!")
+        logger.info(f"📊 Total records analyzed: {results.get('metadata', {}).get('total_records', 'N/A')}")
+        logger.info(f"📈 Channels analyzed: {results.get('metadata', {}).get('channels_analyzed', 'N/A')}")
+        logger.info(f"⏱️  Processing time: {results.get('metadata', {}).get('processing_time_seconds', 'N/A')} seconds")
+        
+        # Show analysis types completed
+        analysis_types = [k for k in results.keys() if k not in ['metadata', 'error']]
+        logger.info(f"🔍 Analysis types completed: {', '.join(analysis_types)}")
+        
+        # Show output location
+        logger.info(f"📁 Results saved to: {config.output_dir}")
+        
+    except Exception as e:
+        logger.error(f"❌ Analysis command failed: {e}")
+        if verbose:
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+
+
 @cli.command(name="import")
 @click.argument("import_file", type=click.Path(exists=True), required=False)
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging output")

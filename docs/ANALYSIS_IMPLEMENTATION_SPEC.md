@@ -19,6 +19,7 @@ This document provides detailed implementation specifications for the `analysis`
 2. **No Caching**: Direct processing without result caching
 3. **Pandas-Centric**: All data operations use pandas DataFrames
 4. **Pydantic Models**: Data validation and serialization
+5. **Pandas JSON Operations**: All JSON file read/write operations must use pandas
 
 ## Module Structure
 
@@ -207,7 +208,7 @@ class FileDataLoader(BaseDataLoader):
         self.file_pattern = "tg_*_combined.json"
     
     async def discover_sources(self) -> List[DataSource]:
-        """Discover available combined JSON files."""
+        """Discover available combined JSON files using pandas."""
         sources = []
         
         if not self.collections_dir.exists():
@@ -216,16 +217,18 @@ class FileDataLoader(BaseDataLoader):
         
         for file_path in self.collections_dir.glob(self.file_pattern):
             try:
-                # Load JSON data
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
+                # Load JSON data using pandas
+                data = pd.read_json(file_path, lines=False)
                 
-                if not data or not isinstance(data, list):
+                if data.empty or not isinstance(data, pd.DataFrame):
                     continue
                 
                 # Extract metadata using pandas
-                first_record = data[0]
-                metadata = first_record.get('metadata', {})
+                if 'metadata' in data.columns:
+                    metadata_series = data['metadata'].iloc[0] if len(data) > 0 else {}
+                    metadata = metadata_series if isinstance(metadata_series, dict) else {}
+                else:
+                    metadata = {}
                 
                 channel_name = metadata.get('channel', 'unknown')
                 total_messages = metadata.get('total_messages', 0)
@@ -233,9 +236,9 @@ class FileDataLoader(BaseDataLoader):
                 if total_messages == 0:
                     continue
                 
-                # Calculate date range and quality score
-                date_range = self._calculate_date_range(data)
-                quality_score = self._calculate_quality_score(data)
+                # Calculate date range and quality score using pandas
+                date_range = self._calculate_date_range_pandas(data)
+                quality_score = self._calculate_quality_score_pandas(data)
                 
                 source = DataSource(
                     source_type="file",
@@ -258,60 +261,83 @@ class FileDataLoader(BaseDataLoader):
         return sources
     
     async def load_data(self, source: DataSource) -> pd.DataFrame:
-        """Load data from file source using pandas."""
+        """Load data from file source using pandas JSON operations."""
         file_path = Path(source.metadata['file_path'])
         
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        # Load JSON data using pandas
+        data = pd.read_json(file_path, lines=False)
         
-        # Extract messages from nested structure
-        messages = []
-        for record in data:
-            if 'messages' in record:
-                for msg in record['messages']:
-                    msg['source'] = 'file'
-                    messages.append(msg)
+        # Extract messages from nested structure using pandas
+        if 'messages' in data.columns:
+            # Use pandas explode to expand nested messages
+            messages_df = data.explode('messages')
+            messages_df = messages_df.dropna(subset=['messages'])
+            
+            # Convert messages to DataFrame using pandas
+            messages_list = messages_df['messages'].tolist()
+            df = pd.DataFrame(messages_list)
+            
+            # Add source column
+            df['source'] = 'file'
+        else:
+            # If no messages column, treat the entire DataFrame as messages
+            df = data.copy()
+            df['source'] = 'file'
         
-        # Create DataFrame using pandas
-        df = pd.DataFrame(messages)
         return self._normalize_dataframe(df)
     
-    def _calculate_date_range(self, data: List[Dict]) -> Tuple[Optional[datetime], Optional[datetime]]:
-        """Calculate date range from message data using pandas."""
-        dates = []
-        for record in data:
-            if 'messages' in record:
-                for msg in record['messages']:
-                    if 'date' in msg and msg['date']:
-                        try:
-                            date = pd.to_datetime(msg['date'])
-                            dates.append(date)
-                        except:
-                            continue
-        
-        if not dates:
+    def _calculate_date_range_pandas(self, data: pd.DataFrame) -> Tuple[Optional[datetime], Optional[datetime]]:
+        """Calculate date range from message data using pandas operations."""
+        if data.empty:
             return (None, None)
         
-        return (min(dates), max(dates))
+        # Extract dates from messages using pandas
+        if 'messages' in data.columns:
+            messages_df = data.explode('messages')
+            messages_df = messages_df.dropna(subset=['messages'])
+            
+            # Convert messages to DataFrame and extract dates
+            messages_list = messages_df['messages'].tolist()
+            messages_df = pd.DataFrame(messages_list)
+            
+            if 'date' in messages_df.columns:
+                dates = pd.to_datetime(messages_df['date'], errors='coerce')
+                dates = dates.dropna()
+                
+                if not dates.empty:
+                    return (dates.min(), dates.max())
+        
+        return (None, None)
     
-    def _calculate_quality_score(self, data: List[Dict]) -> float:
-        """Calculate data quality score based on completeness."""
-        if not data:
+    def _calculate_quality_score_pandas(self, data: pd.DataFrame) -> float:
+        """Calculate data quality score based on completeness using pandas."""
+        if data.empty:
             return 0.0
         
-        total_messages = 0
-        complete_messages = 0
+        # Extract messages using pandas
+        if 'messages' in data.columns:
+            messages_df = data.explode('messages')
+            messages_df = messages_df.dropna(subset=['messages'])
+            
+            # Convert messages to DataFrame
+            messages_list = messages_df['messages'].tolist()
+            messages_df = pd.DataFrame(messages_list)
+            
+            if messages_df.empty:
+                return 0.0
+            
+            # Check for required fields using pandas
+            required_fields = ['message_id', 'channel_username', 'date']
+            complete_messages = 0
+            
+            for field in required_fields:
+                if field in messages_df.columns:
+                    complete_messages += messages_df[field].notna().sum()
+            
+            total_messages = len(messages_df)
+            return complete_messages / (total_messages * len(required_fields)) if total_messages > 0 else 0.0
         
-        for record in data:
-            if 'messages' in record:
-                for msg in record['messages']:
-                    total_messages += 1
-                    # Check for required fields
-                    required_fields = ['message_id', 'channel_username', 'date']
-                    if all(field in msg and msg[field] for field in required_fields):
-                        complete_messages += 1
-        
-        return complete_messages / total_messages if total_messages > 0 else 0.0
+        return 0.0
 ```
 
 ## Analysis Implementation
@@ -587,22 +613,143 @@ async def run_advanced_intermediate_analysis(config: AnalysisConfig) -> Dict[str
         return {"error": str(e)}
 ```
 
+## JSON Output Operations with Pandas
+
+### Output Generation
+
+```python
+class JsonOutputManager:
+    """Manages JSON output operations using pandas."""
+    
+    def __init__(self, config: AnalysisConfig):
+        self.config = config
+        self.output_dir = Path(config.output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+    
+    def save_analysis_results(self, results: Dict[str, Any], filename: str) -> str:
+        """Save analysis results to JSON file using pandas."""
+        output_path = self.output_dir / f"{filename}.json"
+        
+        # Convert results to DataFrame for processing
+        results_df = pd.DataFrame([results])
+        
+        # Use pandas to_json for output
+        results_df.to_json(
+            output_path,
+            orient='records',
+            indent=2,
+            date_format='iso',
+            force_ascii=False
+        )
+        
+        return str(output_path)
+    
+    def save_combined_results(self, results_list: List[Dict[str, Any]], filename: str) -> str:
+        """Save multiple analysis results to JSON file using pandas."""
+        output_path = self.output_dir / f"{filename}.json"
+        
+        # Convert list of results to DataFrame
+        results_df = pd.DataFrame(results_list)
+        
+        # Use pandas to_json for output
+        results_df.to_json(
+            output_path,
+            orient='records',
+            indent=2,
+            date_format='iso',
+            force_ascii=False
+        )
+        
+        return str(output_path)
+    
+    def load_previous_results(self, filename: str) -> pd.DataFrame:
+        """Load previous analysis results from JSON file using pandas."""
+        file_path = self.output_dir / f"{filename}.json"
+        
+        if not file_path.exists():
+            return pd.DataFrame()
+        
+        # Use pandas read_json for input
+        return pd.read_json(file_path, orient='records')
+    
+    def compare_results(self, current_results: Dict[str, Any], previous_results: pd.DataFrame) -> Dict[str, Any]:
+        """Compare current results with previous results using pandas."""
+        if previous_results.empty:
+            return {"comparison": "No previous results available"}
+        
+        # Convert current results to DataFrame
+        current_df = pd.DataFrame([current_results])
+        
+        # Perform comparison using pandas operations
+        comparison = {
+            "current_count": len(current_df),
+            "previous_count": len(previous_results),
+            "difference": len(current_df) - len(previous_results),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        return comparison
+```
+
+### Configuration File Operations
+
+```python
+def save_config_to_json(config: AnalysisConfig, filename: str = "analysis_config.json") -> str:
+    """Save configuration to JSON file using pandas."""
+    config_dict = config.dict()
+    config_df = pd.DataFrame([config_dict])
+    
+    output_path = Path("reports/analysis") / filename
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    config_df.to_json(
+        output_path,
+        orient='records',
+        indent=2,
+        force_ascii=False
+    )
+    
+    return str(output_path)
+
+def load_config_from_json(filename: str = "analysis_config.json") -> AnalysisConfig:
+    """Load configuration from JSON file using pandas."""
+    config_path = Path("reports/analysis") / filename
+    
+    if not config_path.exists():
+        return AnalysisConfig()
+    
+    config_df = pd.read_json(config_path, orient='records')
+    config_dict = config_df.iloc[0].to_dict()
+    
+    return AnalysisConfig(**config_dict)
+```
+
 ## Performance Considerations
 
 ### Memory Management
 - Use pandas chunking for large datasets
 - Process data in batches to avoid memory exhaustion
 - Use appropriate pandas data types (category, int32, etc.)
+- Use pandas `read_json` with `chunksize` parameter for large JSON files
 
 ### Vectorized Operations
 - Prefer pandas vectorized operations over Python loops
 - Use pandas string methods for text processing
 - Leverage pandas groupby and aggregation functions
+- Use pandas `to_json` and `read_json` for all JSON operations
+
+### JSON Operations with Pandas
+- Use `pd.read_json()` for all JSON file reading operations
+- Use `pd.to_json()` for all JSON file writing operations
+- Leverage pandas `orient` parameter for different JSON formats
+- Use pandas `date_format` parameter for consistent datetime handling
+- Apply pandas `force_ascii=False` for proper Unicode support
 
 ### Error Handling
 - Validate data using pydantic models
 - Handle missing data gracefully with pandas
 - Provide meaningful error messages and logging
+- Handle JSON parsing errors with pandas error handling
 
 ## Testing Strategy
 

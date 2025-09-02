@@ -1463,28 +1463,90 @@ Before production deployment:
 ### Required Tools
 ```bash
 # Core development tools
-uv --version  # Package management
+uv --version  # Package management (required)
 python --version  # Python 3.9+
 git --version  # Version control
 
-# Development tools
-black --version  # Code formatting
-flake8 --version  # Linting
-mypy --version  # Type checking
-pytest --version  # Testing
+# Verify uv installation
+uv --version
+# Should show: uv 0.x.x
 ```
 
-### Testing Commands
+### Development Workflow
 ```bash
-# Run tests
-uv run pytest tests/ -v
-
-# Run with coverage
-uv run pytest tests/ --cov=modules.analysis
+# All development commands use uv run
+uv run pytest tests/ -v                    # Run tests
+uv run pytest tests/ --cov=modules.analysis  # Run with coverage
+uv run black modules/                       # Format code
+uv run flake8 modules/                      # Lint code
+uv run mypy modules/                        # Type check
 
 # Run specific test categories
 uv run pytest tests/ -m "not slow"
 uv run pytest tests/ -m "integration"
+
+# Add new dependencies during development
+uv add requests>=2.28.0                    # Add runtime dependency
+uv add --dev pytest-mock>=3.10.0          # Add dev dependency
+```
+
+### Virtual Environment Management
+```bash
+# uv automatically manages virtual environments
+# No need to manually activate - uv run handles this
+
+# Check current environment
+uv pip list
+
+# Sync dependencies from pyproject.toml
+uv sync
+
+# Update all dependencies
+uv lock --upgrade
+```
+
+### Dependency Management Best Practices
+```bash
+# 1. Always use uv for package management
+# ❌ DON'T: pip install package
+# ✅ DO: uv add package
+
+# 2. Pin dependency versions for reproducibility
+# ❌ DON'T: uv add pandas
+# ✅ DO: uv add pandas>=1.5.0,<2.0.0
+
+# 3. Separate runtime and dev dependencies
+# Runtime dependencies (needed in production)
+uv add pandas>=1.5.0
+uv add pydantic>=2.0.0
+
+# Development dependencies (only needed for development)
+uv add --dev pytest>=7.0.0
+uv add --dev black>=23.0.0
+
+# 4. Use uv run for all commands
+# ❌ DON'T: pytest tests/
+# ✅ DO: uv run pytest tests/
+
+# 5. Keep pyproject.toml in version control
+# This ensures reproducible builds across environments
+```
+
+### Troubleshooting Dependency Issues
+```bash
+# If you encounter dependency conflicts:
+uv lock --upgrade  # Update lock file
+uv sync --reinstall  # Reinstall all packages
+
+# If virtual environment gets corrupted:
+rm -rf .venv
+uv sync  # Recreate environment
+
+# Check for outdated packages:
+uv pip list --outdated
+
+# Update specific package:
+uv add package@latest
 ```
 
 ## Conclusion

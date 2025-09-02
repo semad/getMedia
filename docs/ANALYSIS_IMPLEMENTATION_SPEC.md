@@ -7,9 +7,11 @@ This document provides detailed implementation specifications for the `analysis`
 ## Implementation Requirements
 
 ### Technology Stack
+- **Package Management**: `uv` (fast, reliable Python package management)
 - **pandas**: >=1.5.0 (primary data processing and JSON operations)
 - **pydantic**: >=2.0.0 (data validation and models)
 - **aiohttp**: >=3.8.0 (async HTTP client for API operations)
+- **psutil**: >=5.9.0 (system and process monitoring)
 - **asyncio**: Built-in (async operations and concurrency)
 - **logging**: Built-in (logging functionality)
 - **pathlib**: Built-in (file path operations)
@@ -29,6 +31,53 @@ This document provides detailed implementation specifications for the `analysis`
 7. **Error Resilience**: Comprehensive error handling with specific exception types
 8. **Configuration-Driven**: All endpoints, constants, and file patterns must come from `config.py`
 
+## Package Management Setup
+
+### Using uv for Development
+```bash
+# Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Initialize project with uv
+uv init analysis-project
+cd analysis-project
+
+# Add core dependencies
+uv add pandas>=1.5.0
+uv add pydantic>=2.0.0
+uv add aiohttp>=3.8.0
+uv add psutil>=5.9.0
+
+# Add development dependencies
+uv add --dev pytest>=7.0.0
+uv add --dev pytest-asyncio>=0.21.0
+uv add --dev pytest-cov>=4.0.0
+uv add --dev black>=23.0.0
+uv add --dev flake8>=6.0.0
+uv add --dev mypy>=1.0.0
+
+# Activate virtual environment
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
+
+### Development Commands
+```bash
+# Run tests
+uv run pytest tests/ -v
+
+# Run with coverage
+uv run pytest tests/ --cov=modules.analysis
+
+# Format code
+uv run black modules/
+
+# Lint code
+uv run flake8 modules/
+
+# Type check
+uv run mypy modules/
+```
+
 ## Module Structure
 
 ```python
@@ -45,12 +94,16 @@ import asyncio
 import aiohttp
 import re
 import time
+import gc
+import psutil
 from pathlib import Path
-from typing import Dict, List, Optional, Union, Any, Tuple
-from datetime import datetime
+from typing import Dict, List, Optional, Union, Any, Tuple, Callable
+from datetime import datetime, timedelta
 from urllib.parse import urlparse
+from concurrent.futures import ThreadPoolExecutor
+import json
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ValidationError
 from config import API_ENDPOINTS, COMBINED_COLLECTION_GLOB, COLLECTIONS_DIR, ANALYSIS_BASE
 
 # Configuration Constants

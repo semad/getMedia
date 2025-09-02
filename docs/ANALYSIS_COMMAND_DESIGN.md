@@ -58,22 +58,37 @@ The analysis command MUST provide comprehensive filesize analysis capabilities i
   - Identify size clusters and patterns
   - Generate storage optimization recommendations
 
-#### **REQ-003: Data Source Integration**
+#### **REQ-003: Language Analysis**
+The analysis command MUST provide comprehensive language analysis capabilities including:
+
+- **REQ-003.1**: **Language Detection**
+  - Detect primary language of message content
+  - Identify language distribution across all messages
+  - Handle unknown or mixed language content gracefully
+  - Provide fallback mechanisms for detection failures
+
+- **REQ-003.2**: **Language Statistics**
+  - Calculate percentage distribution of detected languages
+  - Identify most common languages (top 5)
+  - Generate language diversity metrics
+  - Provide language-specific content analysis
+
+#### **REQ-004: Data Source Integration**
 The analysis command MUST support multiple data sources:
 
-- **REQ-003.1**: **File Source Support**
+- **REQ-004.1**: **File Source Support**
   - Read from combined JSON files in `reports/collections/` directory
   - Support files matching `tg_*_combined.json` pattern
   - Handle both small and large files efficiently
   - Provide data quality assessment for file sources
 
-- **REQ-003.2**: **API Source Support**
+- **REQ-004.2**: **API Source Support**
   - Fetch data from REST API endpoints
   - Support pagination for large datasets
   - Handle API timeouts and connection errors gracefully
   - Provide real-time data availability checks
 
-- **REQ-003.3**: **Dual Source Comparison**
+- **REQ-004.3**: **Dual Source Comparison**
   - Compare data between file and API sources
   - Calculate sync percentages and status
   - Identify missing records in each source
@@ -81,23 +96,23 @@ The analysis command MUST support multiple data sources:
 
 ### Non-Functional Requirements
 
-#### **REQ-004: Performance Requirements**
-- **REQ-004.1**: Process datasets up to 100,000 records within 60 seconds
-- **REQ-004.2**: Use memory-efficient pandas operations for large datasets
-- **REQ-004.3**: Support chunked processing for files exceeding available memory
-- **REQ-004.4**: Provide progress indicators for operations longer than 30 seconds
+#### **REQ-005: Performance Requirements**
+- **REQ-005.1**: Process datasets up to 100,000 records within 60 seconds
+- **REQ-005.2**: Use memory-efficient pandas operations for large datasets
+- **REQ-005.3**: Support chunked processing for files exceeding available memory
+- **REQ-005.4**: Provide progress indicators for operations longer than 30 seconds
 
-#### **REQ-005: Output Requirements**
-- **REQ-005.1**: Generate structured JSON output with comprehensive analysis results
-- **REQ-005.2**: Include detailed metadata and processing statistics
-- **REQ-005.3**: Provide actionable insights for media library optimization
-- **REQ-005.4**: Support both individual channel and summary reports
+#### **REQ-006: Output Requirements**
+- **REQ-006.1**: Generate structured JSON output with comprehensive analysis results
+- **REQ-006.2**: Include detailed metadata and processing statistics
+- **REQ-006.3**: Provide actionable insights for media library optimization
+- **REQ-006.4**: Support both individual channel and summary reports
 
-#### **REQ-006: Error Handling Requirements**
-- **REQ-006.1**: Continue processing with partial data when possible
-- **REQ-006.2**: Provide clear, actionable error messages with specific error codes
-- **REQ-006.3**: Log all errors with timestamps and context
-- **REQ-006.4**: Generate error summaries in output metadata
+#### **REQ-007: Error Handling Requirements**
+- **REQ-007.1**: Continue processing with partial data when possible
+- **REQ-007.2**: Provide clear, actionable error messages with specific error codes
+- **REQ-007.3**: Log all errors with timestamps and context
+- **REQ-007.4**: Generate error summaries in output metadata
 
 ## Design Constraints
 

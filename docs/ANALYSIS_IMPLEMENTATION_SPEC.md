@@ -27,6 +27,7 @@ This document provides detailed implementation specifications for the `analysis`
 5. **Pandas JSON Operations**: All JSON file read/write operations must use pandas
 6. **Async-First**: All I/O operations use async/await patterns
 7. **Error Resilience**: Comprehensive error handling with specific exception types
+8. **Configuration-Driven**: All endpoints, constants, and file patterns must come from `config.py`
 
 ## Module Structure
 
@@ -50,6 +51,7 @@ from datetime import datetime
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, field_validator
+from config import API_ENDPOINTS, COMBINED_COLLECTION_GLOB, COLLECTIONS_DIR, ANALYSIS_BASE
 
 # Configuration Constants
 # Data Models (Pydantic)
@@ -72,7 +74,7 @@ class AnalysisConfig(BaseModel):
     enable_diff_analysis: bool = True
     channels: List[str] = Field(default_factory=list)
     verbose: bool = False
-    output_dir: str = "reports/analysis"
+    output_dir: str = ANALYSIS_BASE
     api_base_url: str = "http://localhost:8000"
     api_timeout: int = 30
     items_per_page: int = 100
@@ -92,7 +94,7 @@ class AnalysisConfig(BaseModel):
             if not parsed.scheme or not parsed.netloc:
                 raise ValueError("Invalid URL format")
             return v
-        except Exception:
+        except (ValueError, TypeError, AttributeError):
             raise ValueError("Invalid URL format")
     
     @field_validator('api_timeout')
@@ -123,6 +125,14 @@ class AnalysisConfig(BaseModel):
             # Validate output directory
             output_path = Path(self.output_dir)
             if not output_path.parent.exists():
+                return False
+            
+            # Validate that config.py imports are available
+            try:
+                from config import API_ENDPOINTS, COMBINED_COLLECTION_GLOB, COLLECTIONS_DIR, ANALYSIS_BASE
+                if not API_ENDPOINTS or not isinstance(API_ENDPOINTS, dict):
+                    return False
+            except ImportError:
                 return False
             
             return True
@@ -215,7 +225,7 @@ class BaseDataLoader:
         """Discover available data sources."""
         raise NotImplementedError
     
-    async def load_data(self, source: DataSource) -> pd.DataFrame:
+    def load_data(self, source: DataSource) -> pd.DataFrame:
         """Load data from source into DataFrame."""
         raise NotImplementedError
     
@@ -269,8 +279,8 @@ class FileDataLoader(BaseDataLoader):
     
     def __init__(self, config: AnalysisConfig):
         super().__init__(config)
-        self.collections_dir = Path("reports/collections")
-        self.file_pattern = "tg_*_combined.json"
+        self.collections_dir = Path(COLLECTIONS_DIR)
+        self.file_pattern = COMBINED_COLLECTION_GLOB
     
     async def discover_sources(self) -> List[DataSource]:
         """Discover available combined JSON files."""
@@ -319,11 +329,8 @@ class FileDataLoader(BaseDataLoader):
                 )
                 sources.append(source)
                 
-            except (FileNotFoundError, pd.errors.EmptyDataError, pd.errors.ParserError, ValueError) as e:
+            except (FileNotFoundError, pd.errors.EmptyDataError, pd.errors.ParserError, ValueError, OSError) as e:
                 self.logger.error(f"Error processing file {file_path}: {e}")
-                continue
-            except Exception as e:
-                self.logger.error(f"Unexpected error processing file {file_path}: {e}")
                 continue
         
         return sources
@@ -415,7 +422,7 @@ class FileDataLoader(BaseDataLoader):
             else:
                 return pd.DataFrame()
                 
-        except Exception as e:
+        except (OSError, pd.errors.EmptyDataError, pd.errors.ParserError, ValueError, MemoryError) as e:
             self.logger.error(f"Error loading large file {file_path}: {e}")
             raise ValueError(f"Failed to load large file: {e}")
     
@@ -481,10 +488,7 @@ class ApiDataLoader(BaseDataLoader):
         super().__init__(config)
         self.base_url = config.api_base_url
         self.timeout = aiohttp.ClientTimeout(total=config.api_timeout)
-        self.endpoints = {
-            'channels': '/api/channels',
-            'messages': '/api/messages'
-        }
+        self.endpoints = API_ENDPOINTS
     
     async def discover_sources(self) -> List[DataSource]:
         """Discover available API data sources."""
@@ -528,12 +532,12 @@ class ApiDataLoader(BaseDataLoader):
             self.logger.error(f"API connection error: {e}")
         except asyncio.TimeoutError:
             self.logger.error("API request timeout")
-        except Exception as e:
-            self.logger.error(f"Unexpected error discovering API sources: {e}")
+        except ValueError as e:
+            self.logger.error(f"Error discovering API sources: {e}")
         
         return sources
     
-    async def load_data(self, source: DataSource) -> pd.DataFrame:
+    async def load_data_async(self, source: DataSource) -> pd.DataFrame:
         """Load data from API source using pagination with memory management."""
         all_messages = []
         page = 1
@@ -582,8 +586,8 @@ class ApiDataLoader(BaseDataLoader):
             self.logger.error(f"API connection error: {e}")
         except asyncio.TimeoutError:
             self.logger.error("API request timeout")
-        except Exception as e:
-            self.logger.error(f"Unexpected error loading API data: {e}")
+        except (ValueError, MemoryError) as e:
+            self.logger.error(f"Error loading API data: {e}")
         
         # Convert to DataFrame with memory optimization
         if all_messages:
@@ -605,7 +609,7 @@ class ApiDataLoader(BaseDataLoader):
                 if response.status == 200:
                     data = await response.json()
                     return data.get('total_count', 0)
-        except Exception as e:
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:
             self.logger.error(f"Error getting message count for {channel_username}: {e}")
         return 0
     
@@ -640,7 +644,7 @@ class ApiDataLoader(BaseDataLoader):
                                     last_date = pd.to_datetime(messages2[0].get('date'), errors='coerce')
                                     return (first_date, last_date)
                                     
-        except Exception as e:
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:
             self.logger.error(f"Error getting date range for {channel_username}: {e}")
         
         return (None, None)
@@ -670,10 +674,27 @@ class ApiDataLoader(BaseDataLoader):
                     
                     return complete_messages / len(messages) if messages else 0.0
                     
-        except Exception as e:
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:
             self.logger.error(f"Error getting quality score for {channel_username}: {e}")
         
         return 0.0
+    
+    def load_data(self, source: DataSource) -> pd.DataFrame:
+        """Synchronous wrapper for async load_data_async."""
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If we're already in an async context, we need to use a different approach
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(asyncio.run, self.load_data_async(source))
+                    return future.result()
+            else:
+                return loop.run_until_complete(self.load_data_async(source))
+        except RuntimeError:
+            # No event loop running, create a new one
+            return asyncio.run(self.load_data_async(source))
 ```
 
 ## Analysis Implementation
@@ -1083,8 +1104,8 @@ class MessageAnalyzer:
             
             return 'english'
         
-        # Apply language detection using pandas (vectorized where possible)
-        languages = text_df['text'].apply(detect_language_improved)
+        # Apply language detection using chunked processing for performance
+        languages = self._detect_language_chunked(text_df['text'])
         language_counts = languages.value_counts()
         
         # Calculate language diversity (number of unique languages)
@@ -1101,6 +1122,60 @@ class MessageAnalyzer:
             "total_messages_analyzed": len(languages),
             "language_diversity": language_diversity
         }
+    
+    def _detect_language_chunked(self, text_series: pd.Series) -> pd.Series:
+        """Detect languages using chunked processing for performance."""
+        if text_series.empty:
+            return pd.Series(dtype=str)
+        
+        # Process in chunks to avoid memory issues
+        chunk_size = 1000
+        results = []
+        
+        for i in range(0, len(text_series), chunk_size):
+            chunk = text_series.iloc[i:i+chunk_size]
+            
+            # Apply language detection to chunk
+            def detect_language_improved(text):
+                if not text or len(text.strip()) < 3:
+                    return 'unknown'
+                
+                text_lower = text.lower()
+                
+                # Character frequency patterns for different languages
+                patterns = {
+                    'german': ['ä', 'ö', 'ü', 'ß', 'sch', 'ch'],
+                    'french': ['é', 'è', 'à', 'ç', 'ê', 'ô', 'û'],
+                    'spanish': ['ñ', 'á', 'é', 'í', 'ó', 'ú', 'll', 'rr'],
+                    'russian': ['а', 'б', 'в', 'г', 'д', 'е', 'ё', 'ж'],
+                    'arabic': ['ا', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ'],
+                    'chinese': ['的', '了', '在', '是', '我', '有', '和'],
+                    'japanese': ['の', 'に', 'は', 'を', 'が', 'で', 'と']
+                }
+                
+                # Count pattern matches
+                pattern_scores = {}
+                for lang, chars in patterns.items():
+                    score = sum(text_lower.count(char) for char in chars)
+                    pattern_scores[lang] = score
+                
+                # Find language with highest score
+                if pattern_scores:
+                    best_lang = max(pattern_scores, key=pattern_scores.get)
+                    if pattern_scores[best_lang] > 0:
+                        return best_lang
+                
+                # Fallback: check for non-ASCII characters
+                non_ascii_count = sum(1 for char in text if ord(char) > 127)
+                if non_ascii_count > len(text) * 0.1:  # More than 10% non-ASCII
+                    return 'non_english'
+                
+                return 'english'
+            
+            chunk_results = chunk.apply(detect_language_improved)
+            results.append(chunk_results)
+        
+        return pd.concat(results, ignore_index=True)
 ```
 
 ## Main Entry Points
@@ -1152,7 +1227,7 @@ async def run_advanced_intermediate_analysis(config: AnalysisConfig) -> Dict[str
                 if source.source_type == "file":
                     df = file_loader.load_data(source)
                 elif source.source_type == "api":
-                    df = await api_loader.load_data(source)
+                    df = api_loader.load_data(source)
                 else:
                     return source.channel_name, {"error": f"Unknown source type: {source.source_type}"}
                 
@@ -1179,7 +1254,7 @@ async def run_advanced_intermediate_analysis(config: AnalysisConfig) -> Dict[str
                 
                 return source.channel_name, result
                 
-            except Exception as e:
+            except (ValueError, MemoryError, OSError) as e:
                 logger.error(f"Error processing source {source.channel_name}: {e}")
                 return source.channel_name, {"error": str(e)}
         
@@ -1198,7 +1273,7 @@ async def run_advanced_intermediate_analysis(config: AnalysisConfig) -> Dict[str
         
         return results
         
-    except Exception as e:
+    except (ValueError, MemoryError, OSError) as e:
         logger.error(f"Analysis failed: {e}")
         return {"error": str(e)}
 ```
@@ -1340,6 +1415,13 @@ def load_config_from_json(filename: str = "analysis_config.json") -> AnalysisCon
 - Implement retry mechanisms for API failures
 - Add circuit breaker patterns for external service calls
 
+### Configuration Management
+- Import all endpoints from `config.API_ENDPOINTS`
+- Use file patterns from `config.py` (e.g., `COMBINED_COLLECTION_GLOB`)
+- Use directory paths from `config.py` (e.g., `COLLECTIONS_DIR`, `ANALYSIS_BASE`)
+- Avoid hardcoding any paths, endpoints, or patterns
+- Ensure all configuration values are centralized in `config.py`
+
 ## Testing Strategy
 
 ### Unit Tests
@@ -1375,6 +1457,12 @@ class TestAnalysisConfig:
         """Test invalid channel names."""
         with pytest.raises(ValueError):
             AnalysisConfig(channels=['invalid_channel'])
+    
+    def test_config_imports_validation(self):
+        """Test that config.py imports are properly validated."""
+        config = AnalysisConfig()
+        # This should pass if config.py is properly imported
+        assert config.validate_config() == True
 
 class TestFilenameAnalyzer:
     """Test FilenameAnalyzer functionality."""

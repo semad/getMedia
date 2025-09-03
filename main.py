@@ -277,46 +277,8 @@ def combine_collections(channels, verbose):
 @click.option("--verbose", "-v", 
               is_flag=True, 
               help="Enable verbose logging output")
-# Data source control options
-@click.option("--enable-file-source/--no-file-source", 
-              default=True,
-              help="Enable/disable file-based data sources (default: enabled)")
-@click.option("--enable-api-source/--no-api-source", 
-              default=True,
-              help="Enable/disable API-based data sources (default: enabled)")
-@click.option("--enable-diff-analysis/--no-diff-analysis", 
-              default=True,
-              help="Enable/disable diff analysis between file and API sources (default: enabled)")
-# API configuration options
-@click.option("--api-base-url", 
-              default="http://localhost:8000",
-              help="Base URL for API endpoints (default: http://localhost:8000)")
-@click.option("--api-timeout", 
-              type=int, 
-              default=30,
-              help="API request timeout in seconds (default: 30)")
-@click.option("--items-per-page", 
-              type=int, 
-              default=100,
-              help="Number of items per API page (default: 100)")
-# Performance and reliability options
-@click.option("--memory-limit", 
-              type=int, 
-              default=100000,
-              help="Memory limit for processing in MB (default: 100000)")
-@click.option("--retry-attempts", 
-              type=int, 
-              default=3,
-              help="Number of retry attempts for failed operations (default: 3)")
-@click.option("--retry-delay", 
-              type=float, 
-              default=1.0,
-              help="Delay between retry attempts in seconds (default: 1.0)")
 @click.help_option("-h", "--help")
-def analysis(channels, analysis_types, output_dir, chunk_size, verbose,
-             enable_file_source, enable_api_source, enable_diff_analysis,
-             api_base_url, api_timeout, items_per_page,
-             memory_limit, retry_attempts, retry_delay):
+def analysis(channels, analysis_types, output_dir, chunk_size, verbose):
     """Run comprehensive analysis on Telegram channel data.
     
     This command analyzes collected Telegram channel data for filename patterns,
@@ -329,12 +291,6 @@ def analysis(channels, analysis_types, output_dir, chunk_size, verbose,
         python main.py analysis --output-dir ./results    # Specify output directory
         python main.py analysis --chunk-size 5000         # Use smaller chunks for large datasets
         python main.py analysis --verbose                 # Enable verbose logging
-        python main.py analysis --no-file-source          # Use only API sources
-        python main.py analysis --no-api-source           # Use only file sources
-        python main.py analysis --no-diff-analysis        # Disable diff analysis
-        python main.py analysis --api-base-url http://api.example.com  # Custom API endpoint
-        python main.py analysis --api-timeout 60          # Custom API timeout
-        python main.py analysis --memory-limit 200000     # Custom memory limit
     """
     setup_logging(verbose)
     logger = logging.getLogger(__name__)
@@ -349,16 +305,7 @@ def analysis(channels, analysis_types, output_dir, chunk_size, verbose,
         # Create configuration
         config_kwargs = {
             "verbose": verbose,
-            "chunk_size": chunk_size,
-            "enable_file_source": enable_file_source,
-            "enable_api_source": enable_api_source,
-            "enable_diff_analysis": enable_diff_analysis,
-            "api_base_url": api_base_url,
-            "api_timeout": api_timeout,
-            "items_per_page": items_per_page,
-            "memory_limit": memory_limit,
-            "retry_attempts": retry_attempts,
-            "retry_delay": retry_delay
+            "chunk_size": chunk_size
         }
         
         # Add output directory if provided

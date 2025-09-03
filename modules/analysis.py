@@ -3054,9 +3054,9 @@ class AnalysisOrchestrator:
                 channels
             )
             
-            # Determine source type and diff analysis from data sources
-            source_type = "file"  # default
-            is_diff_analysis = False
+            # Determine source types from data sources
+            has_api_source = False
+            has_file_source = False
             if data_sources:
                 # Check if any data source is from API
                 # data_sources can be dicts, tuples, or objects
@@ -3072,18 +3072,50 @@ class AnalysisOrchestrator:
                     (hasattr(source, 'source_type') and source.source_type == "file")
                     for source in data_sources
                 )
-                
-                if has_api_source:
-                    source_type = "api"
-                
-                # Check if this is diff analysis (both file and API sources present)
-                if has_file_source and has_api_source:
-                    is_diff_analysis = True
             
-            # Generate individual reports
-            individual_paths = self.output_manager.generate_individual_reports(
-                filename_result, filesize_result, message_result, output_dir, channels, source_type, is_diff_analysis
-            )
+            # Generate reports based on available sources
+            individual_paths = {}
+            
+            if has_file_source and has_api_source:
+                # Both sources present: generate file-only, API-only, and diff reports
+                self.logger.info("Both file and API sources present - generating file-only, API-only, and diff reports")
+                
+                # Generate file-only reports
+                file_paths = self.output_manager.generate_individual_reports(
+                    filename_result, filesize_result, message_result, output_dir, channels, "file", False
+                )
+                individual_paths.update({f"file_{k}": v for k, v in file_paths.items()})
+                
+                # Generate API-only reports
+                api_paths = self.output_manager.generate_individual_reports(
+                    filename_result, filesize_result, message_result, output_dir, channels, "api", False
+                )
+                individual_paths.update({f"api_{k}": v for k, v in api_paths.items()})
+                
+                # Generate diff reports
+                diff_paths = self.output_manager.generate_individual_reports(
+                    filename_result, filesize_result, message_result, output_dir, channels, "api", True
+                )
+                individual_paths.update({f"diff_{k}": v for k, v in diff_paths.items()})
+                
+            elif has_file_source:
+                # Only file sources present
+                self.logger.info("Only file sources present - generating file-only reports")
+                individual_paths = self.output_manager.generate_individual_reports(
+                    filename_result, filesize_result, message_result, output_dir, channels, "file", False
+                )
+                
+            elif has_api_source:
+                # Only API sources present
+                self.logger.info("Only API sources present - generating API-only reports")
+                individual_paths = self.output_manager.generate_individual_reports(
+                    filename_result, filesize_result, message_result, output_dir, channels, "api", False
+                )
+            
+            else:
+                # No sources detected (shouldn't happen)
+                self.logger.warning("No data sources detected for report generation")
+                individual_paths = {}
             
             # Combine all output paths
             output_paths = {
@@ -3132,9 +3164,9 @@ class AnalysisOrchestrator:
             
             all_output_paths = {}
             
-            # Determine source type and diff analysis from data sources (once for all channels)
-            source_type = "file"  # default
-            is_diff_analysis = False
+            # Determine source types from data sources (once for all channels)
+            has_api_source = False
+            has_file_source = False
             if data_sources:
                 has_api_source = any(
                     (isinstance(source, dict) and source.get('source_type') == "api") or
@@ -3148,38 +3180,92 @@ class AnalysisOrchestrator:
                     (hasattr(source, 'source_type') and source.source_type == "file")
                     for source in data_sources
                 )
-                
-                if has_api_source:
-                    source_type = "api"
-                
-                # Check if this is diff analysis (both file and API sources present)
-                if has_file_source and has_api_source:
-                    is_diff_analysis = True
             
             # Generate reports for each unique channel
             for channel_name in unique_channels:
                 self.logger.info(f"Generating reports for channel: {channel_name}")
                 
-                # Create channel-specific paths
-                channel_paths = self.output_manager._get_output_paths([channel_name], source_type, is_diff_analysis)
-                
-                # Generate comprehensive report for this channel
-                comprehensive_path = self.output_manager.generate_analysis_report(
-                    filename_result, filesize_result, message_result, [], 
-                    channel_paths['analysis_file'],
-                    [channel_name]
-                )
-                
-                # Generate individual reports for this channel
-                individual_paths = self.output_manager.generate_individual_reports(
-                    filename_result, filesize_result, message_result, 
-                    channel_paths['channels_dir'], [channel_name], source_type, is_diff_analysis
-                )
-                
-                # Store paths with channel prefix
-                all_output_paths[f"{channel_name}_comprehensive"] = comprehensive_path
-                for report_type, path in individual_paths.items():
-                    all_output_paths[f"{channel_name}_{report_type}"] = path
+                if has_file_source and has_api_source:
+                    # Both sources present: generate file-only, API-only, and diff reports
+                    self.logger.info(f"Both file and API sources present for {channel_name} - generating all report types")
+                    
+                    # Generate file-only reports
+                    file_paths = self.output_manager._get_output_paths([channel_name], "file", False)
+                    file_comprehensive = self.output_manager.generate_analysis_report(
+                        filename_result, filesize_result, message_result, [], 
+                        file_paths['analysis_file'], [channel_name]
+                    )
+                    file_individual = self.output_manager.generate_individual_reports(
+                        filename_result, filesize_result, message_result, 
+                        file_paths['channels_dir'], [channel_name], "file", False
+                    )
+                    
+                    # Generate API-only reports
+                    api_paths = self.output_manager._get_output_paths([channel_name], "api", False)
+                    api_comprehensive = self.output_manager.generate_analysis_report(
+                        filename_result, filesize_result, message_result, [], 
+                        api_paths['analysis_file'], [channel_name]
+                    )
+                    api_individual = self.output_manager.generate_individual_reports(
+                        filename_result, filesize_result, message_result, 
+                        api_paths['channels_dir'], [channel_name], "api", False
+                    )
+                    
+                    # Generate diff reports
+                    diff_paths = self.output_manager._get_output_paths([channel_name], "api", True)
+                    diff_comprehensive = self.output_manager.generate_analysis_report(
+                        filename_result, filesize_result, message_result, [], 
+                        diff_paths['analysis_file'], [channel_name]
+                    )
+                    diff_individual = self.output_manager.generate_individual_reports(
+                        filename_result, filesize_result, message_result, 
+                        diff_paths['channels_dir'], [channel_name], "api", True
+                    )
+                    
+                    # Store all paths with prefixes
+                    all_output_paths[f"{channel_name}_file_comprehensive"] = file_comprehensive
+                    for report_type, path in file_individual.items():
+                        all_output_paths[f"{channel_name}_file_{report_type}"] = path
+                    
+                    all_output_paths[f"{channel_name}_api_comprehensive"] = api_comprehensive
+                    for report_type, path in api_individual.items():
+                        all_output_paths[f"{channel_name}_api_{report_type}"] = path
+                    
+                    all_output_paths[f"{channel_name}_diff_comprehensive"] = diff_comprehensive
+                    for report_type, path in diff_individual.items():
+                        all_output_paths[f"{channel_name}_diff_{report_type}"] = path
+                        
+                elif has_file_source:
+                    # Only file sources present
+                    file_paths = self.output_manager._get_output_paths([channel_name], "file", False)
+                    comprehensive_path = self.output_manager.generate_analysis_report(
+                        filename_result, filesize_result, message_result, [], 
+                        file_paths['analysis_file'], [channel_name]
+                    )
+                    individual_paths = self.output_manager.generate_individual_reports(
+                        filename_result, filesize_result, message_result, 
+                        file_paths['channels_dir'], [channel_name], "file", False
+                    )
+                    
+                    all_output_paths[f"{channel_name}_comprehensive"] = comprehensive_path
+                    for report_type, path in individual_paths.items():
+                        all_output_paths[f"{channel_name}_{report_type}"] = path
+                        
+                elif has_api_source:
+                    # Only API sources present
+                    api_paths = self.output_manager._get_output_paths([channel_name], "api", False)
+                    comprehensive_path = self.output_manager.generate_analysis_report(
+                        filename_result, filesize_result, message_result, [], 
+                        api_paths['analysis_file'], [channel_name]
+                    )
+                    individual_paths = self.output_manager.generate_individual_reports(
+                        filename_result, filesize_result, message_result, 
+                        api_paths['channels_dir'], [channel_name], "api", False
+                    )
+                    
+                    all_output_paths[f"{channel_name}_comprehensive"] = comprehensive_path
+                    for report_type, path in individual_paths.items():
+                        all_output_paths[f"{channel_name}_{report_type}"] = path
             
             self.logger.info(f"Generated {len(all_output_paths)} individual channel reports")
             return all_output_paths

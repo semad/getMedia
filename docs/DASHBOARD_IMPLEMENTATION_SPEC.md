@@ -151,122 +151,41 @@ Each analysis file must contain:
 - **Path Sanitization**: Sanitize file paths to prevent directory traversal
 - **Safe Templates**: Use Jinja2 autoescape for XSS prevention
 
-### Single Module Requirement
+### Key Requirements
 
-#### **Consolidated Dashboard Processor**
+**Single Module Architecture:** Use `dashboard_processor.py` containing all dashboard functionality (data processing, template rendering, file generation, single page creation).
 
-The implementation must use a single module called `dashboard_processor.py` that contains all dashboard functionality:
-
-- **Single File Architecture**: All dashboard logic consolidated into one module
-- **Complete Functionality**: Data processing, template rendering, file generation, and single page creation
-- **Simplified Maintenance**: Easier to maintain and debug with all code in one place
-- **Reduced Complexity**: No need to manage multiple module dependencies
-
-### Single Page Module Requirement
-
-#### **Standalone Dashboard Pages**
-
-The implementation must support generating single-page dashboard modules that can be embedded or used independently:
-
-- **Self-Contained HTML**: Single HTML file with embedded CSS, JavaScript, and data
-- **No External Dependencies**: All resources (CSS, JS, data) embedded within the HTML file
-- **Portable**: Can be shared, emailed, or hosted anywhere without additional files
-- **Lightweight**: Optimized for minimal file size while maintaining functionality
-
-#### **Use Cases**
-
-- **Email Sharing**: Send dashboard snapshots via email
-- **Embedding**: Include dashboard widgets in other websites
-- **Offline Viewing**: View dashboards without internet connectivity
-- **Quick Reports**: Generate standalone reports for specific time periods
-
-#### **Technical Requirements**
-
-- **Embedded Resources**: CSS and JavaScript must be inlined within `<style>` and `<script>` tags
-- **Data Embedding**: JSON data must be embedded as JavaScript variables
-- **Chart.js CDN**: Use CDN for Chart.js library (with fallback for offline mode)
-- **File Size Limit**: Target single-page files under 2MB
+**Single Page Module:** Generate self-contained HTML files with embedded CSS, JavaScript, and data for email sharing, embedding, offline viewing, and quick reports. Target files under 2MB.
 
 ## Configuration Extensions
 
-### Add to `config.py`
+Add the following constants to `config.py` (reusing existing `ANALYSIS_BASE`, `DASHBOARDS_DIR`, `DEFAULT_GA_MEASUREMENT_ID`):
 
-**Note**: The following constants already exist in `config.py`:
+**Core Configuration:**
 
-- `ANALYSIS_BASE` (line 21)
-- `DASHBOARDS_DIR` (line 39)
-- `DEFAULT_GA_MEASUREMENT_ID` (line 81)
+- `DASHBOARD_INPUT_DIR`, `DASHBOARD_OUTPUT_DIR`, `DASHBOARD_INDEX_FILENAME`, `DASHBOARD_CSS_FILENAME`, `DASHBOARD_JS_FILENAME`, `DASHBOARD_DATA_FILENAME`
 
-**Add these new constants to `config.py`:**
+**Paths and UI:**
 
-**Dashboard Configuration:**
-
-- `DASHBOARD_INPUT_DIR` = ANALYSIS_BASE (already exists)
-- `DASHBOARD_OUTPUT_DIR` = DASHBOARDS_DIR (already exists)
-
-**File Naming:**
-
-- `DASHBOARD_INDEX_FILENAME` = "index.html"
-- `DASHBOARD_CSS_FILENAME` = "dashboard.css"
-- `DASHBOARD_JS_FILENAME` = "dashboard.js"
-- `DASHBOARD_DATA_FILENAME` = "dashboard-data.json"
-
-**Static File Paths:**
-
-- `DASHBOARD_CSS_PATH` = "dashboard/css"
-- `DASHBOARD_JS_PATH` = "dashboard/js"
-
-**HTML Generation:**
-
-- `DASHBOARD_HTML_TITLE` = "Telegram Channel Analysis Dashboard"
-- `DASHBOARD_HTML_CHARSET` = "UTF-8"
-- `DASHBOARD_HTML_VIEWPORT` = "width=device-width, initial-scale=1.0"
+- `DASHBOARD_CSS_PATH`, `DASHBOARD_JS_PATH`, `DASHBOARD_HTML_TITLE`, `DASHBOARD_HTML_CHARSET`, `DASHBOARD_HTML_VIEWPORT`
 
 **Data Processing:**
 
-- `DASHBOARD_DEFAULT_CHANNELS` = "all"
-- `DASHBOARD_SUPPORTED_ANALYSIS_TYPES` = ["filename", "filesize", "message"]
-- `DASHBOARD_SUPPORTED_SOURCE_TYPES` = ["file_messages", "db_messages", "diff_messages"]
-- `DASHBOARD_MAX_CHANNEL_NAME_LENGTH` = 50
+- `DASHBOARD_DEFAULT_CHANNELS`, `DASHBOARD_SUPPORTED_ANALYSIS_TYPES`, `DASHBOARD_SUPPORTED_SOURCE_TYPES`, `DASHBOARD_MAX_CHANNEL_NAME_LENGTH`
 
-**Chart Configuration:**
+**Charts and Analytics:**
 
-- `DASHBOARD_CHART_WIDTH` = 800
-- `DASHBOARD_CHART_HEIGHT` = 600
-- `DASHBOARD_MAX_DATA_POINTS` = 10000
-- `DASHBOARD_CHARTJS_CDN_URL` = <https://cdn.jsdelivr.net/npm/chart.js>
+- `DASHBOARD_CHART_WIDTH`, `DASHBOARD_CHART_HEIGHT`, `DASHBOARD_MAX_DATA_POINTS`, `DASHBOARD_CHARTJS_CDN_URL`, `DASHBOARD_GA_MEASUREMENT_ID`, `DASHBOARD_GA_ENABLED`
 
-**Google Analytics Configuration:**
+**Single Page Module:**
 
-- `DASHBOARD_GA_MEASUREMENT_ID` = DEFAULT_GA_MEASUREMENT_ID (from existing config)
-- `DASHBOARD_GA_ENABLED` = True
-
-**Single Page Module Configuration:**
-
-- `DASHBOARD_SINGLE_PAGE_ENABLED` = True
-- `DASHBOARD_SINGLE_PAGE_FILENAME` = "dashboard-standalone.html"
-- `DASHBOARD_SINGLE_PAGE_MAX_SIZE_MB` = 2
+- `DASHBOARD_SINGLE_PAGE_ENABLED`, `DASHBOARD_SINGLE_PAGE_FILENAME`, `DASHBOARD_SINGLE_PAGE_MAX_SIZE_MB`
 
 ## Implementation Architecture
 
-### Core Components
+**Core Component:** `modules/dashboard_processor.py` - Single module containing all dashboard functionality including data processing, template rendering, file generation, single page creation, Chart.js integration, and error handling.
 
-1. **Dashboard Processor** (`modules/dashboard_processor.py`)
-   - Complete dashboard generation logic
-   - Data processing and aggregation
-   - JSON file parsing and validation
-   - HTML template rendering
-   - File output management
-   - Single page module generation
-   - Chart.js integration
-   - Resource embedding (CSS, JS, data)
-   - Error handling for missing data
-
-2. **Configuration Integration** (`config.py` extensions)
-   - Dashboard-specific constants
-   - File path configurations
-   - Chart and UI settings
-   - Single page module settings
+**Configuration:** Extend `config.py` with dashboard-specific constants for file paths, chart settings, and single page module configuration.
 
 ## Implementation Steps
 
@@ -300,223 +219,68 @@ Create a single comprehensive module that handles all dashboard functionality:
 
 ### Step 2: CLI Integration
 
-#### Add to `main.py`
+Add dashboard command to `main.py` with click options for input-dir, output-dir, channels, single-page, and verbose flags. Import DashboardProcessor and handle exceptions.
 
-**CLI Command Structure:**
+### Step 3: Complete Module Implementation
 
-- `@cli.command()` decorator for dashboard command
-- Click options for input-dir, output-dir, channels, single-page, verbose
-- Import DashboardProcessor from modules.dashboard_processor
-- Initialize processor with provided parameters
-- Call processor.process() method
-- Handle ImportError and general exceptions with appropriate error messages
+The `dashboard_processor.py` module should include:
 
-### Step 2: Complete Module Implementation
+**Data Processing Methods:**
 
-The `dashboard_processor.py` module should include all the following methods and functionality:
+- `_discover_analysis_files()`, `_load_analysis_data()`, `_aggregate_channel_data()`
+- `_extract_channel_name()`, `_sanitize_channel_name()`, `_update_summary_metrics()`
 
-#### **Data Processing Methods**
+**Template Rendering Methods:**
 
-The `dashboard_processor.py` module should include these data processing methods:
+- `_render_index_page()`, `_render_channel_page()`, `_render_shared_css()`, `_render_shared_js()`
 
-- `_discover_analysis_files()` - Find all analysis JSON files
-- `_load_analysis_data()` - Load and validate JSON data
-- `_aggregate_channel_data()` - Combine data from multiple files
-- `_extract_channel_name()` - Extract channel names from file paths
-- `_sanitize_channel_name()` - Clean channel names for file system use
-- `_update_summary_metrics()` - Calculate summary statistics
+**File Generation Methods:**
 
-#### **Template Rendering Methods**
+- `_generate_shared_files()`, `_generate_html_pages()`, `_generate_single_pages()`, `_create_empty_dashboard_data()`
 
-The module should include these template rendering methods:
+### Step 4: HTML Templates
 
-- `_render_index_page()` - Generate main dashboard page
-- `_render_channel_page()` - Generate individual channel pages
-- `_render_shared_css()` - Generate CSS styles
-- `_render_shared_js()` - Generate JavaScript with Google Analytics
-- `_render_single_page_template()` - Generate standalone HTML pages
+Create `templates/dashboard/index.html`, `channel.html`, and `single.html` with Jinja2 syntax, Google Analytics integration, responsive design, and Chart.js support. Adapt existing `dashboard_index.html` and `dashboard_channel.html` templates.
 
-#### **File Generation Methods**
+### Step 5: Single Page Module
 
-The module should include these file generation methods:
-
-- `_generate_shared_files()` - Create CSS, JS, and data files
-- `_generate_html_pages()` - Create all HTML pages
-- `_generate_single_pages()` - Create standalone dashboard files
-- `_create_empty_dashboard_data()` - Handle cases with no data
-
-### Step 3: HTML Templates
-
-**Required Template Files:**
-
-- `templates/dashboard/index.html` - Main dashboard page
-- `templates/dashboard/channel.html` - Individual channel page  
-- `templates/dashboard/single.html` - Single page template (optional)
-
-**Template Features:**
-
-- Jinja2 template syntax with variables and loops
-- Google Analytics integration with conditional loading
-- Responsive design with CSS Grid and Flexbox
-- Chart.js integration for data visualization
-- Navigation and action buttons
-- Metric cards and channel grids
-
-**Existing Templates to Adapt:**
-
-- `templates/dashboard_index.html` → `templates/dashboard/index.html`
-- `templates/dashboard_channel.html` → `templates/dashboard/channel.html`
-
-### Step 4: Single Page Module
-
-**Single Page Module Features:**
-
-- Self-contained HTML files with embedded CSS, JavaScript, and data
-- No external dependencies for offline viewing
-- File size validation and optimization
-- Google Analytics integration
-- Chart.js CDN or embedded version support
-- Channel-specific and full dashboard views
-
-**Key Methods:**
-
-- `generate_single_page()` - Main generation method
-- `_get_embedded_css()` - Extract CSS for embedding
-- `_get_embedded_js()` - Extract JavaScript for embedding
-- `_get_embedded_data()` - Convert data to JavaScript variables
-- `_get_chartjs_script()` - Get Chart.js script tag
-- `_render_single_page_template()` - Render complete HTML with embedded resources
-- `_get_single_page_filename()` - Generate appropriate filename
+Generate self-contained HTML files with embedded CSS, JavaScript, and data. Include methods for CSS/JS embedding, data serialization, Chart.js integration, and file size validation.
 
 ## Google Analytics Integration
 
-### Tracking Events
+Implement Google Analytics 4 tracking for page views, chart interactions, and export actions. Include privacy controls with configurable enable/disable flag. Track anonymous usage patterns only.
 
-The dashboard includes comprehensive Google Analytics 4 tracking for the following events:
+## Error Handling & Performance
 
-#### **Page Views**
+**Error Handling:**
 
-- **Event**: `page_view`
-- **Parameters**:
-  - `page_title`: Dashboard page title
-  - `page_location`: Current URL
-  - `dashboard_type`: "index" or "channel"
-  - `channel_name`: Channel name (for channel pages)
+- Skip missing files with warnings, handle corrupted JSON gracefully, provide fallbacks for missing data
+- Create output directories if missing, handle permission errors, continue processing on individual file failures
 
-#### **Chart Interactions**
+**Performance Requirements:**
 
-- **Event**: `chart_interaction`
-- **Parameters**:
-  - `chart_type`: Type of chart (bar, pie, line)
-  - `action`: User action (hover, click, legend_toggle)
-  - `channel_name`: Associated channel
-  - `label`: Combined identifier
-
-#### **Export Actions**
-
-- **Event**: `export_action`
-- **Parameters**:
-  - `export_type`: Type of export (data, chart, pdf)
-  - `channel_name`: Associated channel
-  - `label`: Export identifier
-
-### Privacy Considerations
-
-- Google Analytics is only loaded when `DASHBOARD_GA_ENABLED` is True
-- No personal data is tracked, only dashboard usage patterns
-- Users can disable tracking by setting the configuration flag to False
-- All tracking is anonymous and aggregated
-
-## Error Handling
-
-### Data Processing Errors
-
-- Skip missing analysis files with warnings
-- Handle corrupted JSON gracefully
-- Provide fallback for missing data sections
-- Log all errors with appropriate levels
-
-### Output Generation Errors
-
-- Create output directories if missing
-- Handle file write permission errors
-- Provide meaningful error messages
-- Continue processing if individual files fail
-
-## Performance Considerations
-
-### Data Size Limits
-
-- Limit charts to 10,000 data points maximum
-- Target HTML file size under 5MB
-- Process large datasets in chunks
-- Use data sampling for overview charts
-
-### Optimization Strategies
-
-- Minify JSON data before embedding
-- Use efficient chart rendering
-- Implement lazy loading for large datasets
-- Cache processed data to avoid reprocessing
+- Limit charts to 10,000 data points, target HTML files under 5MB, process large datasets in chunks
+- Minify JSON data, use efficient chart rendering, implement lazy loading, cache processed data
 
 ## Testing Strategy
 
-### Unit Tests
+**Unit Tests:** Cover DashboardProcessor initialization, data processing, template rendering, error handling, and single page generation.
 
-**Test Coverage Areas:**
+**Integration Tests:** End-to-end dashboard generation workflow, file output verification, error scenarios, and performance testing with large datasets.
 
-- DashboardProcessor initialization and configuration
-- Data processing and file discovery
-- Template rendering and file generation
-- Error handling and edge cases
-- Single page module generation
-
-**Key Test Functions:**
-
-- `test_dashboard_generator_initialization()` - Verify proper initialization
-- `test_data_processor_file_discovery()` - Test file discovery functionality
-- `test_template_rendering()` - Test template rendering with various data
-- `test_single_page_generation()` - Test single page module creation
-
-### Integration Tests
-
-**End-to-End Testing:**
-
-- Complete dashboard generation workflow
-- File output verification
-- Single page module generation
-- Error handling scenarios
-- Performance testing with large datasets
-
-**Test Data Requirements:**
-
-- Sample analysis JSON files
-- Various channel configurations
-- Edge cases (empty data, missing files, corrupted data)
+**Test Data:** Sample analysis JSON files, various channel configurations, and edge cases (empty data, missing files, corrupted data).
 
 ## Deployment and Usage
 
-### Installation
+**Installation:** Add dashboard modules, update `config.py` with constants, add CLI command to `main.py`, install dependencies.
 
-1. Add dashboard modules to the project
-2. Update `config.py` with dashboard constants
-3. Add CLI command to `main.py`
-4. Install required dependencies
+**Usage Examples:**
 
-### Usage Examples
-
-**Basic Usage:**
-
-- `python main.py dashboard` - Generate dashboard with default settings
-- `python main.py dashboard -c "books,@SherwinVakiliLibrary"` - Generate for specific channels
+- `python main.py dashboard` - Default settings
+- `python main.py dashboard -c "books,@SherwinVakiliLibrary"` - Specific channels
 - `python main.py dashboard -i /path/to/analysis -o /path/to/output` - Custom directories
+- `python main.py dashboard -s` - Single-page standalone dashboards
 - `python main.py dashboard -v` - Verbose logging
-
-**Single Page Module:**
-
-- `python main.py dashboard -s` - Generate single-page standalone dashboards
-- `python main.py dashboard -s -c "books,@SherwinVakiliLibrary"` - Single-page for specific channels
-- `python main.py dashboard -s -v` - Both multi-page and single-page dashboards
 
 ## Implementation Checklist
 

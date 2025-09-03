@@ -263,34 +263,39 @@ def combine_collections(channels, verbose):
 
 
 @cli.command(name="analysis")
+@click.option("--no-file", 
+              is_flag=True, 
+              help="Disable file source (combined collections)")
+@click.option("--no-api", 
+              is_flag=True, 
+              help="Disable API source (REST endpoints)")
+@click.option("--no-diff", 
+              is_flag=True, 
+              help="Disable diff analysis (file vs API comparison)")
 @click.option("--channels", "-c", 
-              help="Comma-separated list of channel usernames to analyze")
-@click.option("--analysis-types", "-t",
-              help="Comma-separated list of analysis types: filename,filesize,message (default: all)")
-@click.option("--output-dir", "-o", 
-              type=click.Path(), 
-              help="Output directory for analysis results (default: analysis_output_<timestamp>)")
-@click.option("--chunk-size", 
-              type=int, 
-              default=10000,
-              help="Chunk size for processing large datasets (default: 10000)")
+              default="all",
+              help="Comma-separated channel list or 'all'")
 @click.option("--verbose", "-v", 
               is_flag=True, 
-              help="Enable verbose logging output")
+              help="Enable verbose logging")
 @click.help_option("-h", "--help")
-def analysis(channels, analysis_types, output_dir, chunk_size, verbose):
+def analysis(no_file, no_api, no_diff, channels, verbose):
     """Run comprehensive analysis on Telegram channel data.
     
     This command analyzes collected Telegram channel data for filename patterns,
     filesize distributions, and message content patterns.
     
     Examples:
-        python main.py analysis                           # Analyze all data with default settings
-        python main.py analysis --channels "@channel1,@channel2"    # Analyze specific channels
-        python main.py analysis --analysis-types filename,filesize  # Run specific analysis types
-        python main.py analysis --output-dir ./results    # Specify output directory
-        python main.py analysis --chunk-size 5000         # Use smaller chunks for large datasets
-        python main.py analysis --verbose                 # Enable verbose logging
+        python main.py analysis                           # Default behavior (all sources and diff analysis)
+        python main.py analysis --channels @SherwinVakiliLibrary  # Analysis with specific channels
+        python main.py analysis --verbose                 # Analysis with verbose logging
+        python main.py analysis --channels @SherwinVakiliLibrary --verbose  # Analysis with specific channels and verbose logging
+        python main.py analysis --no-file                 # Analysis without file source (API only)
+        python main.py analysis --no-api                  # Analysis without API source (file only)
+        python main.py analysis --no-diff                 # Analysis without diff comparison (file and API separately)
+        python main.py analysis --no-api --no-diff        # Analysis with only file source (no API, no diff)
+        python main.py analysis --no-file --no-diff       # Analysis with only API source (no file, no diff)
+        python main.py analysis --channels @SherwinVakiliLibrary --no-diff  # Analysis with specific channels and no diff
     """
     setup_logging(verbose)
     logger = logging.getLogger(__name__)
@@ -305,12 +310,15 @@ def analysis(channels, analysis_types, output_dir, chunk_size, verbose):
         # Create configuration
         config_kwargs = {
             "verbose": verbose,
-            "chunk_size": chunk_size
+            "enable_file_source": not no_file,
+            "enable_api_source": not no_api,
+            "enable_diff_analysis": not no_diff
         }
         
-        # Add output directory if provided
-        if output_dir:
-            config_kwargs["output_dir"] = output_dir
+        # Add channels if specified
+        if channels and channels != "all":
+            channel_list = [ch.strip() for ch in channels.split(",")]
+            config_kwargs["channels"] = channel_list
         
         # Create configuration
         config = create_analysis_config(**config_kwargs)
@@ -322,23 +330,10 @@ def analysis(channels, analysis_types, output_dir, chunk_size, verbose):
         # Prepare analysis parameters
         analysis_kwargs = {}
         
-        if channels:
+        # Add channels if specified (already handled in config, but keep for orchestrator)
+        if channels and channels != "all":
             channel_list = [ch.strip() for ch in channels.split(",")]
             analysis_kwargs["channels"] = channel_list
-        
-        # Set analysis types
-        if analysis_types:
-            analysis_types_list = [t.strip() for t in analysis_types.split(",")]
-            # Validate analysis types
-            valid_types = ["filename", "filesize", "message"]
-            invalid_types = [t for t in analysis_types_list if t not in valid_types]
-            if invalid_types:
-                logger.error(f"❌ Invalid analysis types: {invalid_types}. Valid types: {valid_types}")
-                return
-            analysis_kwargs["analysis_types"] = analysis_types_list
-        else:
-            # Default to all analysis types
-            analysis_kwargs["analysis_types"] = ["filename", "filesize", "message"]
         
         # Run analysis
         logger.info("🚀 Starting comprehensive analysis...")

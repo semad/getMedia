@@ -15,6 +15,46 @@ The `analysis` command is an advanced intermediate data analysis tool for Telegr
 7. **Extensibility**: Easy to add new analysis types and advanced features in future versions
 8. **Error Handling**: Comprehensive error handling and validation throughout the pipeline
 
+## Command Line Interface
+
+### Basic Usage
+```bash
+python main.py analysis [OPTIONS]
+```
+
+### CLI Options
+
+#### **Core Options**
+- `--channels, -c TEXT`: Comma-separated list of channel usernames to analyze
+- `--analysis-types, -t TEXT`: Comma-separated list of analysis types: filename,filesize,message (default: all)
+- `--output-dir, -o PATH`: Output directory for analysis results (default: analysis_output_<timestamp>)
+- `--chunk-size INTEGER`: Chunk size for processing large datasets (default: 10000)
+- `--verbose, -v`: Enable verbose logging output
+- `--help, -h`: Show help message and exit
+
+### Usage Examples
+
+#### **Basic Analysis**
+```bash
+# Analyze all data with default settings
+python main.py analysis
+
+# Analyze specific channels
+python main.py analysis --channels "@channel1,@channel2"
+
+# Run specific analysis types
+python main.py analysis --analysis-types filename,filesize
+
+# Specify output directory
+python main.py analysis --output-dir ./results
+
+# Use smaller chunks for large datasets
+python main.py analysis --chunk-size 5000
+
+# Enable verbose logging
+python main.py analysis --verbose
+```
+
 ## Requirements
 
 ### Functional Requirements

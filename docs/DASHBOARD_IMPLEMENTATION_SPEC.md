@@ -59,7 +59,7 @@ The implementation requires the following directory structure to exist or be cre
   - `index.html` - Generated main dashboard
   - `{channel}.html` - Generated channel pages
   - `dashboard-standalone.html` - Generated single page dashboards
-  - `dashboard/` - Static files
+  - `static/` - Static files
     - `css/dashboard.css` - Generated styles
     - `js/dashboard.js` - Generated JavaScript
   - `data/dashboard-data.json` - Generated analysis data
@@ -242,8 +242,6 @@ The `dashboard_processor.py` module should include:
 
 Create `templates/dashboard/index.html`, `channel.html`, and `single.html` with Jinja2 syntax, Google Analytics integration, responsive design, and Chart.js support. Adapt existing `dashboard_index.html` and `dashboard_channel.html` templates.
 
-### Step 5: Single Page Module
-
 Generate self-contained HTML files with embedded CSS, JavaScript, and data. Include methods for CSS/JS embedding, data serialization, Chart.js integration, and file size validation.
 
 ## Google Analytics Integration
@@ -279,7 +277,6 @@ Implement Google Analytics 4 tracking for page views, chart interactions, and ex
 - `python main.py dashboard` - Default settings
 - `python main.py dashboard -c "books,@SherwinVakiliLibrary"` - Specific channels
 - `python main.py dashboard -i /path/to/analysis -o /path/to/output` - Custom directories
-- `python main.py dashboard -s` - Single-page standalone dashboards
 - `python main.py dashboard -v` - Verbose logging
 
 ## Implementation Checklist

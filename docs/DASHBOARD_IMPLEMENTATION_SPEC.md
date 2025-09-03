@@ -4,34 +4,45 @@
 
 This document provides detailed implementation specifications for the Dashboard command, based on the Dashboard General Design, HTML prototypes, and existing configuration structure. The implementation will generate a multi-page HTML dashboard website from analysis command output.
 
-## Implementation Requirements
+## Key Requirements
 
-### Development Environment Setup
+**Single Module Architecture:** Use `dashboard_processor.py` containing all dashboard functionality (data processing, template rendering, file generation, single page creation).
 
-#### **Python Dependencies**
+**Single Page Module:** Generate self-contained HTML files with embedded CSS, JavaScript, and data for email sharing, embedding, offline viewing, and quick reports. Target files under 2MB.
 
-**Core dependencies:**
+## Implementation Architecture
 
-- jinja2>=3.1.0
-- click>=8.0.0
-- pathlib2>=2.3.0 (for Python < 3.4 compatibility)
+**Core Component:** `modules/dashboard_processor.py` - Single module containing all dashboard functionality including data processing, template rendering, file generation, single page creation, Chart.js integration, and error handling.
 
-**Development dependencies:**
+**Configuration:** Extend `config.py` with dashboard-specific constants for file paths, chart settings, and single page module configuration.
 
-- pytest>=7.0.0
-- pytest-cov>=4.0.0
-- black>=22.0.0
-- flake8>=5.0.0
+## Configuration Extensions
 
-#### **Required Python Version**
+Add the following constants to `config.py` (reusing existing `ANALYSIS_BASE`, `DASHBOARDS_DIR`, `DEFAULT_GA_MEASUREMENT_ID`):
 
-- **Minimum**: Python 3.8+
-- **Recommended**: Python 3.9+
-- **Tested**: Python 3.8, 3.9, 3.10, 3.11
+**Core Configuration:**
 
-### File System Requirements
+- `DASHBOARD_INPUT_DIR`, `DASHBOARD_OUTPUT_DIR`, `DASHBOARD_INDEX_FILENAME`, `DASHBOARD_CSS_FILENAME`, `DASHBOARD_JS_FILENAME`, `DASHBOARD_DATA_FILENAME`
 
-#### **Directory Structure**
+**Paths and UI:**
+
+- `DASHBOARD_CSS_PATH`, `DASHBOARD_JS_PATH`, `DASHBOARD_HTML_TITLE`, `DASHBOARD_HTML_CHARSET`, `DASHBOARD_HTML_VIEWPORT`
+
+**Data Processing:**
+
+- `DASHBOARD_DEFAULT_CHANNELS`, `DASHBOARD_SUPPORTED_ANALYSIS_TYPES`, `DASHBOARD_SUPPORTED_SOURCE_TYPES`, `DASHBOARD_MAX_CHANNEL_NAME_LENGTH`
+
+**Charts and Analytics:**
+
+- `DASHBOARD_CHART_WIDTH`, `DASHBOARD_CHART_HEIGHT`, `DASHBOARD_MAX_DATA_POINTS`, `DASHBOARD_CHARTJS_CDN_URL`, `DASHBOARD_GA_MEASUREMENT_ID`, `DASHBOARD_GA_ENABLED`
+
+**Single Page Module:**
+
+- `DASHBOARD_SINGLE_PAGE_ENABLED`, `DASHBOARD_SINGLE_PAGE_FILENAME`, `DASHBOARD_SINGLE_PAGE_MAX_SIZE_MB`
+
+## File System Requirements
+
+### Directory Structure
 
 The implementation requires the following directory structure to exist or be created:
 
@@ -64,15 +75,15 @@ The implementation requires the following directory structure to exist or be cre
     - `js/dashboard.js` - Generated JavaScript
   - `data/dashboard-data.json` - Generated analysis data
 
-#### **File Permissions**
+### File Permissions
 
 - **Read Access**: Required for analysis input files
 - **Write Access**: Required for dashboard output directory
 - **Execute Access**: Required for creating subdirectories
 
-### Input Data Requirements
+## Input Data Requirements
 
-#### **Analysis Command Output**
+### Analysis Command Output
 
 The dashboard requires analysis command output in the following format:
 
@@ -86,7 +97,7 @@ The dashboard requires analysis command output in the following format:
 - `reports/analysis/db_messages/channels/channel2/`
 - `reports/analysis/diff_messages/channels/channel3/`
 
-#### **JSON File Format**
+### JSON File Format
 
 Each analysis file must contain:
 
@@ -97,7 +108,7 @@ Each analysis file must contain:
 - `analysis_version`: Version of analysis format
 - `data`: Analysis-specific data object
 
-#### **Single Page Module Data Validation**
+### Single Page Module Data Validation
 
 - **Data Size Limits**: Validate embedded data doesn't exceed memory limits
 - **JSON Serialization**: Ensure all data can be serialized to JSON for embedding
@@ -107,85 +118,28 @@ Each analysis file must contain:
 - **Metadata Validation**: Ensure metadata contains required generation information
 - **Analysis Data Validation**: Validate analysis data structure before embedding
 
-### Browser Compatibility
+## Development Environment Setup
 
-#### **Supported Browsers**
+### Python Dependencies
 
-- **Chrome**: Version 90+
-- **Firefox**: Version 88+
-- **Safari**: Version 14+
-- **Edge**: Version 90+
+**Core dependencies:**
 
-#### **Required Features**
+- jinja2>=3.1.0
+- click>=8.0.0
+- pathlib2>=2.3.0 (for Python < 3.4 compatibility)
 
-- **CSS Grid**: For responsive layouts
-- **ES6 JavaScript**: For modern JavaScript features
-- **Fetch API**: For data loading
+**Development dependencies:**
 
-### Performance Requirements
+- pytest>=7.0.0
+- pytest-cov>=4.0.0
+- black>=22.0.0
+- flake8>=5.0.0
 
-#### **Data Size Limits**
+### Required Python Version
 
-- **Maximum Data Points**: 10,000 per chart
-- **Maximum File Size**: 5MB per HTML file
-- **Maximum Channels**: 100 channels per dashboard
-- **Memory Usage**: < 100MB in browser
-
-#### **Loading Performance**
-
-- **Index Page Load**: < 1 second
-- **Channel Page Load**: < 1.5 seconds
-- **Chart Rendering**: < 500ms per chart
-
-### Security Requirements
-
-#### **Data Privacy**
-
-- **No Personal Data**: Dashboard does not collect or store personal information
-- **Anonymous Analytics**: Google Analytics tracking is anonymous
-- **Local Processing**: All data processing happens locally
-
-#### **File Security**
-
-- **Input Validation**: Validate all JSON input files
-- **Path Sanitization**: Sanitize file paths to prevent directory traversal
-- **Safe Templates**: Use Jinja2 autoescape for XSS prevention
-
-### Key Requirements
-
-**Single Module Architecture:** Use `dashboard_processor.py` containing all dashboard functionality (data processing, template rendering, file generation, single page creation).
-
-**Single Page Module:** Generate self-contained HTML files with embedded CSS, JavaScript, and data for email sharing, embedding, offline viewing, and quick reports. Target files under 2MB.
-
-## Configuration Extensions
-
-Add the following constants to `config.py` (reusing existing `ANALYSIS_BASE`, `DASHBOARDS_DIR`, `DEFAULT_GA_MEASUREMENT_ID`):
-
-**Core Configuration:**
-
-- `DASHBOARD_INPUT_DIR`, `DASHBOARD_OUTPUT_DIR`, `DASHBOARD_INDEX_FILENAME`, `DASHBOARD_CSS_FILENAME`, `DASHBOARD_JS_FILENAME`, `DASHBOARD_DATA_FILENAME`
-
-**Paths and UI:**
-
-- `DASHBOARD_CSS_PATH`, `DASHBOARD_JS_PATH`, `DASHBOARD_HTML_TITLE`, `DASHBOARD_HTML_CHARSET`, `DASHBOARD_HTML_VIEWPORT`
-
-**Data Processing:**
-
-- `DASHBOARD_DEFAULT_CHANNELS`, `DASHBOARD_SUPPORTED_ANALYSIS_TYPES`, `DASHBOARD_SUPPORTED_SOURCE_TYPES`, `DASHBOARD_MAX_CHANNEL_NAME_LENGTH`
-
-**Charts and Analytics:**
-
-- `DASHBOARD_CHART_WIDTH`, `DASHBOARD_CHART_HEIGHT`, `DASHBOARD_MAX_DATA_POINTS`, `DASHBOARD_CHARTJS_CDN_URL`, `DASHBOARD_GA_MEASUREMENT_ID`, `DASHBOARD_GA_ENABLED`
-
-**Single Page Module:**
-
-- `DASHBOARD_SINGLE_PAGE_ENABLED`, `DASHBOARD_SINGLE_PAGE_FILENAME`, `DASHBOARD_SINGLE_PAGE_MAX_SIZE_MB`
-
-## Implementation Architecture
-
-**Core Component:** `modules/dashboard_processor.py` - Single module containing all dashboard functionality including data processing, template rendering, file generation, single page creation, Chart.js integration, and error handling.
-
-**Configuration:** Extend `config.py` with dashboard-specific constants for file paths, chart settings, and single page module configuration.
+- **Minimum**: Python 3.8+
+- **Recommended**: Python 3.9+
+- **Tested**: Python 3.8, 3.9, 3.10, 3.11
 
 ## Implementation Steps
 
@@ -259,6 +213,35 @@ Implement Google Analytics 4 tracking for page views, chart interactions, and ex
 
 - Limit charts to 10,000 data points, target HTML files under 5MB, process large datasets in chunks
 - Minify JSON data, use efficient chart rendering, implement lazy loading, cache processed data
+
+## Browser Compatibility
+
+### Supported Browsers
+
+- **Chrome**: Version 90+
+- **Firefox**: Version 88+
+- **Safari**: Version 14+
+- **Edge**: Version 90+
+
+### Required Features
+
+- **CSS Grid**: For responsive layouts
+- **ES6 JavaScript**: For modern JavaScript features
+- **Fetch API**: For data loading
+
+## Security Requirements
+
+### Data Privacy
+
+- **No Personal Data**: Dashboard does not collect or store personal information
+- **Anonymous Analytics**: Google Analytics tracking is anonymous
+- **Local Processing**: All data processing happens locally
+
+### File Security
+
+- **Input Validation**: Validate all JSON input files
+- **Path Sanitization**: Sanitize file paths to prevent directory traversal
+- **Safe Templates**: Use Jinja2 autoescape for XSS prevention
 
 ## Testing Strategy
 

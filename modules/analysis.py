@@ -2211,8 +2211,9 @@ class JsonOutputManager:
             source_type = "file"  # default
             if data_sources:
                 # Check if any data source is from API
-                # data_sources contains tuples of (dataframe, DataSource)
+                # data_sources can be dicts, tuples, or objects
                 has_api_source = any(
+                    (isinstance(source, dict) and source.get('source_type') == "api") or
                     (isinstance(source, tuple) and len(source) > 1 and source[1].source_type == "api") or
                     (hasattr(source, 'source_type') and source.source_type == "api")
                     for source in data_sources
@@ -3038,8 +3039,9 @@ class AnalysisOrchestrator:
             source_type = "file"  # default
             if data_sources:
                 # Check if any data source is from API
-                # data_sources contains tuples of (dataframe, DataSource)
+                # data_sources can be dicts, tuples, or objects
                 has_api_source = any(
+                    (isinstance(source, dict) and source.get('source_type') == "api") or
                     (isinstance(source, tuple) and len(source) > 1 and source[1].source_type == "api") or
                     (hasattr(source, 'source_type') and source.source_type == "api")
                     for source in data_sources

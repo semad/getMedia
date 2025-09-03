@@ -41,6 +41,8 @@ from config import (
     FILES_CHANNELS_DIR,
     DB_MESSAGES_DIR,
     DB_CHANNELS_DIR,
+    DIFF_MESSAGES_DIR,
+    DIFF_CHANNELS_DIR,
     ANALYSIS_FILE_PATTERN,
     ANALYSIS_SUMMARY_PATTERN
 )
@@ -200,6 +202,8 @@ class AnalysisConfig(BaseModel):
     FILES_CHANNELS_DIR,
     DB_MESSAGES_DIR,
     DB_CHANNELS_DIR,
+    DIFF_MESSAGES_DIR,
+    DIFF_CHANNELS_DIR,
     ANALYSIS_FILE_PATTERN,
     ANALYSIS_SUMMARY_PATTERN
 )
@@ -2145,11 +2149,13 @@ class JsonOutputManager:
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         self.performance_monitor = PerformanceMonitor()
     
-    def _get_output_paths(self, channels: List[str] = None, source_type: str = "file") -> Dict[str, str]:
+    def _get_output_paths(self, channels: List[str] = None, source_type: str = "file", is_diff_analysis: bool = False) -> Dict[str, str]:
         """Generate output paths according to config.py structure."""
         try:
-            # Choose the appropriate base directory based on source type
-            if source_type == "api" or source_type == "database":
+            # Choose the appropriate base directory based on source type and analysis type
+            if is_diff_analysis:
+                base_dir = DIFF_MESSAGES_DIR
+            elif source_type == "api" or source_type == "database":
                 base_dir = DB_MESSAGES_DIR
             else:
                 base_dir = FILE_MESSAGES_DIR
@@ -2207,8 +2213,9 @@ class JsonOutputManager:
         try:
             self.performance_monitor.start()
             
-            # Determine source type from data sources
+            # Determine source type and diff analysis from data sources
             source_type = "file"  # default
+            is_diff_analysis = False
             if data_sources:
                 # Check if any data source is from API
                 # data_sources can be dicts, tuples, or objects
@@ -2218,12 +2225,23 @@ class JsonOutputManager:
                     (hasattr(source, 'source_type') and source.source_type == "api")
                     for source in data_sources
                 )
+                has_file_source = any(
+                    (isinstance(source, dict) and source.get('source_type') == "file") or
+                    (isinstance(source, tuple) and len(source) > 1 and source[1].source_type == "file") or
+                    (hasattr(source, 'source_type') and source.source_type == "file")
+                    for source in data_sources
+                )
+                
                 if has_api_source:
                     source_type = "api"
+                
+                # Check if this is diff analysis (both file and API sources present)
+                if has_file_source and has_api_source:
+                    is_diff_analysis = True
             
             # Create output path if not provided
             if not output_path:
-                paths = self._get_output_paths(channels, source_type)
+                paths = self._get_output_paths(channels, source_type, is_diff_analysis)
                 output_path = paths['analysis_file']
             
             self.logger.info(f"Generating analysis report: {output_path}")
@@ -2264,14 +2282,15 @@ class JsonOutputManager:
                                   message_result: MessageAnalysisResult,
                                   output_dir: str = None,
                                   channels: List[str] = None,
-                                  source_type: str = "file") -> Dict[str, str]:
+                                  source_type: str = "file",
+                                  is_diff_analysis: bool = False) -> Dict[str, str]:
         """Generate individual analysis reports for each analysis type."""
         try:
             self.performance_monitor.start()
             
             # Create output directory if not provided
             if not output_dir:
-                paths = self._get_output_paths(channels, source_type)
+                paths = self._get_output_paths(channels, source_type, is_diff_analysis)
                 output_dir = paths['channels_dir']
             
             Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -3035,8 +3054,9 @@ class AnalysisOrchestrator:
                 channels
             )
             
-            # Determine source type from data sources
+            # Determine source type and diff analysis from data sources
             source_type = "file"  # default
+            is_diff_analysis = False
             if data_sources:
                 # Check if any data source is from API
                 # data_sources can be dicts, tuples, or objects
@@ -3046,12 +3066,23 @@ class AnalysisOrchestrator:
                     (hasattr(source, 'source_type') and source.source_type == "api")
                     for source in data_sources
                 )
+                has_file_source = any(
+                    (isinstance(source, dict) and source.get('source_type') == "file") or
+                    (isinstance(source, tuple) and len(source) > 1 and source[1].source_type == "file") or
+                    (hasattr(source, 'source_type') and source.source_type == "file")
+                    for source in data_sources
+                )
+                
                 if has_api_source:
                     source_type = "api"
+                
+                # Check if this is diff analysis (both file and API sources present)
+                if has_file_source and has_api_source:
+                    is_diff_analysis = True
             
             # Generate individual reports
             individual_paths = self.output_manager.generate_individual_reports(
-                filename_result, filesize_result, message_result, output_dir, channels, source_type
+                filename_result, filesize_result, message_result, output_dir, channels, source_type, is_diff_analysis
             )
             
             # Combine all output paths
@@ -3101,19 +3132,36 @@ class AnalysisOrchestrator:
             
             all_output_paths = {}
             
-            # Determine source type from data sources (once for all channels)
+            # Determine source type and diff analysis from data sources (once for all channels)
             source_type = "file"  # default
+            is_diff_analysis = False
             if data_sources:
-                has_api_source = any(source.source_type == "api" for source in data_sources)
+                has_api_source = any(
+                    (isinstance(source, dict) and source.get('source_type') == "api") or
+                    (isinstance(source, tuple) and len(source) > 1 and source[1].source_type == "api") or
+                    (hasattr(source, 'source_type') and source.source_type == "api")
+                    for source in data_sources
+                )
+                has_file_source = any(
+                    (isinstance(source, dict) and source.get('source_type') == "file") or
+                    (isinstance(source, tuple) and len(source) > 1 and source[1].source_type == "file") or
+                    (hasattr(source, 'source_type') and source.source_type == "file")
+                    for source in data_sources
+                )
+                
                 if has_api_source:
                     source_type = "api"
+                
+                # Check if this is diff analysis (both file and API sources present)
+                if has_file_source and has_api_source:
+                    is_diff_analysis = True
             
             # Generate reports for each unique channel
             for channel_name in unique_channels:
                 self.logger.info(f"Generating reports for channel: {channel_name}")
                 
                 # Create channel-specific paths
-                channel_paths = self.output_manager._get_output_paths([channel_name], source_type)
+                channel_paths = self.output_manager._get_output_paths([channel_name], source_type, is_diff_analysis)
                 
                 # Generate comprehensive report for this channel
                 comprehensive_path = self.output_manager.generate_analysis_report(
@@ -3125,7 +3173,7 @@ class AnalysisOrchestrator:
                 # Generate individual reports for this channel
                 individual_paths = self.output_manager.generate_individual_reports(
                     filename_result, filesize_result, message_result, 
-                    channel_paths['channels_dir'], [channel_name], source_type
+                    channel_paths['channels_dir'], [channel_name], source_type, is_diff_analysis
                 )
                 
                 # Store paths with channel prefix

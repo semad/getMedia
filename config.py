@@ -23,6 +23,8 @@ FILE_MESSAGES_DIR = f"{ANALYSIS_BASE}/file_messages"    # File-based message ana
 FILES_CHANNELS_DIR = f"{FILE_MESSAGES_DIR}/channels"             # Channel-specific reports
 DB_MESSAGES_DIR = f"{ANALYSIS_BASE}/db_messages"        # Database message analysis
 DB_CHANNELS_DIR = f"{DB_MESSAGES_DIR}/channels"             # Channel-specific reports
+DIFF_MESSAGES_DIR = f"{ANALYSIS_BASE}/diff_messages"    # Diff analysis between file and API sources
+DIFF_CHANNELS_DIR = f"{DIFF_MESSAGES_DIR}/channels"             # Channel-specific diff reports
 
 # Analysis file patterns
 ANALYSIS_FILE_PATTERN = "{channel}_analysis.json"        # Analysis report files

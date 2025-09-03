@@ -120,6 +120,12 @@ The analysis command MUST support multiple data sources:
   - Use `FILE_MESSAGES_DIR` for base directory
   - Use `ANALYSIS_FILE_PATTERN` and `ANALYSIS_SUMMARY_PATTERN` for file naming
   - Ensure directory structure matches configuration requirements
+- **REQ-006.8**: **Diff Analysis Output Structure**: Diff analysis results must be output to separate directory structure
+  - Diff analysis output: `reports/analysis/diff_messages/{channel_name}/`
+  - File-based analysis output: `reports/analysis/file_messages/{channel_name}/`
+  - API-based analysis output: `reports/analysis/db_messages/{channel_name}/`
+  - Use `DIFF_MESSAGES_DIR` for diff analysis base directory
+  - Maintain same file naming patterns within each directory type
 
 #### **REQ-007: Error Handling Requirements**
 - **REQ-007.1**: Continue processing with partial data when possible
@@ -512,6 +518,26 @@ reports/analysis/file_messages/combined_2_channels/
 ├── message_analysis.json
 └── analysis_summary.json
 ```
+
+#### **Diff Analysis Output Structure**
+When diff analysis is enabled (both file and API sources present), output is generated in the `diff_messages` directory:
+
+```bash
+# Command: python main.py analysis --channels @books (with both file and API sources)
+reports/analysis/diff_messages/books/
+├── books_analysis.json              # Comprehensive diff analysis report
+├── filename_analysis.json           # Filename analysis from combined sources
+├── filesize_analysis.json           # Filesize analysis from combined sources
+├── message_analysis.json            # Message analysis from combined sources
+└── analysis_summary.json            # Summary of diff analysis results
+```
+
+#### **Data Source-Specific Output Structure**
+The system automatically routes output based on data source types:
+
+- **File-only sources**: `reports/analysis/file_messages/{channel_name}/`
+- **API-only sources**: `reports/analysis/db_messages/{channel_name}/`
+- **Mixed sources (diff analysis)**: `reports/analysis/diff_messages/{channel_name}/`
 
 #### **Legacy Structure (Deprecated)**
 The old structure is no longer used but documented for reference:

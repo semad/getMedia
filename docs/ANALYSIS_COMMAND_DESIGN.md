@@ -15,6 +15,100 @@ The `analysis` command is an advanced intermediate data analysis tool for Telegr
 7. **Extensibility**: Easy to add new analysis types and advanced features in future versions
 8. **Error Handling**: Comprehensive error handling and validation throughout the pipeline
 
+## Command Line Interface
+
+### Basic Usage
+```bash
+python main.py analysis [OPTIONS]
+```
+
+### CLI Options
+
+#### **Core Options**
+- `--channels, -c TEXT`: Comma-separated list of channel usernames to analyze
+- `--analysis-types, -t TEXT`: Comma-separated list of analysis types: filename,filesize,message (default: all)
+- `--output-dir, -o PATH`: Output directory for analysis results (default: analysis_output_<timestamp>)
+- `--chunk-size INTEGER`: Chunk size for processing large datasets (default: 10000)
+- `--verbose, -v`: Enable verbose logging output
+- `--help, -h`: Show help message and exit
+
+#### **Data Source Control Options**
+- `--enable-file-source / --no-file-source`: Enable/disable file-based data sources (default: enabled)
+- `--enable-api-source / --no-api-source`: Enable/disable API-based data sources (default: enabled)
+- `--enable-diff-analysis / --no-diff-analysis`: Enable/disable diff analysis between file and API sources (default: enabled)
+
+#### **API Configuration Options**
+- `--api-base-url TEXT`: Base URL for API endpoints (default: http://localhost:8000)
+- `--api-timeout INTEGER`: API request timeout in seconds (default: 30)
+- `--items-per-page INTEGER`: Number of items per API page (default: 100)
+
+#### **Performance and Reliability Options**
+- `--memory-limit INTEGER`: Memory limit for processing in MB (default: 100000)
+- `--retry-attempts INTEGER`: Number of retry attempts for failed operations (default: 3)
+- `--retry-delay FLOAT`: Delay between retry attempts in seconds (default: 1.0)
+
+### Usage Examples
+
+#### **Basic Analysis**
+```bash
+# Analyze all data with default settings
+python main.py analysis
+
+# Analyze specific channels
+python main.py analysis --channels "@channel1,@channel2"
+
+# Run specific analysis types
+python main.py analysis --analysis-types filename,filesize
+
+# Specify output directory
+python main.py analysis --output-dir ./results
+
+# Use smaller chunks for large datasets
+python main.py analysis --chunk-size 5000
+
+# Enable verbose logging
+python main.py analysis --verbose
+```
+
+#### **Data Source Control**
+```bash
+# Use only API sources
+python main.py analysis --no-file-source
+
+# Use only file sources
+python main.py analysis --no-api-source
+
+# Disable diff analysis
+python main.py analysis --no-diff-analysis
+
+# Combine file and API sources (diff analysis)
+python main.py analysis --enable-file-source --enable-api-source
+```
+
+#### **API Configuration**
+```bash
+# Custom API endpoint
+python main.py analysis --api-base-url http://api.example.com
+
+# Custom API timeout
+python main.py analysis --api-timeout 60
+
+# Custom items per page
+python main.py analysis --items-per-page 200
+```
+
+#### **Performance Tuning**
+```bash
+# Custom memory limit
+python main.py analysis --memory-limit 200000
+
+# Custom retry settings
+python main.py analysis --retry-attempts 5 --retry-delay 2.0
+
+# Combined performance settings
+python main.py analysis --chunk-size 5000 --memory-limit 150000 --retry-attempts 3
+```
+
 ## Requirements
 
 ### Functional Requirements

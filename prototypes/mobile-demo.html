@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Mobile Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 375px;
+            margin: 0 auto;
+            padding: 0 16px;
+        }
+
+        /* Mobile Header */
+        .header {
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 12px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #2563eb;
+        }
+
+        .mobile-menu-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: #64748b;
+            cursor: pointer;
+        }
+
+        /* Mobile Navigation */
+        .mobile-nav {
+            display: none;
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 16px 0;
+        }
+
+        .mobile-nav.active {
+            display: block;
+        }
+
+        .mobile-nav-items {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .mobile-nav-item {
+            padding: 12px 16px;
+            color: #64748b;
+            text-decoration: none;
+            font-weight: 500;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .mobile-nav-item:hover, .mobile-nav-item.active {
+            background: #f1f5f9;
+            color: #2563eb;
+        }
+
+        /* Main Content */
+        .main {
+            padding: 24px 0;
+        }
+
+        .page-title {
+            font-size: 1.875rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+
+        .page-subtitle {
+            color: #64748b;
+            font-size: 1rem;
+            margin-bottom: 24px;
+        }
+
+        /* Mobile Metrics */
+        .metrics-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .metric-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .metric-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .metric-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .metric-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .metric-icon.messages { background: #dbeafe; color: #2563eb; }
+        .metric-icon.files { background: #dcfce7; color: #059669; }
+        .metric-icon.size { background: #fef3c7; color: #d97706; }
+        .metric-icon.quality { background: #e0e7ff; color: #6366f1; }
+
+        .metric-details {
+            flex: 1;
+        }
+
+        .metric-label {
+            font-size: 0.875rem;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .metric-trend {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.75rem;
+        }
+
+        .metric-trend.positive { color: #059669; }
+        .metric-trend.negative { color: #dc2626; }
+
+        /* Mobile Channel Cards */
+        .channels-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .channel-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .channel-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .channel-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background: #f1f5f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .channel-name {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .channel-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .channel-stat {
+            text-align: center;
+            padding: 12px;
+            background: #f8fafc;
+            border-radius: 6px;
+        }
+
+        .channel-stat-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .channel-stat-label {
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+
+        .channel-quality {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .quality-score {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #059669;
+        }
+
+        .quality-bar {
+            width: 80px;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .quality-fill {
+            height: 100%;
+            background: #059669;
+            border-radius: 3px;
+        }
+
+        .channel-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 10px 16px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 500;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #2563eb;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #2563eb;
+            border: 1px solid #2563eb;
+        }
+
+        .btn-secondary:hover {
+            background: #f1f5f9;
+        }
+
+        /* Mobile Charts */
+        .charts-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .chart-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 16px;
+        }
+
+        .chart-placeholder {
+            height: 200px;
+            background: #f8fafc;
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            font-size: 0.875rem;
+            text-align: center;
+            padding: 16px;
+        }
+
+        /* Mobile Footer */
+        .footer {
+            background: white;
+            border-top: 1px solid #e2e8f0;
+            padding: 24px 0;
+            margin-top: 32px;
+        }
+
+        .footer-content {
+            text-align: center;
+            color: #64748b;
+            font-size: 0.75rem;
+            line-height: 1.5;
+        }
+
+        /* Touch Interactions */
+        .touch-target {
+            min-height: 44px;
+            min-width: 44px;
+        }
+
+        /* Swipe Indicators */
+        .swipe-hint {
+            text-align: center;
+            color: #94a3b8;
+            font-size: 0.75rem;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Mobile Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">📊 Dashboard</div>
+                <button class="mobile-menu-btn" onclick="toggleMobileNav()">☰</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Mobile Navigation -->
+    <nav class="mobile-nav" id="mobileNav">
+        <div class="container">
+            <div class="mobile-nav-items">
+                <a href="#" class="mobile-nav-item active">Overview</a>
+                <a href="#" class="mobile-nav-item">Channels</a>
+                <a href="#" class="mobile-nav-item">Analysis</a>
+                <a href="#" class="mobile-nav-item">Settings</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <h1 class="page-title">Channel Analysis</h1>
+            <p class="page-subtitle">Mobile view • 2 channels analyzed</p>
+
+            <!-- Mobile Metrics Stack -->
+            <div class="metrics-stack">
+                <div class="metric-card">
+                    <div class="metric-content">
+                        <div class="metric-info">
+                            <div class="metric-icon messages">📈</div>
+                            <div class="metric-details">
+                                <div class="metric-label">Messages</div>
+                                <div class="metric-value">1,247</div>
+                            </div>
+                        </div>
+                        <div class="metric-trend positive">
+                            <span>↗</span>
+                            <span>+12%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-content">
+                        <div class="metric-info">
+                            <div class="metric-icon files">📁</div>
+                            <div class="metric-details">
+                                <div class="metric-label">Files</div>
+                                <div class="metric-value">856</div>
+                            </div>
+                        </div>
+                        <div class="metric-trend positive">
+                            <span>↗</span>
+                            <span>+8%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-content">
+                        <div class="metric-info">
+                            <div class="metric-icon size">💾</div>
+                            <div class="metric-details">
+                                <div class="metric-label">Size</div>
+                                <div class="metric-value">2.1 GB</div>
+                            </div>
+                        </div>
+                        <div class="metric-trend positive">
+                            <span>↗</span>
+                            <span>+15%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-content">
+                        <div class="metric-info">
+                            <div class="metric-icon quality">⭐</div>
+                            <div class="metric-details">
+                                <div class="metric-label">Quality</div>
+                                <div class="metric-value">87%</div>
+                            </div>
+                        </div>
+                        <div class="metric-trend positive">
+                            <span>↗</span>
+                            <span>+3%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile Channel Cards -->
+            <div class="channels-stack">
+                <div class="channel-card">
+                    <div class="channel-header">
+                        <div class="channel-icon">📚</div>
+                        <div class="channel-name">books</div>
+                    </div>
+                    <div class="channel-stats">
+                        <div class="channel-stat">
+                            <div class="channel-stat-value">423</div>
+                            <div class="channel-stat-label">Messages</div>
+                        </div>
+                        <div class="channel-stat">
+                            <div class="channel-stat-value">312</div>
+                            <div class="channel-stat-label">Files</div>
+                        </div>
+                        <div class="channel-stat">
+                            <div class="channel-stat-value">1.2 GB</div>
+                            <div class="channel-stat-label">Size</div>
+                        </div>
+                        <div class="channel-stat">
+                            <div class="channel-stat-value">89%</div>
+                            <div class="channel-stat-label">Quality</div>
+                        </div>
+                    </div>
+                    <div class="channel-quality">
+                        <span>Quality Score</span>
+                        <div class="quality-bar">
+                            <div class="quality-fill" style="width: 89%"></div>
+                        </div>
+                    </div>
+                    <div class="channel-actions">
+                        <button class="btn btn-primary">View Details</button>
+                        <button class="btn btn-secondary">Export</button>
+                    </div>
+                </div>
+
+                <div class="channel-card">
+                    <div class="channel-header">
+                        <div class="channel-icon">📖</div>
+                        <div class="channel-name">@SherwinVakiliLibrary</div>
+                    </div>
+                    <div class="channel-stats">
+                        <div class="channel-stat">
+                            <div class="channel-stat-value">824</div>
+                            <div class="channel-stat-label">Messages</div>
+                        </div>
+                        <div class="channel-stat">
+                            <div class="channel-stat-value">544</div>
+                            <div class="channel-stat-label">Files</div>
+                        </div>
+                        <div class="channel-stat">
+                            <div class="channel-stat-value">0.9 GB</div>
+                            <div class="channel-stat-label">Size</div>
+                        </div>
+                        <div class="channel-stat">
+                            <div class="channel-stat-value">85%</div>
+                            <div class="channel-stat-label">Quality</div>
+                        </div>
+                    </div>
+                    <div class="channel-quality">
+                        <span>Quality Score</span>
+                        <div class="quality-bar">
+                            <div class="quality-fill" style="width: 85%"></div>
+                        </div>
+                    </div>
+                    <div class="channel-actions">
+                        <button class="btn btn-primary">View Details</button>
+                        <button class="btn btn-secondary">Export</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile Charts -->
+            <div class="charts-stack">
+                <div class="chart-card">
+                    <h3 class="chart-title">Filename Quality</h3>
+                    <div class="chart-placeholder">
+                        📊<br>
+                        Bar Chart:<br>
+                        Quality by Channel
+                    </div>
+                    <div class="swipe-hint">Swipe to see more charts</div>
+                </div>
+
+                <div class="chart-card">
+                    <h3 class="chart-title">Size Distribution</h3>
+                    <div class="chart-placeholder">
+                        📊<br>
+                        Pie Chart:<br>
+                        File Size Categories
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <h3 class="chart-title">Message Trends</h3>
+                    <div class="chart-placeholder">
+                        📊<br>
+                        Line Chart:<br>
+                        Volume Over Time
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Mobile Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <p>Analysis Period: Jan 1-15, 2025</p>
+                <p>Generated by getMedia Dashboard v1.0</p>
+                <p>Powered by Chart.js</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        function toggleMobileNav() {
+            const mobileNav = document.getElementById('mobileNav');
+            mobileNav.classList.toggle('active');
+        }
+
+        // Close mobile nav when clicking outside
+        document.addEventListener('click', function(event) {
+            const mobileNav = document.getElementById('mobileNav');
+            const menuBtn = document.querySelector('.mobile-menu-btn');
+            
+            if (!mobileNav.contains(event.target) && !menuBtn.contains(event.target)) {
+                mobileNav.classList.remove('active');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Channel Analysis Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 16px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #2563eb;
+        }
+
+        .nav {
+            display: flex;
+            gap: 32px;
+        }
+
+        .nav-item {
+            color: #64748b;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav-item:hover, .nav-item.active {
+            color: #2563eb;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #2563eb;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #2563eb;
+            border: 1px solid #2563eb;
+        }
+
+        .btn-secondary:hover {
+            background: #f1f5f9;
+        }
+
+        /* Main Content */
+        .main {
+            padding: 32px 0;
+        }
+
+        .page-header {
+            margin-bottom: 32px;
+        }
+
+        .page-title {
+            font-size: 2.25rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+
+        .page-subtitle {
+            color: #64748b;
+            font-size: 1.125rem;
+        }
+
+        /* Metrics Cards */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+            margin-bottom: 48px;
+        }
+
+        .metric-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.2s;
+        }
+
+        .metric-card:hover {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .metric-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .metric-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .metric-icon.messages { background: #dbeafe; color: #2563eb; }
+        .metric-icon.files { background: #dcfce7; color: #059669; }
+        .metric-icon.size { background: #fef3c7; color: #d97706; }
+        .metric-icon.quality { background: #e0e7ff; color: #6366f1; }
+
+        .metric-label {
+            font-size: 0.875rem;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+
+        .metric-trend {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.875rem;
+        }
+
+        .metric-trend.positive { color: #059669; }
+        .metric-trend.negative { color: #dc2626; }
+        .metric-trend.neutral { color: #64748b; }
+
+        /* Channel Grid */
+        .section {
+            margin-bottom: 48px;
+        }
+
+        .section-title {
+            font-size: 1.875rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 24px;
+        }
+
+        .channels-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+        }
+
+        .channel-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .channel-card:hover {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .channel-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .channel-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background: #f1f5f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .channel-name {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .channel-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .channel-stat {
+            text-align: center;
+        }
+
+        .channel-stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .channel-stat-label {
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+
+        .channel-quality {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .quality-score {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #059669;
+        }
+
+        .quality-bar {
+            width: 100px;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .quality-fill {
+            height: 100%;
+            background: #059669;
+            border-radius: 4px;
+        }
+
+        .channel-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.875rem;
+        }
+
+        /* Charts Section */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 24px;
+        }
+
+        .chart-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .chart-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .chart-placeholder {
+            height: 300px;
+            background: #f8fafc;
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            font-size: 1rem;
+        }
+
+        /* Footer */
+        .footer {
+            background: white;
+            border-top: 1px solid #e2e8f0;
+            padding: 32px 0;
+            margin-top: 64px;
+        }
+
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #64748b;
+            font-size: 0.875rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 16px;
+            }
+
+            .header-content {
+                flex-direction: column;
+                gap: 16px;
+            }
+
+            .nav {
+                gap: 24px;
+            }
+
+            .page-title {
+                font-size: 1.875rem;
+            }
+
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .channels-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .footer-content {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">📊 Dashboard</div>
+                <nav class="nav">
+                    <a href="#" class="nav-item active">Overview</a>
+                    <a href="#" class="nav-item">Channels</a>
+                    <a href="#" class="nav-item">Analysis</a>
+                    <a href="#" class="nav-item">Settings</a>
+                </nav>
+                <div class="header-actions">
+                    <button class="btn btn-secondary">Export</button>
+                    <button class="btn btn-primary">Refresh</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <!-- Page Header -->
+            <div class="page-header">
+                <h1 class="page-title">Telegram Channel Analysis</h1>
+                <p class="page-subtitle">Comprehensive analysis of your Telegram channels • Generated on January 15, 2025</p>
+            </div>
+
+            <!-- Overview Metrics -->
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-icon messages">📈</div>
+                        <div class="metric-label">Total Messages</div>
+                    </div>
+                    <div class="metric-value">1,247</div>
+                    <div class="metric-trend positive">
+                        <span>↗</span>
+                        <span>+12% vs last period</span>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-icon files">📁</div>
+                        <div class="metric-label">Total Files</div>
+                    </div>
+                    <div class="metric-value">856</div>
+                    <div class="metric-trend positive">
+                        <span>↗</span>
+                        <span>+8% vs last period</span>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-icon size">💾</div>
+                        <div class="metric-label">Total Size</div>
+                    </div>
+                    <div class="metric-value">2.1 GB</div>
+                    <div class="metric-trend positive">
+                        <span>↗</span>
+                        <span>+15% vs last period</span>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <div class="metric-icon quality">⭐</div>
+                        <div class="metric-label">Quality Score</div>
+                    </div>
+                    <div class="metric-value">87%</div>
+                    <div class="metric-trend positive">
+                        <span>↗</span>
+                        <span>+3% vs last period</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Channel Analysis -->
+            <div class="section">
+                <h2 class="section-title">Channel Analysis</h2>
+                <div class="channels-grid">
+                    <div class="channel-card">
+                        <div class="channel-header">
+                            <div class="channel-icon">📚</div>
+                            <div class="channel-name">books</div>
+                        </div>
+                        <div class="channel-stats">
+                            <div class="channel-stat">
+                                <div class="channel-stat-value">423</div>
+                                <div class="channel-stat-label">Messages</div>
+                            </div>
+                            <div class="channel-stat">
+                                <div class="channel-stat-value">312</div>
+                                <div class="channel-stat-label">Files</div>
+                            </div>
+                            <div class="channel-stat">
+                                <div class="channel-stat-value">1.2 GB</div>
+                                <div class="channel-stat-label">Size</div>
+                            </div>
+                            <div class="channel-stat">
+                                <div class="channel-stat-value">89%</div>
+                                <div class="channel-stat-label">Quality</div>
+                            </div>
+                        </div>
+                        <div class="channel-quality">
+                            <span>Quality Score</span>
+                            <div class="quality-bar">
+                                <div class="quality-fill" style="width: 89%"></div>
+                            </div>
+                        </div>
+                        <div class="channel-actions">
+                            <button class="btn btn-primary btn-sm">View Details</button>
+                            <button class="btn btn-secondary btn-sm">Export</button>
+                        </div>
+                    </div>
+
+                    <div class="channel-card">
+                        <div class="channel-header">
+                            <div class="channel-icon">📖</div>
+                            <div class="channel-name">@SherwinVakiliLibrary</div>
+                        </div>
+                        <div class="channel-stats">
+                            <div class="channel-stat">
+                                <div class="channel-stat-value">824</div>
+                                <div class="channel-stat-label">Messages</div>
+                            </div>
+                            <div class="channel-stat">
+                                <div class="channel-stat-value">544</div>
+                                <div class="channel-stat-label">Files</div>
+                            </div>
+                            <div class="channel-stat">
+                                <div class="channel-stat-value">0.9 GB</div>
+                                <div class="channel-stat-label">Size</div>
+                            </div>
+                            <div class="channel-stat">
+                                <div class="channel-stat-value">85%</div>
+                                <div class="channel-stat-label">Quality</div>
+                            </div>
+                        </div>
+                        <div class="channel-quality">
+                            <span>Quality Score</span>
+                            <div class="quality-bar">
+                                <div class="quality-fill" style="width: 85%"></div>
+                            </div>
+                        </div>
+                        <div class="channel-actions">
+                            <button class="btn btn-primary btn-sm">View Details</button>
+                            <button class="btn btn-secondary btn-sm">Export</button>
+                        </div>
+                    </div>
+
+                    <div class="channel-card">
+                        <div class="channel-header">
+                            <div class="channel-icon">🔗</div>
+                            <div class="channel-name">Combined Analysis</div>
+                        </div>
+                        <div class="channel-stats">
+                            <div class="channel-stat">
+                                <div class="channel-stat-value">1,247</div>
+                                <div class="channel-stat-label">Messages</div>
+                            </div>
+                            <div class="channel-stat">
+                                <div class="channel-stat-value">856</div>
+                                <div class="channel-stat-label">Files</div>
+                            </div>
+                            <div class="channel-stat">
+                                <div class="channel-stat-value">2.1 GB</div>
+                                <div class="channel-stat-label">Size</div>
+                            </div>
+                            <div class="channel-stat">
+                                <div class="channel-stat-value">87%</div>
+                                <div class="channel-stat-label">Quality</div>
+                            </div>
+                        </div>
+                        <div class="channel-quality">
+                            <span>Quality Score</span>
+                            <div class="quality-bar">
+                                <div class="quality-fill" style="width: 87%"></div>
+                            </div>
+                        </div>
+                        <div class="channel-actions">
+                            <button class="btn btn-primary btn-sm">View Details</button>
+                            <button class="btn btn-secondary btn-sm">Export</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary Charts -->
+            <div class="section">
+                <h2 class="section-title">Overview Analysis</h2>
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Filename Quality Distribution</h3>
+                        </div>
+                        <div class="chart-placeholder">
+                            📊 Bar Chart: Filename Quality by Channel
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">File Size Distribution</h3>
+                        </div>
+                        <div class="chart-placeholder">
+                            📊 Pie Chart: Size Categories (tiny, small, medium, large, huge)
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Message Volume Trends</h3>
+                        </div>
+                        <div class="chart-placeholder">
+                            📊 Line Chart: Messages Over Time
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Quality Score Comparison</h3>
+                        </div>
+                        <div class="chart-placeholder">
+                            📊 Bar Chart: Quality Scores by Channel
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div>
+                    <p>Analysis Period: January 1, 2025 - January 15, 2025</p>
+                    <p>Generated by getMedia Dashboard v1.0</p>
+                </div>
+                <div>
+                    <p>Powered by Chart.js • Data from Telegram API</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

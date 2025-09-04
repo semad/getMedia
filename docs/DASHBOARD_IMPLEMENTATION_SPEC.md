@@ -6,9 +6,9 @@ This document provides detailed implementation specifications for the Dashboard 
 
 ## Key Requirements
 
-**Single Module Architecture:** Use `dashboard_processor.py` containing all dashboard functionality (data processing, template rendering, file generation, single page creation).
+**Single python Module Architecture:** Use `dashboard_processor.py` containing all dashboard functionality (data processing, template rendering, file generation, single page creation).
 
-**Single Page Module:** Generate self-contained HTML files with embedded CSS, JavaScript, and data for email sharing, embedding, offline viewing, and quick reports. Target files under 2MB.
+**Static Html Files:** Generate self-contained HTML files with embedded CSS, JavaScript, and data for email sharing, embedding, offline viewing, and quick reports. Target files under 2MB.
 
 ## Implementation Architecture
 
@@ -36,7 +36,7 @@ Add the following constants to `config.py` (reusing existing `ANALYSIS_BASE`, `D
 
 - `DASHBOARD_CHART_WIDTH`, `DASHBOARD_CHART_HEIGHT`, `DASHBOARD_MAX_DATA_POINTS`, `DASHBOARD_CHARTJS_CDN_URL`, `DASHBOARD_GA_MEASUREMENT_ID`, `DASHBOARD_GA_ENABLED`
 
-**Single Page Module:**
+**Static HTML Files:**
 
 - `DASHBOARD_SINGLE_PAGE_ENABLED`, `DASHBOARD_SINGLE_PAGE_FILENAME`, `DASHBOARD_SINGLE_PAGE_MAX_SIZE_MB`
 
@@ -108,15 +108,13 @@ Each analysis file must contain:
 - `analysis_version`: Version of analysis format
 - `data`: Analysis-specific data object
 
-### Single Page Module Data Validation
+### Data Validation
 
 - **Data Size Limits**: Validate embedded data doesn't exceed memory limits
 - **JSON Serialization**: Ensure all data can be serialized to JSON for embedding
 - **Required Fields Validation**: Check for required fields before embedding
 - **Data Sanitization**: Sanitize data to prevent XSS in embedded content
 - **Channel Name Validation**: Validate channel names are safe for file system use
-- **Metadata Validation**: Ensure metadata contains required generation information
-- **Analysis Data Validation**: Validate analysis data structure before embedding
 
 ## Development Environment Setup
 
@@ -168,7 +166,7 @@ Create a single comprehensive module that handles all dashboard functionality:
 - Data processing and aggregation
 - Template rendering
 - File generation
-- Single page module creation
+- Static HTML file creation
 - Error handling
 
 ### Step 2: CLI Integration
@@ -190,13 +188,21 @@ The `dashboard_processor.py` module should include:
 
 **File Generation Methods:**
 
-- `_generate_shared_files()`, `_generate_html_pages()`, `_generate_single_pages()`, `_create_empty_dashboard_data()`
+- `_generate_shared_files()`, `_generate_html_pages()`, `_generate_static_html()`, `_create_empty_dashboard_data()`
 
 ### Step 4: HTML Templates
 
 Create `templates/dashboard/index.html`, `channel.html`, and `single.html` with Jinja2 syntax, Google Analytics integration, responsive design, and Chart.js support. Adapt existing `dashboard_index.html` and `dashboard_channel.html` templates.
 
 Generate self-contained HTML files with embedded CSS, JavaScript, and data. Include methods for CSS/JS embedding, data serialization, Chart.js integration, and file size validation.
+
+## Testing Strategy
+
+**Unit Tests:** Cover DashboardProcessor initialization, data processing, template rendering, error handling, and static HTML generation.
+
+**Integration Tests:** End-to-end dashboard generation workflow, file output verification, error scenarios, and performance testing with large datasets.
+
+**Test Data:** Sample analysis JSON files, various channel configurations, and edge cases (empty data, missing files, corrupted data).
 
 ## Google Analytics Integration
 
@@ -243,14 +249,6 @@ Implement Google Analytics 4 tracking for page views, chart interactions, and ex
 - **Path Sanitization**: Sanitize file paths to prevent directory traversal
 - **Safe Templates**: Use Jinja2 autoescape for XSS prevention
 
-## Testing Strategy
-
-**Unit Tests:** Cover DashboardProcessor initialization, data processing, template rendering, error handling, and single page generation.
-
-**Integration Tests:** End-to-end dashboard generation workflow, file output verification, error scenarios, and performance testing with large datasets.
-
-**Test Data:** Sample analysis JSON files, various channel configurations, and edge cases (empty data, missing files, corrupted data).
-
 ## Deployment and Usage
 
 **Installation:** Add dashboard modules, update `config.py` with constants, add CLI command to `main.py`, install dependencies.
@@ -273,7 +271,7 @@ Implement Google Analytics 4 tracking for page views, chart interactions, and ex
 - [ ] Implement complete data aggregation logic
 - [ ] Add Chart.js implementation to JavaScript
 - [ ] Test with sample analysis data
-- [ ] Verify single page generation works
+- [ ] Verify static HTML generation works
 - [ ] Test error handling scenarios
 
 This implementation specification provides a complete roadmap for building the dashboard system, integrating with the existing codebase, and maintaining consistency with the established patterns and configuration structure.

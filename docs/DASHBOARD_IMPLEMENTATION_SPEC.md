@@ -6,15 +6,13 @@ This document provides detailed implementation specifications for the Dashboard 
 
 ## Key Requirements
 
-**Single python Module Architecture:** Use `dashboard_processor.py` containing all dashboard functionality (data processing, template rendering, file generation, static HTML creation).
-
-**Static Html Files:** Generate self-contained HTML files with embedded CSS, JavaScript, and data for email sharing, embedding, offline viewing, and quick reports. Target files under 2MB.
+**Single python Module Architecture:** Use `dashboard_processor.py` containing all dashboard functionality (data processing, template rendering, file generation).
 
 ## Implementation Architecture
 
-**Core Component:** `modules/dashboard_processor.py` - Single module containing all dashboard functionality including data processing, template rendering, file generation, static HTML creation, Chart.js integration, and error handling.
+**Core Component:** `modules/dashboard_processor.py` - Single module containing all dashboard functionality including data processing, template rendering, file generation, Chart.js integration, and error handling.
 
-**Configuration:** Extend `config.py` with dashboard-specific constants for file paths, chart settings, and static HTML configuration.
+**Configuration:** Extend `config.py` with dashboard-specific constants for file paths, chart settings, and UI configuration.
 
 ## Configuration Extensions
 
@@ -36,10 +34,6 @@ Add the following constants to `config.py` (reusing existing `ANALYSIS_BASE`, `D
 
 - `DASHBOARD_CHART_WIDTH`, `DASHBOARD_CHART_HEIGHT`, `DASHBOARD_MAX_DATA_POINTS`, `DASHBOARD_CHARTJS_CDN_URL`, `DASHBOARD_GA_MEASUREMENT_ID`, `DASHBOARD_GA_ENABLED`
 
-**Static HTML Files:**
-
-- `DASHBOARD_STATIC_HTML_ENABLED`, `DASHBOARD_STATIC_HTML_FILENAME`, `DASHBOARD_STATIC_HTML_MAX_SIZE_MB`
-
 ## File System Requirements
 
 ### Directory Structure
@@ -50,15 +44,8 @@ The implementation requires the following directory structure to exist or be cre
 
 - `getMedia/modules/dashboard_processor.py` - Complete dashboard processor
 - `getMedia/templates/dashboard/` - HTML templates directory
-  - `base.html` - Base template
   - `index.html` - Index page template
   - `channel.html` - Channel page template
-  - `single.html` - Single page template
-  - `components/` - Template components
-    - `header.html` - Header component
-    - `metrics.html` - Metrics cards
-    - `charts.html` - Chart containers
-    - `footer.html` - Footer component
 
 **Input Structure:**
 
@@ -154,7 +141,7 @@ Create a single comprehensive module that handles all dashboard functionality:
 
 **DashboardProcessor Class Structure:**
 
-- `__init__()` - Initialize with input/output directories, channels, static_html flag, verbose mode
+- `__init__()` - Initialize with input/output directories, channels, verbose mode
 - `_setup_logger()` - Configure logging
 - `_setup_templates()` - Setup Jinja2 template environment
 - `_parse_channels()` - Parse comma-separated channel list
@@ -165,12 +152,11 @@ Create a single comprehensive module that handles all dashboard functionality:
 - Data processing and aggregation
 - Template rendering
 - File generation
-- Static HTML file creation
 - Error handling
 
 ### Step 2: CLI Integration
 
-Add dashboard command to `main.py` with click options for input-dir, output-dir, channels, static-html, and verbose flags. Import DashboardProcessor and handle exceptions.
+Add dashboard command to `main.py` with click options for input-dir, output-dir, channels, and verbose flags. Import DashboardProcessor and handle exceptions.
 
 ### Step 3: Complete Module Implementation
 

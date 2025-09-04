@@ -671,21 +671,35 @@ document.addEventListener('DOMContentLoaded', function() {{
 }});
 
 function initializeCharts() {{
+    // Get chart data from script tag
+    const chartDataScript = document.getElementById('chart-data');
+    if (!chartDataScript) {{
+        console.error('Chart data script not found');
+        return;
+    }}
+    
+    let chartData;
+    try {{
+        chartData = JSON.parse(chartDataScript.textContent);
+    }} catch (error) {{
+        console.error('Error parsing chart data:', error);
+        return;
+    }}
+    
     // Initialize Chart.js charts
     const chartElements = document.querySelectorAll('.chart-container');
     
     chartElements.forEach((element, index) => {{
-        const chartConfigStr = element.dataset.chartConfig || '{{}}';
+        const chartType = element.dataset.chartType;
         
-        try {{
-            const chartConfig = JSON.parse(chartConfigStr);
-            
-            if (chartConfig && Object.keys(chartConfig).length > 0) {{
-                // Use the complete chart configuration from the server
+        if (chartType && chartData[chartType]) {{
+            try {{
+                const chartConfig = chartData[chartType];
                 new Chart(element, chartConfig);
+                console.log('Chart initialized:', chartType);
+            }} catch (error) {{
+                console.error('Error creating chart for', chartType, ':', error);
             }}
-        }} catch (error) {{
-            console.error('Error parsing chart config for chart', index, ':', error);
         }}
     }});
 }}
@@ -740,7 +754,7 @@ function handleChartInteraction(chartType, action, channelName) {{
             
             # Generate JavaScript
             js_content = self._render_shared_js()
-            js_file = self.output_dir / DASHBOARD_JS_PATH / DASHBOARD_JS_FILENAME
+            js_file = self.output_dir / DASHBOARD_JS_PATH / "dashboard_new.js"
             js_file.write_text(js_content, encoding='utf-8')
             self.logger.debug(f"Generated JavaScript file: {js_file}")
             

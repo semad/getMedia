@@ -81,12 +81,10 @@ DASHBOARD_SUPPORTED_SOURCE_TYPES = [
 DASHBOARD_MAX_CHANNEL_NAME_LENGTH = 50
 
 # Charts and Analytics
-DASHBOARD_CHART_WIDTH = 400
-DASHBOARD_CHART_HEIGHT = 300
-DASHBOARD_MAX_DATA_POINTS = 10000
 DASHBOARD_CHARTJS_CDN_URL = "https://cdn.jsdelivr.net/npm/chart.js"
 DASHBOARD_GA_MEASUREMENT_ID = DEFAULT_GA_MEASUREMENT_ID
 DASHBOARD_GA_ENABLED = True
+DASHBOARD_MAX_DATA_POINTS = 10000  # Limit for performance
 
 # Template Configuration (already defined in config.py)
 # TEMPLATES_DIR = f"{BASE_DIR}/templates"  # Already exists in config.py
@@ -230,10 +228,19 @@ class DashboardProcessor:
     def _setup_templates(self) -> Environment:
         """Setup Jinja2 template environment."""
         template_dir = Path(TEMPLATES_DIR) / "dashboard"
-        return Environment(
+        env = Environment(
             loader=FileSystemLoader(str(template_dir)),
             autoescape=True
         )
+        
+        # Add custom filters
+        env.filters['tojson'] = self._tojson_filter
+        return env
+    
+    def _tojson_filter(self, obj):
+        """Custom Jinja2 filter to convert Python objects to JSON."""
+        import json
+        return json.dumps(obj, default=str)
 
     def _parse_channels(self, channels_str: Optional[str]) -> List[str]:
         """Parse comma-separated channel list."""
@@ -343,6 +350,28 @@ class DashboardProcessor:
         
         return sanitized
 
+    def _validate_and_limit_data(self, data: Dict[str, Any], report_type: str) -> bool:
+        """Validate and limit data size for performance."""
+        try:
+            # Check if data is too large
+            data_str = json.dumps(data, default=str)
+            if len(data_str) > DASHBOARD_MAX_DATA_POINTS * 100:  # Rough size limit
+                self.logger.warning(f"Data too large for {report_type}, truncating")
+                return False
+            
+            # Validate data structure based on report type
+            if report_type == 'analysis_summary':
+                required_fields = ['total_messages', 'total_files']
+                if not all(field in data for field in required_fields):
+                    self.logger.warning(f"Missing required fields in {report_type}")
+                    return False
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error validating data for {report_type}: {e}")
+            return False
+
     def _aggregate_channel_data(self, files: Dict[str, List[Path]]) -> Dict[str, Any]:
         """Combine data from multiple files into dashboard structure."""
         dashboard_data = {
@@ -389,13 +418,18 @@ class DashboardProcessor:
                 for report in data:
                     report_type = report.get('report_type', '')
                     if report_type in DASHBOARD_SUPPORTED_ANALYSIS_TYPES:
-                        channel_data[channel_name][report_type] = report.get('data', {})
+                        report_data = report.get('data', {})
                         
-                        # Update summary metrics
-                        if report_type == 'analysis_summary':
-                            summary_data = report.get('data', {})
-                            channel_data[channel_name]['messages'] = summary_data.get('total_messages', 0)
-                            channel_data[channel_name]['files'] = summary_data.get('total_files', 0)
+                        # Validate and limit data size for performance
+                        if self._validate_and_limit_data(report_data, report_type):
+                            channel_data[channel_name][report_type] = report_data
+                            
+                            # Update summary metrics
+                            if report_type == 'analysis_summary':
+                                channel_data[channel_name]['messages'] = report_data.get('total_messages', 0)
+                                channel_data[channel_name]['files'] = report_data.get('total_files', 0)
+                        else:
+                            self.logger.warning(f"Skipping {report_type} for {channel_name} due to validation failure")
         
         dashboard_data['channels'] = channel_data
         dashboard_data['metadata']['total_channels'] = len(channel_data)
@@ -1353,6 +1387,42 @@ Chart is not defined
 - Verify Chart.js CDN URL is accessible
 - Check internet connection for CDN resources
 - Ensure Chart.js script is loaded before dashboard.js
+
+#### Issue: Data Too Large
+
+```text
+Data too large for filename_analysis, truncating
+```
+
+**Solution:**
+
+- Check DASHBOARD_MAX_DATA_POINTS configuration
+- Consider reducing data size in analysis output
+- Implement data sampling for large datasets
+
+#### Issue: Template Filter Error
+
+```text
+jinja2.exceptions.UndefinedError: 'tojson' is undefined
+```
+
+**Solution:**
+
+- Ensure custom Jinja2 filters are properly registered
+- Check _setup_templates method includes filter registration
+- Verify _tojson_filter method is implemented
+
+#### Issue: Memory Issues
+
+```text
+MemoryError: Unable to allocate array
+```
+
+**Solution:**
+
+- Reduce DASHBOARD_MAX_DATA_POINTS value
+- Process data in smaller chunks
+- Increase system memory or use data sampling
 
 ### Debug Mode
 

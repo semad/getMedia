@@ -429,5 +429,59 @@ def import_file(import_file, verbose):
 
             logger.error(f"Traceback: {traceback.format_exc()}")
 
+
+@cli.command()
+@click.option('--input-dir', '-i', 'input_dir',
+              default=None, help='Directory containing analysis results')
+@click.option('--output-dir', '-o', 'output_dir',
+              default=None, help='Directory to save generated HTML files')
+@click.option('--channels', '-c', 'channels',
+              default=None, help='Comma-separated list of channels to process')
+@click.option('--verbose', '-v', 'verbose',
+              is_flag=True, help='Enable verbose logging output')
+def dashboard(input_dir, output_dir, channels, verbose):
+    """Generate HTML dashboard from analysis results."""
+    # Setup logging if setup_logging function exists, otherwise use basic logging
+    try:
+        setup_logging(verbose)
+    except ImportError:
+        import logging
+        logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO)
+    
+    try:
+        from modules.dashboard_processor import DashboardProcessor
+        
+        processor = DashboardProcessor(
+            input_dir=input_dir,
+            output_dir=output_dir,
+            channels=channels,
+            verbose=verbose
+        )
+        
+        processor.process()
+        click.echo("Dashboard generated successfully!")
+        
+    except ImportError as e:
+        click.echo(f"Error importing dashboard modules: {e}", err=True)
+        if verbose:
+            import traceback
+            traceback.print_exc()
+    except FileNotFoundError as e:
+        click.echo(f"Required file or directory not found: {e}", err=True)
+        if verbose:
+            import traceback
+            traceback.print_exc()
+    except PermissionError as e:
+        click.echo(f"Permission denied: {e}", err=True)
+        if verbose:
+            import traceback
+            traceback.print_exc()
+    except Exception as e:
+        click.echo(f"Error generating dashboard: {e}", err=True)
+        if verbose:
+            import traceback
+            traceback.print_exc()
+
+
 if __name__ == "__main__":
     cli()

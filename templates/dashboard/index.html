@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="static/css/dashboard.css">
+    {% if ga_measurement_id %}
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ ga_measurement_id }}"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', '{{ ga_measurement_id }}');
+    </script>
+    {% endif %}
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">📊 Telegram Analysis Dashboard</div>
+                <nav class="nav">
+                    <a href="index.html" class="nav-item active">Overview</a>
+                    <a href="#" class="nav-item">Export</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <h1>Channel Analysis Overview</h1>
+        
+        <!-- Summary Metrics -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-value">{{ data.summary.channels_count }}</div>
+                <div class="metric-label">Total Channels</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">{{ "{:,}".format(data.summary.total_messages) }}</div>
+                <div class="metric-label">Total Messages</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">{{ "{:,}".format(data.summary.total_files) }}</div>
+                <div class="metric-label">Total Files</div>
+            </div>
+        </div>
+
+        <!-- Channels Grid -->
+        <h2>Channels</h2>
+        <div class="channels-grid">
+            {% for channel_name, channel_data in data.channels.items() %}
+            <div class="channel-card">
+                <div class="channel-name">{{ channel_name }}</div>
+                <div class="channel-stats">
+                    <div>
+                        <div class="channel-stat-value">{{ "{:,}".format(channel_data.messages) }}</div>
+                        <div class="channel-stat-label">Messages</div>
+                    </div>
+                    <div>
+                        <div class="channel-stat-value">{{ "{:,}".format(channel_data.files) }}</div>
+                        <div class="channel-stat-label">Files</div>
+                    </div>
+                </div>
+                <a href="{{ channel_name|replace('@', 'at_')|replace(' ', '_') }}.html" 
+                   class="btn btn-primary">View Details</a>
+            </div>
+            {% endfor %}
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="static/js/dashboard.js"></script>
+</body>
+</html>

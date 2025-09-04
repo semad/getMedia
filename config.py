@@ -80,6 +80,43 @@ DEFAULT_SESSION_COOLDOWN = 30  # Reduced from 60 to 30 secondssure
 # Google Analytics configuration
 DEFAULT_GA_MEASUREMENT_ID = "G-KH0N6NM83F"
 
+# Dashboard Configuration
+# Note: These reference existing constants from config.py
+DASHBOARD_INPUT_DIR = ANALYSIS_BASE  # Points to reports/analysis/
+DASHBOARD_OUTPUT_DIR = DASHBOARDS_DIR  # Points to reports/dashboards/html/
+DASHBOARD_INDEX_FILENAME = "index.html"
+DASHBOARD_CSS_FILENAME = "dashboard.css"
+DASHBOARD_JS_FILENAME = "dashboard.js"
+DASHBOARD_DATA_FILENAME = "dashboard-data.json"
+
+# Paths and UI
+DASHBOARD_CSS_PATH = "static/css"
+DASHBOARD_JS_PATH = "static/js"
+DASHBOARD_HTML_TITLE = "Telegram Channel Analysis Dashboard"
+DASHBOARD_HTML_CHARSET = "UTF-8"
+DASHBOARD_HTML_VIEWPORT = "width=device-width, initial-scale=1.0"
+
+# Data Processing
+DASHBOARD_DEFAULT_CHANNELS = []
+DASHBOARD_SUPPORTED_ANALYSIS_TYPES = [
+    "filename_analysis",
+    "filesize_analysis", 
+    "message_analysis",
+    "analysis_summary"
+]
+DASHBOARD_SUPPORTED_SOURCE_TYPES = [
+    "file_messages",
+    "db_messages",
+    "diff_messages"
+]
+DASHBOARD_MAX_CHANNEL_NAME_LENGTH = 50
+
+# Charts and Analytics
+DASHBOARD_CHARTJS_CDN_URL = "https://cdn.jsdelivr.net/npm/chart.js"
+DASHBOARD_GA_MEASUREMENT_ID = DEFAULT_GA_MEASUREMENT_ID
+DASHBOARD_GA_ENABLED = True
+DASHBOARD_MAX_DATA_POINTS = 10000  # Limit for performance
+
 # API Endpoints
 API_BASE_PATH = "/api/v1/telegram"
 API_ENDPOINTS = {

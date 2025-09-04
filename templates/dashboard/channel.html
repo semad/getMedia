@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="static/css/dashboard.css">
+    {% if ga_measurement_id %}
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ ga_measurement_id }}"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', '{{ ga_measurement_id }}');
+    </script>
+    {% endif %}
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">📊 Telegram Analysis Dashboard</div>
+                <nav class="nav">
+                    <a href="index.html" class="nav-item">Overview</a>
+                    <a href="#" class="nav-item">Export</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <h1>{{ channel_name }}</h1>
+        
+        <!-- Channel Metrics -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-value">{{ "{:,}".format(channel_data.messages) }}</div>
+                <div class="metric-label">Total Messages</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">{{ "{:,}".format(channel_data.files) }}</div>
+                <div class="metric-label">Total Files</div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        {% if channel_data.filename_analysis %}
+        <div class="chart-section">
+            <h2>File Analysis</h2>
+            <div class="chart-container" 
+                 data-chart-type="pie" 
+                 data-chart-data="{{ channel_data.filename_analysis|tojson }}">
+            </div>
+        </div>
+        {% endif %}
+
+        {% if channel_data.filesize_analysis %}
+        <div class="chart-section">
+            <h2>File Size Distribution</h2>
+            <div class="chart-container" 
+                 data-chart-type="bar" 
+                 data-chart-data="{{ channel_data.filesize_analysis|tojson }}">
+            </div>
+        </div>
+        {% endif %}
+
+        {% if channel_data.message_analysis %}
+        <div class="chart-section">
+            <h2>Message Analysis</h2>
+            <div class="chart-container" 
+                 data-chart-type="line" 
+                 data-chart-data="{{ channel_data.message_analysis|tojson }}">
+            </div>
+        </div>
+        {% endif %}
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="static/js/dashboard.js"></script>
+</body>
+</html>

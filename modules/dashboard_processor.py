@@ -194,6 +194,21 @@ class DashboardProcessor:
                 if not (has_old_fields or has_new_fields):
                     self.logger.warning(f"Missing required fields in {report_type}")
                     return False
+            elif report_type == 'message_analysis':
+                # Validate message analysis has basic fields
+                if not any(field in data for field in ['total_messages', 'text_messages', 'media_messages']):
+                    self.logger.warning(f"Missing required fields in {report_type}")
+                    return False
+            elif report_type == 'filename_analysis':
+                # Validate filename analysis has basic fields
+                if not any(field in data for field in ['total_files', 'unique_filenames', 'duplicate_filenames']):
+                    self.logger.warning(f"Missing required fields in {report_type}")
+                    return False
+            elif report_type == 'filesize_analysis':
+                # Validate filesize analysis has basic fields
+                if not any(field in data for field in ['total_size_bytes', 'total_size_mb', 'avg_file_size_mb']):
+                    self.logger.warning(f"Missing required fields in {report_type}")
+                    return False
             
             return True
             
@@ -250,14 +265,11 @@ class DashboardProcessor:
                         # Extract data from the appropriate field based on report type
                         if report_type == 'analysis_summary':
                             report_data = report.get('summary', {})
-                        elif report_type == 'filename_analysis':
-                            report_data = report.get('filename_analysis', {})
-                        elif report_type == 'filesize_analysis':
-                            report_data = report.get('filesize_analysis', {})
-                        elif report_type == 'message_analysis':
-                            report_data = report.get('message_analysis', {})
                         else:
-                            report_data = report.get('data', {})
+                            # For other analysis types, the data is directly in the report object
+                            # Remove metadata fields to get the actual analysis data
+                            report_data = {k: v for k, v in report.items() 
+                                         if k not in ['report_type', 'generated_at', 'analysis_version']}
                         
                         # Validate and limit data size for performance
                         if self._validate_and_limit_data(report_data, report_type):

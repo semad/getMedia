@@ -49,8 +49,7 @@
         <div class="chart-section">
             <h2>File Analysis</h2>
             <div class="chart-container" 
-                 data-chart-type="pie" 
-                 data-chart-data="{{ channel_data.filename_analysis|tojson }}">
+                 data-chart-config="{{ channel_data.filename_analysis|tojson|safe }}">
             </div>
         </div>
         {% endif %}
@@ -59,8 +58,7 @@
         <div class="chart-section">
             <h2>File Size Distribution</h2>
             <div class="chart-container" 
-                 data-chart-type="bar" 
-                 data-chart-data="{{ channel_data.filesize_analysis|tojson }}">
+                 data-chart-config="{{ channel_data.filesize_analysis|tojson|safe }}">
             </div>
         </div>
         {% endif %}
@@ -69,8 +67,7 @@
         <div class="chart-section">
             <h2>Message Analysis</h2>
             <div class="chart-container" 
-                 data-chart-type="line" 
-                 data-chart-data="{{ channel_data.message_analysis|tojson }}">
+                 data-chart-config="{{ channel_data.message_analysis|tojson|safe }}">
             </div>
         </div>
         {% endif %}

@@ -67,6 +67,154 @@ class DashboardProcessor:
         """Custom Jinja2 filter to convert Python objects to JSON."""
         import json
         return json.dumps(obj, default=str)
+    
+    def _transform_data_for_charts(self, data: Dict[str, Any], report_type: str) -> Dict[str, Any]:
+        """Transform analysis data into Chart.js compatible format."""
+        try:
+            if report_type == 'filename_analysis':
+                return self._transform_filename_analysis(data)
+            elif report_type == 'filesize_analysis':
+                return self._transform_filesize_analysis(data)
+            elif report_type == 'message_analysis':
+                return self._transform_message_analysis(data)
+            else:
+                return data
+        except Exception as e:
+            self.logger.error(f"Error transforming {report_type} data: {e}")
+            return data
+    
+    def _transform_filename_analysis(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Transform filename analysis data for charts."""
+        # Create a pie chart for file uniqueness
+        unique_files = data.get('unique_filenames', 0)
+        duplicate_files = data.get('duplicate_filenames', 0)
+        
+        return {
+            'type': 'pie',
+            'data': {
+                'labels': ['Unique Files', 'Duplicate Files'],
+                'datasets': [{
+                    'label': 'File Uniqueness',
+                    'data': [unique_files, duplicate_files],
+                    'backgroundColor': ['#28a745', '#dc3545'],
+                    'borderWidth': 2
+                }]
+            },
+            'options': {
+                'responsive': True,
+                'plugins': {
+                    'title': {
+                        'display': True,
+                        'text': 'File Uniqueness Distribution'
+                    },
+                    'legend': {
+                        'position': 'bottom'
+                    }
+                }
+            }
+        }
+    
+    def _transform_filesize_analysis(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Transform filesize analysis data for charts."""
+        # Create a bar chart for file size distribution
+        size_distribution = data.get('size_distribution', {})
+        
+        labels = []
+        values = []
+        colors = []
+        
+        for size_category, count in size_distribution.items():
+            labels.append(size_category.title())
+            values.append(count)
+            # Color coding based on size category
+            if size_category == 'tiny':
+                colors.append('#17a2b8')
+            elif size_category == 'small':
+                colors.append('#28a745')
+            elif size_category == 'medium':
+                colors.append('#ffc107')
+            elif size_category == 'large':
+                colors.append('#fd7e14')
+            elif size_category == 'huge':
+                colors.append('#dc3545')
+            else:
+                colors.append('#6c757d')
+        
+        return {
+            'type': 'bar',
+            'data': {
+                'labels': labels,
+                'datasets': [{
+                    'label': 'Number of Files',
+                    'data': values,
+                    'backgroundColor': colors,
+                    'borderWidth': 1
+                }]
+            },
+            'options': {
+                'responsive': True,
+                'plugins': {
+                    'title': {
+                        'display': True,
+                        'text': 'File Size Distribution'
+                    },
+                    'legend': {
+                        'display': False
+                    }
+                },
+                'scales': {
+                    'y': {
+                        'beginAtZero': True
+                    }
+                }
+            }
+        }
+    
+    def _transform_message_analysis(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Transform message analysis data for charts."""
+        # Create a line chart for temporal patterns (hourly)
+        temporal_patterns = data.get('temporal_patterns', {})
+        hourly_data = temporal_patterns.get('hourly', {})
+        
+        hours = []
+        counts = []
+        
+        for hour in range(24):
+            hours.append(f"{hour:02d}:00")
+            counts.append(hourly_data.get(str(hour), 0))
+        
+        return {
+            'type': 'line',
+            'data': {
+                'labels': hours,
+                'datasets': [{
+                    'label': 'Messages per Hour',
+                    'data': counts,
+                    'borderColor': '#007bff',
+                    'backgroundColor': 'rgba(0, 123, 255, 0.1)',
+                    'borderWidth': 2,
+                    'fill': True,
+                    'tension': 0.4
+                }]
+            },
+            'options': {
+                'responsive': True,
+                'plugins': {
+                    'title': {
+                        'display': True,
+                        'text': 'Message Activity by Hour'
+                    },
+                    'legend': {
+                        'display': False
+                    }
+                },
+                'scales': {
+                    'y': {
+                        'beginAtZero': True
+                    }
+                }
+            }
+        }
 
     def _parse_channels(self, channels_str: Optional[str]) -> List[str]:
         """Parse comma-separated channel list."""
@@ -273,7 +421,9 @@ class DashboardProcessor:
                         
                         # Validate and limit data size for performance
                         if self._validate_and_limit_data(report_data, report_type):
-                            channel_data[channel_name][report_type] = report_data
+                            # Transform data for chart visualization
+                            chart_data = self._transform_data_for_charts(report_data, report_type)
+                            channel_data[channel_name][report_type] = chart_data
                             
                             # Update summary metrics
                             if report_type == 'analysis_summary':
@@ -523,24 +673,19 @@ document.addEventListener('DOMContentLoaded', function() {{
 function initializeCharts() {{
     // Initialize Chart.js charts
     const chartElements = document.querySelectorAll('.chart-container');
-    chartElements.forEach(element => {{
-        const chartType = element.dataset.chartType;
-        const chartData = JSON.parse(element.dataset.chartData || '{{}}');
+    
+    chartElements.forEach((element, index) => {{
+        const chartConfigStr = element.dataset.chartConfig || '{{}}';
         
-        if (chartData && Object.keys(chartData).length > 0) {{
-            new Chart(element, {{
-                type: chartType,
-                data: chartData,
-                options: {{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {{
-                        legend: {{
-                            position: 'bottom'
-                        }}
-                    }}
-                }}
-            }});
+        try {{
+            const chartConfig = JSON.parse(chartConfigStr);
+            
+            if (chartConfig && Object.keys(chartConfig).length > 0) {{
+                // Use the complete chart configuration from the server
+                new Chart(element, chartConfig);
+            }}
+        }} catch (error) {{
+            console.error('Error parsing chart config for chart', index, ':', error);
         }}
     }});
 }}

@@ -15,16 +15,10 @@ REPORTS_BASE = f"{BASE_DIR}/reports"
 REPORTS_DIR = REPORTS_BASE
 
 COLLECTIONS_DIR = f"{REPORTS_BASE}/collections"
-RAW_COLLECTIONS_DIR = f"{COLLECTIONS_DIR}/raw"
+COMBINED_DIR = f"{REPORTS_BASE}/combined"
 
 # Analysis structure (new nested organization)
 ANALYSIS_BASE = f"{REPORTS_BASE}/analysis"
-FILE_MESSAGES_DIR = f"{ANALYSIS_BASE}/file_messages"    # File-based message analysis
-FILES_CHANNELS_DIR = f"{FILE_MESSAGES_DIR}/channels"             # Channel-specific reports
-DB_MESSAGES_DIR = f"{ANALYSIS_BASE}/db_messages"        # Database message analysis
-DB_CHANNELS_DIR = f"{DB_MESSAGES_DIR}/channels"             # Channel-specific reports
-DIFF_MESSAGES_DIR = f"{ANALYSIS_BASE}/diff_messages"    # Diff analysis between file and API sources
-DIFF_CHANNELS_DIR = f"{DIFF_MESSAGES_DIR}/channels"             # Channel-specific diff reports
 
 # Analysis file patterns
 ANALYSIS_FILE_PATTERN = "{channel}_analysis.json"        # Analysis report files
@@ -39,7 +33,7 @@ DASHBOARDS_BASE = f"{REPORTS_BASE}/dashboards"
 DASHBOARDS_DIR = f"{DASHBOARDS_BASE}/html"               # HTML dashboards
 
 # Default export path
-DEFAULT_EXPORT_PATH = f"{COLLECTIONS_DIR}/telegram_collection"
+DEFAULT_EXPORT_PATH = f"{COMBINED_DIR}/telegram_collection"
 
 # Filename patterns
 F_PREFIX = "tg"
@@ -48,10 +42,6 @@ F_EXTENSION = ".json"
 
 # File naming patterns
 COMBINED_FILE_PATTERN = "tg_{channel}_combined.json"
-REPORT_FILE_PATTERN = "{channel}_report.json"
-SUMMARY_FILE_PATTERN = "{channel}_summary.txt"
-DASHBOARD_FILE_PATTERN = "{channel}_dashboard.html"
-CHANNELS_OVERVIEW_FILE = "channels_overview.json"
 
 # File glob patterns
 RAW_COLLECTION_GLOB = "tg_*.json"
@@ -65,11 +55,11 @@ DEFAULT_OFFSET_ID = 0
 DEFAULT_RATE_LIMIT = 5000  # Increased from 120 to 5000 messages per minute
 DEFAULT_SESSION_NAME = "telegram_collector"
 DEFAULT_DB_URL = "http://localhost:8000"
+DEFAULT_API_URL = "http://localhost:80"
 
 # Channel defaults
 DEFAULT_CHANNEL = ("@SherwinVakiliLibrary", "@books_magazine", "@books", "@Free_Books_life")
 # other channels
-OTHER_CHANNELS = ["@books_magazine", "@books","@Free_Books_life" ]
 DEFAULT_CHANNEL_PRIORITY = 1
 
 # Rate limiting defaults

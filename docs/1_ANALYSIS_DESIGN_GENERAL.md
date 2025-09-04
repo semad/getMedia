@@ -2,14 +2,14 @@
 
 ## Overview
 
-The `analysis` command is an advanced intermediate data analysis tool for Telegram channel data, providing comprehensive data analysis capabilities across multiple sources. It supports file-based data, API endpoints, and diff comparison with pattern recognition, statistical analysis, and detailed reporting.
+The `analysis` command is an data analysis tool for Telegram channel data, providing comprehensive data analysis capabilities via multiple sources. It supports file-based data, but by default  it uses the REST API for fetching data from Telegram's public.
 
 ## Design Goals
 
-1. **Advanced Intermediate Data Analysis Tool**: Comprehensive data analysis with pattern recognition, statistical analysis, and detailed insights
+1. **Data Analysis Tool**: Comprehensive data analysis with pattern recognition, statistical analysis, and detailed insights
 2. **Single Module Architecture**: All analysis functionality consolidated into one module for simplicity and maintainability
-3. **Flexible Data Sources**: Support for file-based data, API endpoints, and diff analysis
-4. **Advanced Intermediate Analytics**: Pattern recognition, language detection, engagement analysis, and statistical metrics
+3. **Flexible Data Sources**: Support for file-based data, API endpoint.
+4. **Provide Analytics**: Pattern recognition, language detection, engagement analysis, and statistical metrics
 5. **Performance Optimization**: Efficient data processing using pandas DataFrames with vectorized operations
 6. **Detailed Output**: JSON reports with comprehensive analysis results and metadata
 7. **Extensibility**: Easy to add new analysis types and advanced features in future versions
@@ -18,6 +18,52 @@ The `analysis` command is an advanced intermediate data analysis tool for Telegr
 ## Requirements
 
 ### Functional Requirements
+
+#### **REQ-004: Data Source Integration**
+The analysis command MUST support multiple data sources:
+
+- **REQ-004.1**: **File Source Support**
+  - Read from combined JSON files in `reports/collections/` directory
+  - Support files matching `tg_*_combined.json` pattern
+  - Handle both small and large files efficiently
+  - Provide data quality assessment for file sources
+
+- **REQ-004.2**: **API Source Support**
+  - Fetch data from REST API endpoints
+  - Support pagination for large datasets
+  - Handle API timeouts and connection errors gracefully
+  - Provide real-time data availability checks
+
+
+#### **REQ-006: Output Requirements**
+- **REQ-006.1**: Generate structured JSON output with comprehensive analysis results
+- **REQ-006.2**: Include detailed metadata and processing statistics
+- **REQ-006.3**: Provide actionable insights for media library optimization
+- **REQ-006.4**: Support both individual channel and summary reports
+
+#### ** **Individual Channel Directory Structure**: Create separate folders for each channel when analyzing all channels
+  - All channels analysis is localed in `reports/analysis/all_channels/`
+Individual folders for each discovered channel
+  - Each channel gets its own directory: `reports/analysis/{channel_name}/`
+  Example:
+  `reports/analysis/channel1`, `reports/analysis/channel2`, ...
+
+- **REQ-006.6**: **Channel-Specific File Naming**: Use channel names in output file names
+  - Comprehensive report: `{channel_name}_analysis.json`
+  - Filename analysis: `{channel_name}_filename_analysis.json`
+  - Filesize analysis: `{channel_name}_filesize_analysis.json`
+  - Message analysis: `{channel_name}_message_analysis.json`
+  - Summary report: `{channel_name}_analysis_summary.json`
+
+Requirement:
+
+  - Summary report: the all report analysis is in 'reports/analysis/ 
+  - It does not filter on channel name and makes all the same analysis on all data: `all_channels_analysis_summary.json`
+   - **REQ-006.7**: **Config.py Compliance**: All output paths must follow patterns defined in `config.py`
+  - Use `FILE_MESSAGES_DIR` for base directory
+  - Use `ANALYSIS_FILE_PATTERN` and `ANALYSIS_SUMMARY_PATTERN` for file naming
+  - Ensure directory structure matches configuration requirements
+
 
 #### **REQ-001: Filename Analysis**
 The analysis command MUST provide comprehensive filename analysis capabilities including:
@@ -73,59 +119,12 @@ The analysis command MUST provide comprehensive language analysis capabilities i
   - Generate language diversity metrics
   - Provide language-specific content analysis
 
-#### **REQ-004: Data Source Integration**
-The analysis command MUST support multiple data sources:
-
-- **REQ-004.1**: **File Source Support**
-  - Read from combined JSON files in `reports/collections/` directory
-  - Support files matching `tg_*_combined.json` pattern
-  - Handle both small and large files efficiently
-  - Provide data quality assessment for file sources
-
-- **REQ-004.2**: **API Source Support**
-  - Fetch data from REST API endpoints
-  - Support pagination for large datasets
-  - Handle API timeouts and connection errors gracefully
-  - Provide real-time data availability checks
-
-- **REQ-004.3**: **Dual Source Comparison**
-  - Compare data between file and API sources
-  - Calculate sync percentages and status
-  - Identify missing records in each source
-  - Generate discrepancy reports
-
 ### Non-Functional Requirements
 
 #### **REQ-005: Performance Requirements**
-- **REQ-005.1**: Process datasets up to 100,000 records within 60 seconds
 - **REQ-005.2**: Use memory-efficient pandas operations for large datasets
 - **REQ-005.3**: Support chunked processing for files exceeding available memory
 - **REQ-005.4**: Provide progress indicators for operations longer than 30 seconds
-
-#### **REQ-006: Output Requirements**
-- **REQ-006.1**: Generate structured JSON output with comprehensive analysis results
-- **REQ-006.2**: Include detailed metadata and processing statistics
-- **REQ-006.3**: Provide actionable insights for media library optimization
-- **REQ-006.4**: Support both individual channel and summary reports
-- **REQ-006.5**: **Individual Channel Directory Structure**: Create separate folders for each channel when analyzing all channels
-  - Each channel gets its own directory: `reports/analysis/file_messages/{channel_name}/`
-  - Single channel analysis: `reports/analysis/file_messages/books/`
-  - Multiple channel analysis: `reports/analysis/file_messages/combined_X_channels/`
-  - All channels analysis: Individual folders for each discovered channel
-- **REQ-006.6**: **Channel-Specific File Naming**: Use channel names in output file names
-  - Comprehensive report: `{channel_name}_analysis.json`
-  - Individual reports: `filename_analysis.json`, `filesize_analysis.json`, `message_analysis.json`
-  - Summary report: `analysis_summary.json`
-- **REQ-006.7**: **Config.py Compliance**: All output paths must follow patterns defined in `config.py`
-  - Use `FILE_MESSAGES_DIR` for base directory
-  - Use `ANALYSIS_FILE_PATTERN` and `ANALYSIS_SUMMARY_PATTERN` for file naming
-  - Ensure directory structure matches configuration requirements
-- **REQ-006.8**: **Diff Analysis Output Structure**: Diff analysis results must be output to separate directory structure
-  - Diff analysis output: `reports/analysis/diff_messages/{channel_name}/`
-  - File-based analysis output: `reports/analysis/file_messages/{channel_name}/`
-  - API-based analysis output: `reports/analysis/db_messages/{channel_name}/`
-  - Use `DIFF_MESSAGES_DIR` for diff analysis base directory
-  - Maintain same file naming patterns within each directory type
 
 #### **REQ-007: Error Handling Requirements**
 - **REQ-007.1**: Continue processing with partial data when possible
@@ -215,35 +214,28 @@ python main.py analysis [options]
 ```
 
 ### Analysis Type
-The analysis command runs **advanced intermediate analysis** providing comprehensive data analysis capabilities:
+The analysis command runs **various data analysis** providing comprehensive data analysis capabilities:
 
 #### **Core Analysis Types (Always Executed)**
 - **Message Analysis**: Comprehensive content statistics and pattern recognition
 - **Media Analysis**: Detailed file type distribution and storage metrics
-
-#### **Comparison Analysis (Enabled by default, can be disabled with --no-diff)**
-- **Diff Analysis**: Detailed record count comparison and sync status
-
-**Note**: This is an advanced intermediate analysis tool providing comprehensive metrics and insights. Additional advanced features (sentiment analysis, topic modeling, network analysis, etc.) will be added in future versions.
+- **File name Analysis**: How many, what types, for each type how many
+- **Contributer Analysis**: Who has contibuted the most
+- **Note**: Additional advanced features (sentiment analysis, topic modeling, network analysis, etc.) will be added in future versions.
 
 ### Command Options
 
 | Option | Short | Type | Default | Description |
 |--------|-------|------|---------|-------------|
-| `--no-file` | | flag | `False` | Disable file source (combined collections) |
-| `--no-api` | | flag | `False` | Disable API source (REST endpoints) |
-| `--no-diff` | | flag | `False` | Disable diff analysis (file vs API comparison) |
 | `--channels` | `-c` | string | `all` | Comma-separated channel list or `all` |
 | `--verbose` | `-v` | flag | `False` | Enable verbose logging |
 | `--help` | `-h` | flag | | Show help message |
-
-**Note**: All sources (file, API, diff) are enabled by default, but can be individually disabled with their respective `--no-*` flags.
 
 ### Flag Validation Rules
 
 The CLI enforces these validation rules:
 
-1. **Default behavior**: All sources (file, API, diff) are enabled by default
+1. **Default behavior**: API is enabled by default
 2. **Individual source control**: Each source can be disabled with its respective `--no-*` flag
 3. **Diff validation**: Diff analysis requires both file and API sources to be available
 4. **Minimum source requirement**: At least one source (file or API) must be enabled
@@ -264,22 +256,8 @@ python main.py analysis --verbose
 python main.py analysis --channels @SherwinVakiliLibrary --verbose
 
 # Analysis without file source (API only)
-python main.py analysis --no-file
+python main.py analysis --from-file
 
-# Analysis without API source (file only)
-python main.py analysis --no-api
-
-# Analysis without diff comparison (file and API separately)
-python main.py analysis --no-diff
-
-# Analysis with only file source (no API, no diff)
-python main.py analysis --no-api --no-diff
-
-# Analysis with only API source (no file, no diff)
-python main.py analysis --no-file --no-diff
-
-# Analysis with specific channels and no diff
-python main.py analysis --channels @SherwinVakiliLibrary --no-diff
 ```
 
 ## Data Discovery and Sources
@@ -287,13 +265,16 @@ python main.py analysis --channels @SherwinVakiliLibrary --no-diff
 ### Data Discovery Phase
 The analysis command first determines what data is available using concrete metrics:
 
-- **API Discovery**: When API source is enabled (not disabled with `--no-api`), queries available endpoints to find:
-  - Available channels (`/api/v1/telegram/channels`) - must return HTTP 200
+- Analysis is done by default via api, unless the API is not available --from-file is specified, the analysis is from file only.
+
+- **API Discovery**: When API source existsn, 
+queries available endpoints to find:
+      - Available channels (`/api/v1/telegram/channels`) - must return HTTP 200
   - Message counts and data ranges from `/api/v1/telegram/messages` endpoint
   - API health check - response time <30 seconds, no HTTP errors
   - Comprehensive data availability check
 
-- **File Discovery**: When file source is enabled (not disabled with `--no-file`), scans the combined collections directory to find:
+- **File Discovery**: When file source is enabled, or no API available(not disabled with `--no-file`), scans the combined collections directory to find:
   - Available combined JSON files matching `*_combined.json` pattern
   - Channel names extracted from file metadata
   - Message counts from file metadata (any files with messages)

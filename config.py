@@ -105,8 +105,6 @@ DASHBOARD_SUPPORTED_ANALYSIS_TYPES = [
     "analysis_summary"
 ]
 DASHBOARD_SUPPORTED_SOURCE_TYPES = [
-    "file_messages",
-    "db_messages",
     "diff_messages"
 ]
 DASHBOARD_MAX_CHANNEL_NAME_LENGTH = 50

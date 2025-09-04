@@ -637,8 +637,10 @@ body {
 }
 
 .chart-container {
-    height: 400px;
+    height: 300px;
     width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
 }
 
 @media (max-width: 768px) {

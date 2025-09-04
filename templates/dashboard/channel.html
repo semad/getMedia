@@ -66,6 +66,13 @@
         </div>
         {% endif %}
 
+        {% if channel_data.timeline_chart %}
+        <div class="chart-section">
+            <h2>Message Activity Timeline</h2>
+            <canvas class="chart-container" data-chart-type="timeline_chart"></canvas>
+        </div>
+        {% endif %}
+
         {% if channel_data.monthly_histogram %}
         <div class="chart-section">
             <h2>Monthly Message Distribution</h2>
@@ -86,6 +93,7 @@
             "source_breakdown_chart": {{ channel_data.source_breakdown_chart|tojson|safe if channel_data.source_breakdown_chart else 'null' }},
             "filename_analysis": {{ channel_data.filename_analysis|tojson|safe if channel_data.filename_analysis else 'null' }},
             "filesize_analysis": {{ channel_data.filesize_analysis|tojson|safe if channel_data.filesize_analysis else 'null' }},
+            "timeline_chart": {{ channel_data.timeline_chart|tojson|safe if channel_data.timeline_chart else 'null' }},
             "monthly_histogram": {{ channel_data.monthly_histogram|tojson|safe if channel_data.monthly_histogram else 'null' }},
             "message_analysis": {{ channel_data.message_analysis|tojson|safe if channel_data.message_analysis else 'null' }}
         }

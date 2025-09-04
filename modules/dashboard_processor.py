@@ -216,6 +216,73 @@ class DashboardProcessor:
             }
         }
 
+    def _transform_timeline_data(self, timeline_data: Dict[str, int]) -> Dict[str, Any]:
+        """Transform timeline data into a line chart format."""
+        try:
+            # Sort dates and prepare data
+            sorted_dates = sorted(timeline_data.keys())
+            labels = []
+            values = []
+            
+            # Limit to reasonable number of data points for performance
+            max_points = 100
+            if len(sorted_dates) > max_points:
+                # Sample the data to avoid too many points
+                step = len(sorted_dates) // max_points
+                sampled_dates = sorted_dates[::step]
+            else:
+                sampled_dates = sorted_dates
+            
+            for date in sampled_dates:
+                labels.append(date)
+                values.append(timeline_data[date])
+            
+            return {
+                'type': 'line',
+                'data': {
+                    'labels': labels,
+                    'datasets': [{
+                        'label': 'Messages per Day',
+                        'data': values,
+                        'borderColor': '#dc3545',
+                        'backgroundColor': 'rgba(220, 53, 69, 0.1)',
+                        'borderWidth': 2,
+                        'fill': True,
+                        'tension': 0.1
+                    }]
+                },
+                'options': {
+                    'responsive': True,
+                    'plugins': {
+                        'title': {
+                            'display': True,
+                            'text': 'Message Activity Timeline'
+                        },
+                        'legend': {
+                            'display': False
+                        }
+                    },
+                    'scales': {
+                        'x': {
+                            'title': {
+                                'display': True,
+                                'text': 'Date'
+                            }
+                        },
+                        'y': {
+                            'beginAtZero': True,
+                            'title': {
+                                'display': True,
+                                'text': 'Messages'
+                            }
+                        }
+                    }
+                }
+            }
+        except Exception as e:
+            self.logger.error(f"Error transforming timeline data: {e}")
+            return {}
+
     def _transform_monthly_histogram(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Transform monthly message data for histogram chart."""
         try:
@@ -322,6 +389,70 @@ class DashboardProcessor:
         except Exception as e:
             self.logger.error(f"Error transforming source breakdown: {e}")
             return {}
+
+    def _get_timeline_data_for_channel(self, channel_name: str) -> Optional[Dict[str, Any]]:
+        """Get timeline data for a specific channel from collection files."""
+        try:
+            # Find the collection file for this channel
+            collections_dir = Path("reports/collections")
+            collection_files = list(collections_dir.glob(f"*{channel_name}*combined.json"))
+            
+            if not collection_files:
+                self.logger.warning(f"Collection file not found for {channel_name}")
+                return None
+            
+            collection_file = collection_files[0]
+            
+            with open(collection_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            if not data or len(data) == 0:
+                return None
+            
+            # Extract messages from the collection data
+            messages = data[0].get('messages', [])
+            if not messages:
+                return None
+            
+            # Process dates and create timeline data
+            from datetime import datetime
+            import pandas as pd
+            
+            # Extract dates and sort them
+            dates = []
+            for message in messages:
+                if 'date' in message:
+                    try:
+                        # Parse the date string
+                        date_str = message['date']
+                        if isinstance(date_str, str):
+                            # Handle different date formats
+                            if '+' in date_str:
+                                date_str = date_str.split('+')[0]  # Remove timezone
+                            date_obj = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+                            dates.append(date_obj)
+                    except Exception as e:
+                        self.logger.debug(f"Error parsing date {date_str}: {e}")
+                        continue
+            
+            if not dates:
+                return None
+            
+            # Sort dates
+            dates.sort()
+            
+            # Create timeline data (daily aggregation)
+            timeline_data = {}
+            for date in dates:
+                date_key = date.strftime('%Y-%m-%d')
+                timeline_data[date_key] = timeline_data.get(date_key, 0) + 1
+            
+            # Convert to chart format
+            return self._transform_timeline_data(timeline_data)
+            
+        except Exception as e:
+            self.logger.error(f"Error getting timeline data for {channel_name}: {e}")
+            return None
 
     def _get_monthly_histogram_for_channel(self, channel_name: str) -> Optional[Dict[str, Any]]:
         """Get monthly histogram data for a specific channel from diff_messages source."""
@@ -594,6 +725,11 @@ class DashboardProcessor:
                 monthly_histogram = self._get_monthly_histogram_for_channel(channel_name)
                 if monthly_histogram:
                     data['monthly_histogram'] = monthly_histogram
+            
+            # Add timeline chart from collection data
+            timeline_chart = self._get_timeline_data_for_channel(channel_name)
+            if timeline_chart:
+                data['timeline_chart'] = timeline_chart
         
         # Calculate total summary
         for channel_data_item in channel_data.values():

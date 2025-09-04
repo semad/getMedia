@@ -119,7 +119,7 @@ class DashboardProcessor:
             return files
         
         for source_type in DASHBOARD_SUPPORTED_SOURCE_TYPES:
-            source_path = input_path / source_type / "channels"
+            source_path = input_path / source_type
             if source_path.exists():
                 files[source_type] = list(source_path.rglob("*.json"))
                 self.logger.debug(f"Found {len(files[source_type])} files in {source_type}")
@@ -138,7 +138,7 @@ class DashboardProcessor:
                 return None
             
             for item in data:
-                if not all(key in item for key in ['report_type', 'generated_at', 'data']):
+                if not all(key in item for key in ['report_type', 'generated_at']):
                     self.logger.warning(f"Missing required fields in {file_path}")
                     return None
             
@@ -154,12 +154,13 @@ class DashboardProcessor:
     def _extract_channel_name(self, file_path: Path) -> Optional[str]:
         """Extract channel name from file path."""
         try:
-            # Path structure: .../channels/channel_name/analysis_file.json
+            # Path structure: .../source_type/channel_name/analysis_file.json
             parts = file_path.parts
-            if 'channels' in parts:
-                channel_index = parts.index('channels')
-                if channel_index + 1 < len(parts):
-                    return parts[channel_index + 1]
+            # Find the source type (file_messages, db_messages, diff_messages)
+            for i, part in enumerate(parts):
+                if part in DASHBOARD_SUPPORTED_SOURCE_TYPES:
+                    if i + 1 < len(parts):
+                        return parts[i + 1]
         except Exception as e:
             self.logger.error(f"Error extracting channel name from {file_path}: {e}")
         return None
@@ -181,14 +182,16 @@ class DashboardProcessor:
         try:
             # Check if data is too large
             data_str = json.dumps(data, default=str)
-            if len(data_str) > DASHBOARD_MAX_DATA_POINTS * 100:  # Rough size limit
+            if len(data_str) > 1000000:  # 1MB limit for performance
                 self.logger.warning(f"Data too large for {report_type}, truncating")
                 return False
             
             # Validate data structure based on report type
             if report_type == 'analysis_summary':
-                required_fields = ['total_messages', 'total_files']
-                if not all(field in data for field in required_fields):
+                # Check for either the old or new field names
+                has_old_fields = all(field in data for field in ['total_messages', 'total_files'])
+                has_new_fields = all(field in data for field in ['total_messages_analyzed', 'total_files_analyzed'])
+                if not (has_old_fields or has_new_fields):
                     self.logger.warning(f"Missing required fields in {report_type}")
                     return False
             
@@ -244,7 +247,17 @@ class DashboardProcessor:
                 for report in data:
                     report_type = report.get('report_type', '')
                     if report_type in DASHBOARD_SUPPORTED_ANALYSIS_TYPES:
-                        report_data = report.get('data', {})
+                        # Extract data from the appropriate field based on report type
+                        if report_type == 'analysis_summary':
+                            report_data = report.get('summary', {})
+                        elif report_type == 'filename_analysis':
+                            report_data = report.get('filename_analysis', {})
+                        elif report_type == 'filesize_analysis':
+                            report_data = report.get('filesize_analysis', {})
+                        elif report_type == 'message_analysis':
+                            report_data = report.get('message_analysis', {})
+                        else:
+                            report_data = report.get('data', {})
                         
                         # Validate and limit data size for performance
                         if self._validate_and_limit_data(report_data, report_type):
@@ -252,8 +265,8 @@ class DashboardProcessor:
                             
                             # Update summary metrics
                             if report_type == 'analysis_summary':
-                                channel_data[channel_name]['messages'] = report_data.get('total_messages', 0)
-                                channel_data[channel_name]['files'] = report_data.get('total_files', 0)
+                                channel_data[channel_name]['messages'] = report_data.get('total_messages_analyzed', 0)
+                                channel_data[channel_name]['files'] = report_data.get('total_files_analyzed', 0)
                         else:
                             self.logger.warning(f"Skipping {report_type} for {channel_name} due to validation failure")
         

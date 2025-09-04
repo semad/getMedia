@@ -763,8 +763,26 @@ class FileDataLoader(BaseDataLoader):
             # Split by underscores and find channel name
             parts = name_without_ext.split('_')
             if len(parts) >= 2:
-                # Assume format: tg_channelname_...
-                channel_name = parts[1]
+                # Handle format: tg_channelname_... or tg_channel_name_...
+                # For channels with underscores in names, we need to reconstruct the full name
+                if len(parts) >= 3:
+                    # Check if the last part is a number (like in tg_books_1_482)
+                    # If so, the channel name is everything between 'tg' and the first number
+                    channel_parts = []
+                    for i, part in enumerate(parts[1:], 1):  # Skip 'tg'
+                        if part.isdigit():
+                            break
+                        channel_parts.append(part)
+                    
+                    if channel_parts:
+                        channel_name = '_'.join(channel_parts)
+                    else:
+                        # Fallback to just the first part after 'tg'
+                        channel_name = parts[1]
+                else:
+                    # Simple case: tg_channelname
+                    channel_name = parts[1]
+                
                 return f"@{channel_name}"
             else:
                 return f"@{name_without_ext}"

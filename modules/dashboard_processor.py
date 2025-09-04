@@ -216,6 +216,54 @@ class DashboardProcessor:
             }
         }
 
+    def _transform_monthly_histogram(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Transform monthly message data for histogram chart."""
+        try:
+            temporal_patterns = data.get('temporal_patterns', {})
+            monthly_data = temporal_patterns.get('monthly', {})
+            
+            # Create monthly labels and data
+            months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+            counts = []
+            
+            for month_num in range(1, 13):
+                counts.append(monthly_data.get(str(month_num), 0))
+            
+            return {
+                'type': 'bar',
+                'data': {
+                    'labels': months,
+                    'datasets': [{
+                        'label': 'Messages per Month',
+                        'data': counts,
+                        'backgroundColor': '#17a2b8',
+                        'borderColor': '#138496',
+                        'borderWidth': 1
+                    }]
+                },
+                'options': {
+                    'responsive': True,
+                    'plugins': {
+                        'title': {
+                            'display': True,
+                            'text': 'Monthly Message Distribution'
+                        },
+                        'legend': {
+                            'display': False
+                        }
+                    },
+                    'scales': {
+                        'y': {
+                            'beginAtZero': True
+                        }
+                    }
+                }
+            }
+        except Exception as e:
+            self.logger.error(f"Error transforming monthly histogram: {e}")
+            return {}
+
     def _transform_source_breakdown(self, source_breakdown: Dict[str, Any]) -> Dict[str, Any]:
         """Transform source breakdown data for charts."""
         try:
@@ -274,6 +322,32 @@ class DashboardProcessor:
         except Exception as e:
             self.logger.error(f"Error transforming source breakdown: {e}")
             return {}
+
+    def _get_monthly_histogram_for_channel(self, channel_name: str) -> Optional[Dict[str, Any]]:
+        """Get monthly histogram data for a specific channel from diff_messages source."""
+        try:
+            # Use diff_messages as the primary source for monthly data
+            message_analysis_file = Path(self.input_dir) / "diff_messages" / channel_name / "message_analysis.json"
+            
+            if not message_analysis_file.exists():
+                self.logger.warning(f"Message analysis file not found for {channel_name}")
+                return None
+            
+            with open(message_analysis_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            if not data or len(data) == 0:
+                return None
+            
+            # The data is a list, get the first item
+            message_data = data[0] if isinstance(data, list) else data
+            
+            # Transform the monthly data
+            return self._transform_monthly_histogram(message_data)
+            
+        except Exception as e:
+            self.logger.error(f"Error getting monthly histogram for {channel_name}: {e}")
+            return None
 
     def _parse_channels(self, channels_str: Optional[str]) -> List[str]:
         """Parse comma-separated channel list."""
@@ -506,12 +580,20 @@ class DashboardProcessor:
         dashboard_data['metadata']['total_channels'] = len(channel_data)
         dashboard_data['summary']['channels_count'] = len(channel_data)
         
-        # Add source breakdown charts for each channel
+        # Add source breakdown charts and monthly histogram for each channel
         for channel_name, data in channel_data.items():
             if 'source_breakdown' in data:
                 source_breakdown_chart = self._transform_source_breakdown(data['source_breakdown'])
                 if source_breakdown_chart:
                     data['source_breakdown_chart'] = source_breakdown_chart
+            
+            # Add monthly histogram from message analysis data
+            if 'message_analysis' in data and data['message_analysis']:
+                # Extract the raw message analysis data to get monthly data
+                # We need to get this from the original analysis files
+                monthly_histogram = self._get_monthly_histogram_for_channel(channel_name)
+                if monthly_histogram:
+                    data['monthly_histogram'] = monthly_histogram
         
         # Calculate total summary
         for channel_data_item in channel_data.values():

@@ -86,6 +86,9 @@ DASHBOARD_MAX_DATA_POINTS = 10000
 DASHBOARD_CHARTJS_CDN_URL = "https://cdn.jsdelivr.net/npm/chart.js"
 DASHBOARD_GA_MEASUREMENT_ID = DEFAULT_GA_MEASUREMENT_ID
 DASHBOARD_GA_ENABLED = True
+
+# Template Configuration
+TEMPLATES_DIR = "templates"
 ```
 
 ### Step 1.2: Install Dependencies
@@ -122,6 +125,42 @@ Ensure the `./prototypes/` directory exists with HTML examples:
 ```bash
 ls -la prototypes/
 # Should show: index.html, channel-books.html, mobile-demo.html, README.md
+```
+
+### Step 1.5: Validate Configuration
+
+Create a validation script to ensure all required constants are defined:
+
+```python
+# Create validate_config.py
+import sys
+import os
+
+# Add the project root to Python path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+try:
+    from config import (
+        DASHBOARD_INPUT_DIR, DASHBOARD_OUTPUT_DIR,
+        DASHBOARD_INDEX_FILENAME, DASHBOARD_CSS_FILENAME,
+        DASHBOARD_JS_FILENAME, DASHBOARD_DATA_FILENAME,
+        DASHBOARD_CSS_PATH, DASHBOARD_JS_PATH,
+        DASHBOARD_GA_MEASUREMENT_ID, DASHBOARD_GA_ENABLED,
+        DASHBOARD_SUPPORTED_ANALYSIS_TYPES, DASHBOARD_SUPPORTED_SOURCE_TYPES,
+        DASHBOARD_MAX_CHANNEL_NAME_LENGTH, DASHBOARD_CHARTJS_CDN_URL,
+        TEMPLATES_DIR
+    )
+    print("✅ All dashboard configuration constants are properly defined!")
+except ImportError as e:
+    print(f"❌ Configuration validation failed: {e}")
+    print("Please ensure all dashboard constants are added to config.py")
+    sys.exit(1)
+```
+
+Run the validation:
+
+```bash
+python validate_config.py
 ```
 
 ### Step 2.1: Create DashboardProcessor Module
@@ -709,6 +748,9 @@ function handleChartInteraction(chartType, action, channelName) {{
 Add the dashboard command to `main.py`:
 
 ```python
+import click
+from modules.dashboard_processor import DashboardProcessor
+
 @cli.command()
 @click.option('--input-dir', '-i', 'input_dir',
               default=None, help='Directory containing analysis results')
@@ -720,11 +762,15 @@ Add the dashboard command to `main.py`:
               is_flag=True, help='Enable verbose logging output')
 def dashboard(input_dir, output_dir, channels, verbose):
     """Generate HTML dashboard from analysis results."""
-    setup_logging(verbose)
+    # Setup logging if setup_logging function exists, otherwise use basic logging
+    try:
+        from main import setup_logging
+        setup_logging(verbose)
+    except ImportError:
+        import logging
+        logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO)
     
     try:
-        from modules.dashboard_processor import DashboardProcessor
-        
         processor = DashboardProcessor(
             input_dir=input_dir,
             output_dir=output_dir,
@@ -737,6 +783,16 @@ def dashboard(input_dir, output_dir, channels, verbose):
         
     except ImportError as e:
         click.echo(f"Error importing dashboard modules: {e}", err=True)
+        if verbose:
+            import traceback
+            traceback.print_exc()
+    except FileNotFoundError as e:
+        click.echo(f"Required file or directory not found: {e}", err=True)
+        if verbose:
+            import traceback
+            traceback.print_exc()
+    except PermissionError as e:
+        click.echo(f"Permission denied: {e}", err=True)
         if verbose:
             import traceback
             traceback.print_exc()
@@ -1255,6 +1311,42 @@ No channel data found. Generating empty dashboard.
 - Verify analysis command has been run
 - Check input directory path
 - Ensure analysis files exist and are valid JSON
+
+#### Issue: Configuration Error
+
+```text
+NameError: name 'DASHBOARD_INPUT_DIR' is not defined
+```
+
+**Solution:**
+
+- Ensure all dashboard constants are added to `config.py`
+- Check that `TEMPLATES_DIR` is defined
+- Verify imports in `dashboard_processor.py`
+
+#### Issue: Template Rendering Error
+
+```text
+jinja2.exceptions.UndefinedError: 'data' is undefined
+```
+
+**Solution:**
+
+- Check template syntax in HTML files
+- Ensure data is passed correctly to templates
+- Verify Jinja2 template variables match data structure
+
+#### Issue: Chart.js Not Loading
+
+```text
+Chart is not defined
+```
+
+**Solution:**
+
+- Verify Chart.js CDN URL is accessible
+- Check internet connection for CDN resources
+- Ensure Chart.js script is loaded before dashboard.js
 
 ### Debug Mode
 

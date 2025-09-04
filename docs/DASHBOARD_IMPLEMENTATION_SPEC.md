@@ -6,15 +6,15 @@ This document provides detailed implementation specifications for the Dashboard 
 
 ## Key Requirements
 
-**Single python Module Architecture:** Use `dashboard_processor.py` containing all dashboard functionality (data processing, template rendering, file generation, single page creation).
+**Single python Module Architecture:** Use `dashboard_processor.py` containing all dashboard functionality (data processing, template rendering, file generation, static HTML creation).
 
 **Static Html Files:** Generate self-contained HTML files with embedded CSS, JavaScript, and data for email sharing, embedding, offline viewing, and quick reports. Target files under 2MB.
 
 ## Implementation Architecture
 
-**Core Component:** `modules/dashboard_processor.py` - Single module containing all dashboard functionality including data processing, template rendering, file generation, single page creation, Chart.js integration, and error handling.
+**Core Component:** `modules/dashboard_processor.py` - Single module containing all dashboard functionality including data processing, template rendering, file generation, static HTML creation, Chart.js integration, and error handling.
 
-**Configuration:** Extend `config.py` with dashboard-specific constants for file paths, chart settings, and single page module configuration.
+**Configuration:** Extend `config.py` with dashboard-specific constants for file paths, chart settings, and static HTML configuration.
 
 ## Configuration Extensions
 
@@ -38,7 +38,7 @@ Add the following constants to `config.py` (reusing existing `ANALYSIS_BASE`, `D
 
 **Static HTML Files:**
 
-- `DASHBOARD_SINGLE_PAGE_ENABLED`, `DASHBOARD_SINGLE_PAGE_FILENAME`, `DASHBOARD_SINGLE_PAGE_MAX_SIZE_MB`
+- `DASHBOARD_STATIC_HTML_ENABLED`, `DASHBOARD_STATIC_HTML_FILENAME`, `DASHBOARD_STATIC_HTML_MAX_SIZE_MB`
 
 ## File System Requirements
 
@@ -69,7 +69,6 @@ The implementation requires the following directory structure to exist or be cre
 - `getMedia/reports/dashboards/html/` - Output directory
   - `index.html` - Generated main dashboard
   - `{channel}.html` - Generated channel pages
-  - `dashboard-standalone.html` - Generated single page dashboards
   - `static/` - Static files
     - `css/dashboard.css` - Generated styles
     - `js/dashboard.js` - Generated JavaScript
@@ -155,7 +154,7 @@ Create a single comprehensive module that handles all dashboard functionality:
 
 **DashboardProcessor Class Structure:**
 
-- `__init__()` - Initialize with input/output directories, channels, single_page flag, verbose mode
+- `__init__()` - Initialize with input/output directories, channels, static_html flag, verbose mode
 - `_setup_logger()` - Configure logging
 - `_setup_templates()` - Setup Jinja2 template environment
 - `_parse_channels()` - Parse comma-separated channel list
@@ -171,7 +170,7 @@ Create a single comprehensive module that handles all dashboard functionality:
 
 ### Step 2: CLI Integration
 
-Add dashboard command to `main.py` with click options for input-dir, output-dir, channels, single-page, and verbose flags. Import DashboardProcessor and handle exceptions.
+Add dashboard command to `main.py` with click options for input-dir, output-dir, channels, static-html, and verbose flags. Import DashboardProcessor and handle exceptions.
 
 ### Step 3: Complete Module Implementation
 
@@ -188,17 +187,17 @@ The `dashboard_processor.py` module should include:
 
 **File Generation Methods:**
 
-- `_generate_shared_files()`, `_generate_html_pages()`, `_generate_static_html()`, `_create_empty_dashboard_data()`
+- `_generate_shared_files()`, `_generate_html_pages()`, `_create_empty_dashboard_data()`
 
 ### Step 4: HTML Templates
 
-Create `templates/dashboard/index.html`, `channel.html`, and `single.html` with Jinja2 syntax, Google Analytics integration, responsive design, and Chart.js support. Adapt existing `dashboard_index.html` and `dashboard_channel.html` templates.
+Create `templates/dashboard/index.html` and `channel.html` with Jinja2 syntax, Google Analytics integration, responsive design, and Chart.js support. Adapt existing `dashboard_index.html` and `dashboard_channel.html` templates.
 
-Generate self-contained HTML files with embedded CSS, JavaScript, and data. Include methods for CSS/JS embedding, data serialization, Chart.js integration, and file size validation.
+**Design Reference:** Use `./prototypes/` directory as visual reference for HTML page layout, styling, and user interface design. The prototypes demonstrate the expected look and feel of the generated dashboard pages.
 
 ## Testing Strategy
 
-**Unit Tests:** Cover DashboardProcessor initialization, data processing, template rendering, error handling, and static HTML generation.
+**Unit Tests:** Cover DashboardProcessor initialization, data processing, template rendering, and error handling.
 
 **Integration Tests:** End-to-end dashboard generation workflow, file output verification, error scenarios, and performance testing with large datasets.
 
@@ -267,11 +266,11 @@ Implement Google Analytics 4 tracking for page views, chart interactions, and ex
 - [ ] Add new constants to `config.py`
 - [ ] Create `templates/dashboard/` directory
 - [ ] Create `index.html` and `channel.html` templates
+- [ ] Reference `./prototypes/` for visual design guidance
 - [ ] Add `jinja2>=3.1.0` to requirements
 - [ ] Implement complete data aggregation logic
 - [ ] Add Chart.js implementation to JavaScript
 - [ ] Test with sample analysis data
-- [ ] Verify static HTML generation works
 - [ ] Test error handling scenarios
 
 This implementation specification provides a complete roadmap for building the dashboard system, integrating with the existing codebase, and maintaining consistency with the established patterns and configuration structure.

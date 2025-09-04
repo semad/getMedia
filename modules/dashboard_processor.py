@@ -216,6 +216,65 @@ class DashboardProcessor:
             }
         }
 
+    def _transform_source_breakdown(self, source_breakdown: Dict[str, Any]) -> Dict[str, Any]:
+        """Transform source breakdown data for charts."""
+        try:
+            labels = []
+            message_data = []
+            file_data = []
+            colors = ['#28a745', '#007bff', '#ffc107']  # Green, Blue, Yellow
+            
+            for i, (source_type, data) in enumerate(source_breakdown.items()):
+                # Format source type names for display
+                display_name = source_type.replace('_', ' ').title()
+                labels.append(display_name)
+                message_data.append(data.get('messages', 0))
+                file_data.append(data.get('files', 0))
+            
+            return {
+                'type': 'bar',
+                'data': {
+                    'labels': labels,
+                    'datasets': [
+                        {
+                            'label': 'Messages',
+                            'data': message_data,
+                            'backgroundColor': colors,
+                            'borderColor': colors,
+                            'borderWidth': 1
+                        },
+                        {
+                            'label': 'Files',
+                            'data': file_data,
+                            'backgroundColor': [f"{color}80" for color in colors],  # Add transparency
+                            'borderColor': colors,
+                            'borderWidth': 1
+                        }
+                    ]
+                },
+                'options': {
+                    'responsive': True,
+                    'plugins': {
+                        'title': {
+                            'display': True,
+                            'text': 'Data Source Breakdown'
+                        },
+                        'legend': {
+                            'display': True,
+                            'position': 'top'
+                        }
+                    },
+                    'scales': {
+                        'y': {
+                            'beginAtZero': True
+                        }
+                    }
+                }
+            }
+        except Exception as e:
+            self.logger.error(f"Error transforming source breakdown: {e}")
+            return {}
+
     def _parse_channels(self, channels_str: Optional[str]) -> List[str]:
         """Parse comma-separated channel list."""
         if not channels_str or channels_str.lower() == 'all':
@@ -403,7 +462,12 @@ class DashboardProcessor:
                         'filename_analysis': {},
                         'filesize_analysis': {},
                         'message_analysis': {},
-                        'analysis_summary': {}
+                        'analysis_summary': {},
+                        'source_breakdown': {
+                            'file_messages': {'messages': 0, 'files': 0},
+                            'db_messages': {'messages': 0, 'files': 0},
+                            'diff_messages': {'messages': 0, 'files': 0}
+                        }
                     }
                 
                 # Process each report in the data
@@ -427,14 +491,27 @@ class DashboardProcessor:
                             
                             # Update summary metrics
                             if report_type == 'analysis_summary':
-                                channel_data[channel_name]['messages'] = report_data.get('total_messages_analyzed', 0)
-                                channel_data[channel_name]['files'] = report_data.get('total_files_analyzed', 0)
+                                # Store source breakdown data
+                                channel_data[channel_name]['source_breakdown'][source_type]['messages'] = report_data.get('total_messages_analyzed', 0)
+                                channel_data[channel_name]['source_breakdown'][source_type]['files'] = report_data.get('total_files_analyzed', 0)
+                                
+                                # Use diff_messages as the primary data source for display
+                                if source_type == 'diff_messages':
+                                    channel_data[channel_name]['messages'] = report_data.get('total_messages_analyzed', 0)
+                                    channel_data[channel_name]['files'] = report_data.get('total_files_analyzed', 0)
                         else:
                             self.logger.warning(f"Skipping {report_type} for {channel_name} due to validation failure")
         
         dashboard_data['channels'] = channel_data
         dashboard_data['metadata']['total_channels'] = len(channel_data)
         dashboard_data['summary']['channels_count'] = len(channel_data)
+        
+        # Add source breakdown charts for each channel
+        for channel_name, data in channel_data.items():
+            if 'source_breakdown' in data:
+                source_breakdown_chart = self._transform_source_breakdown(data['source_breakdown'])
+                if source_breakdown_chart:
+                    data['source_breakdown_chart'] = source_breakdown_chart
         
         # Calculate total summary
         for channel_data_item in channel_data.values():

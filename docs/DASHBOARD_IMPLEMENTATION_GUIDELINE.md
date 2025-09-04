@@ -50,8 +50,9 @@ Add the following constants to `config.py`:
 
 ```python
 # Dashboard Configuration
-DASHBOARD_INPUT_DIR = os.path.join(ANALYSIS_BASE, "analysis")
-DASHBOARD_OUTPUT_DIR = os.path.join(DASHBOARDS_DIR, "html")
+# Note: These reference existing constants from config.py
+DASHBOARD_INPUT_DIR = ANALYSIS_BASE  # Points to reports/analysis/
+DASHBOARD_OUTPUT_DIR = DASHBOARDS_DIR  # Points to reports/dashboards/html/
 DASHBOARD_INDEX_FILENAME = "index.html"
 DASHBOARD_CSS_FILENAME = "dashboard.css"
 DASHBOARD_JS_FILENAME = "dashboard.js"
@@ -87,8 +88,8 @@ DASHBOARD_CHARTJS_CDN_URL = "https://cdn.jsdelivr.net/npm/chart.js"
 DASHBOARD_GA_MEASUREMENT_ID = DEFAULT_GA_MEASUREMENT_ID
 DASHBOARD_GA_ENABLED = True
 
-# Template Configuration
-TEMPLATES_DIR = "templates"
+# Template Configuration (already defined in config.py)
+# TEMPLATES_DIR = f"{BASE_DIR}/templates"  # Already exists in config.py
 ```
 
 ### Step 1.2: Install Dependencies
@@ -112,10 +113,15 @@ pip install -r requirements.txt
 Create the required directories:
 
 ```bash
+# Create template directory
 mkdir -p templates/dashboard
+
+# Create dashboard output directories (these match DASHBOARDS_DIR from config.py)
 mkdir -p reports/dashboards/html/static/css
 mkdir -p reports/dashboards/html/static/js
 mkdir -p reports/dashboards/html/data
+
+# Note: Input directory (reports/analysis/) should already exist from analysis command
 ```
 
 ### Step 1.4: Verify Prototypes Directory
@@ -148,7 +154,7 @@ try:
         DASHBOARD_GA_MEASUREMENT_ID, DASHBOARD_GA_ENABLED,
         DASHBOARD_SUPPORTED_ANALYSIS_TYPES, DASHBOARD_SUPPORTED_SOURCE_TYPES,
         DASHBOARD_MAX_CHANNEL_NAME_LENGTH, DASHBOARD_CHARTJS_CDN_URL,
-        TEMPLATES_DIR
+        TEMPLATES_DIR, ANALYSIS_BASE, DASHBOARDS_DIR
     )
     print("✅ All dashboard configuration constants are properly defined!")
 except ImportError as e:
@@ -183,7 +189,7 @@ from config import (
     DASHBOARD_GA_MEASUREMENT_ID, DASHBOARD_GA_ENABLED,
     DASHBOARD_SUPPORTED_ANALYSIS_TYPES, DASHBOARD_SUPPORTED_SOURCE_TYPES,
     DASHBOARD_MAX_CHANNEL_NAME_LENGTH, DASHBOARD_CHARTJS_CDN_URL,
-    TEMPLATES_DIR
+    TEMPLATES_DIR, ANALYSIS_BASE, DASHBOARDS_DIR
 )
 
 

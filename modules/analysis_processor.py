@@ -1023,11 +1023,11 @@ class MessageAnalyzer:
             )
         
         # Conditionally run language analysis based on config
-        language_analysis = None
         if self.config.enable_language_detection:
             language_analysis = self.language_analyzer.analyze(df, source)
         else:
             self.logger.info("⏭️  Skipping language detection (disabled by config)")
+            language_analysis = {}
         
         return MessageAnalysisResult(
             content_statistics=self._analyze_content_statistics(df),

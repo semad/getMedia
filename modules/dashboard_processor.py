@@ -85,10 +85,14 @@ class DashboardProcessor:
     
     def _transform_filename_analysis(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Transform filename analysis data for charts."""
-        # Create a pie chart for file uniqueness
-        unique_files = data.get('unique_filenames', 0)
-        duplicate_files = data.get('duplicate_filenames', 0)
+        # Extract data from nested structure
+        duplicate_detection = data.get('duplicate_filename_detection', {})
+        pattern_analysis = data.get('filename_pattern_analysis', {})
         
+        unique_files = duplicate_detection.get('total_unique_filenames', 0)
+        duplicate_files = duplicate_detection.get('files_with_duplicate_names', 0)
+        
+        # Create a pie chart for file uniqueness
         return {
             'type': 'pie',
             'data': {
@@ -116,29 +120,26 @@ class DashboardProcessor:
     
     def _transform_filesize_analysis(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Transform filesize analysis data for charts."""
-        # Create a bar chart for file size distribution
-        size_distribution = data.get('size_distribution', {})
+        # Extract data from nested structure
+        filesize_distribution = data.get('filesize_distribution_analysis', {})
+        size_distribution = filesize_distribution.get('size_frequency_distribution', {})
         
         labels = []
         values = []
         colors = []
         
+        # Map size categories to colors
+        color_map = {
+            '0-1MB': '#17a2b8',
+            '1-5MB': '#28a745', 
+            '5-10MB': '#ffc107',
+            '10MB+': '#dc3545'
+        }
+        
         for size_category, count in size_distribution.items():
-            labels.append(size_category.title())
+            labels.append(size_category)
             values.append(count)
-            # Color coding based on size category
-            if size_category == 'tiny':
-                colors.append('#17a2b8')
-            elif size_category == 'small':
-                colors.append('#28a745')
-            elif size_category == 'medium':
-                colors.append('#ffc107')
-            elif size_category == 'large':
-                colors.append('#fd7e14')
-            elif size_category == 'huge':
-                colors.append('#dc3545')
-            else:
-                colors.append('#6c757d')
+            colors.append(color_map.get(size_category, '#6c757d'))
         
         return {
             'type': 'bar',
@@ -713,11 +714,11 @@ class DashboardProcessor:
                         
                         # Process filename analysis
                         if 'filename_analysis' in analysis_results:
-                            channel_data[channel_name]['filename_analysis'] = analysis_results['filename_analysis']
+                            channel_data[channel_name]['filename_analysis'] = self._transform_filename_analysis(analysis_results['filename_analysis'])
                         
                         # Process filesize analysis
                         if 'filesize_analysis' in analysis_results:
-                            channel_data[channel_name]['filesize_analysis'] = analysis_results['filesize_analysis']
+                            channel_data[channel_name]['filesize_analysis'] = self._transform_filesize_analysis(analysis_results['filesize_analysis'])
                         
                         # Process message analysis
                         if 'message_analysis' in analysis_results:
@@ -732,9 +733,9 @@ class DashboardProcessor:
                         # Handle individual analysis files (filename, filesize, message)
                         analysis_type = data.get('analysis_type', '')
                         if analysis_type == 'filename_analysis':
-                            channel_data[channel_name]['filename_analysis'] = data
+                            channel_data[channel_name]['filename_analysis'] = self._transform_filename_analysis(data)
                         elif analysis_type == 'filesize_analysis':
-                            channel_data[channel_name]['filesize_analysis'] = data
+                            channel_data[channel_name]['filesize_analysis'] = self._transform_filesize_analysis(data)
                         elif analysis_type == 'message_analysis':
                             channel_data[channel_name]['message_analysis'] = data
                 

@@ -398,6 +398,29 @@ def combine_existing_collections(
             results["errors"].append(f"No messages found for channel: {channel}")
             continue
 
+        # Deduplicate messages by message_id (keep the latest occurrence)
+        logger.info(f"🔍 Deduplicating messages for {channel}...")
+        original_count = len(all_messages)
+        seen_ids = set()
+        deduplicated_messages = []
+        
+        # Process messages in reverse order to keep the latest occurrence
+        for message in reversed(all_messages):
+            message_id = message.get('message_id')
+            if message_id not in seen_ids:
+                seen_ids.add(message_id)
+                deduplicated_messages.append(message)
+        
+        # Reverse back to original order
+        deduplicated_messages.reverse()
+        all_messages = deduplicated_messages
+        
+        duplicates_removed = original_count - len(all_messages)
+        if duplicates_removed > 0:
+            logger.info(f"✅ Removed {duplicates_removed} duplicate messages for {channel}")
+        else:
+            logger.info(f"✅ No duplicates found for {channel}")
+
         # Update or create metadata
         if existing_metadata:
             # Update existing metadata

@@ -1,22 +1,14 @@
-# Analysis Command Implementation Guideline (Revised)
+# Analysis Command Implementation Plan (Revised)
 
 ## Overview
 
-This document provides a comprehensive, realistic implementation guide for building the `analysis` command based on the specification in `ANALYSIS_IMPLEMENTATION_SPEC.md`. This revised guideline addresses critical issues identified in the review and provides a systematic approach to production-quality implementation.
+This document provides a comprehensive implementation plan for building the `analysis` command based on the updated requirements in `0_ANALYSIS_REQUIREMENT_SPEC.md`, general design in `1_ANALYSIS_GENERAL_DESIGN.md`, and detailed design in `2_ANALYSIS_DETAIL_DESIGN.md`. This revised plan reflects the single-module architecture, file-source default behavior, and advanced analysis capabilities.
 
-## ⚠️ Critical Implementation Notes
-
-### Realistic Timeline
-- **Total Duration**: 20-25 days for production-quality implementation
-- **Buffer Time**: 5 days included for debugging, rework, and unexpected issues
-- **Sequential Phases**: No overlapping phases to prevent resource conflicts
-- **Quality Gates**: Each phase must meet strict completion criteria
-
-### Implementation Strategy
-- **Single Module**: All code in `modules/analysis.py` (1,500-2,000 lines)
-- **Incremental Development**: Build and test each component thoroughly
-- **Comprehensive Testing**: Test-driven development with full coverage
-- **Performance Monitoring**: Continuous performance and memory monitoring
+## Implementation Strategy
+- **Timeline**: 18 days for production-quality implementation
+- **Architecture**: Single module with file source default
+- **Tooling**: Using `uv` for package management
+- **Quality**: Each phase must meet strict completion criteria
 
 ## Implementation Phases
 
@@ -27,79 +19,27 @@ This document provides a comprehensive, realistic implementation guide for build
 
 #### 1.1 Development Environment Setup
 ```bash
-# Install uv if not already installed
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# Install dependencies
+uv add pandas>=1.5.0 pydantic>=2.0.0 aiohttp>=3.8.0 psutil>=5.9.0
+uv add langdetect>=1.0.9 emoji>=2.0.0 requests>=2.28.0
+uv add --dev pytest>=7.0.0 pytest-asyncio>=0.21.0 pytest-cov>=4.0.0
+uv add --dev black>=23.0.0 flake8>=6.0.0 mypy>=1.0.0
 
-# Create project with uv
-uv init analysis-project
-cd analysis-project
-
-# Add core dependencies
-uv add pandas>=1.5.0
-uv add pydantic>=2.0.0
-uv add aiohttp>=3.8.0
-uv add psutil>=5.9.0
-
-# Add development dependencies
-uv add --dev pytest>=7.0.0
-uv add --dev pytest-asyncio>=0.21.0
-uv add --dev pytest-cov>=4.0.0
-uv add --dev black>=23.0.0
-uv add --dev flake8>=6.0.0
-uv add --dev mypy>=1.0.0
-uv add --dev pre-commit>=3.0.0
-
-# Activate virtual environment
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+# Create project structure
+mkdir -p modules tests/{unit,integration,performance}
+touch modules/analysis_processor.py modules/__init__.py
+touch tests/__init__.py tests/conftest.py
 ```
 
-#### 1.2 Project Structure Setup
-```bash
-# Create the analysis module with proper structure
-mkdir -p modules
-mkdir -p tests
-mkdir -p tests/unit
-mkdir -p tests/integration
-mkdir -p tests/performance
-
-# Create main files
-touch modules/analysis.py
-touch modules/__init__.py
-touch tests/__init__.py
-touch tests/conftest.py
-touch tests/unit/test_analysis.py
-touch tests/integration/test_data_loaders.py
-touch tests/performance/test_performance.py
-```
-
-#### 1.3 Core Module Structure
+#### 1.2 Core Module Structure
 ```python
-# modules/analysis.py - Complete module structure
+# modules/analysis_processor.py
 """
-Analysis Command Implementation
-Single module containing all analysis functionality
-
-Module Organization:
-1. Imports and Constants (lines 1-50)
-2. Data Models (lines 51-200)
-3. Base Classes (lines 201-300)
-4. Data Loaders (lines 301-600)
-5. Analysis Engines (lines 601-1000)
-6. Output Management (lines 1001-1200)
-7. Main Orchestration (lines 1201-1400)
-8. Utility Functions (lines 1401-1500)
-9. CLI Integration (lines 1501-1600)
+Analysis Command Implementation - Single module containing all functionality
 """
 
-# Imports and Constants
-import pandas as pd
-import logging
-import asyncio
-import aiohttp
-import re
-import time
-import gc
-import psutil
+# Core imports
+import pandas as pd, logging, asyncio, aiohttp, requests, re, time, gc, psutil
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Any, Tuple, Callable
 from datetime import datetime, timedelta
@@ -107,82 +47,32 @@ from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor
 import json
 
+# Analysis-specific imports
+import langdetect
+from langdetect import LangDetectException
+import emoji
+
 from pydantic import BaseModel, Field, field_validator, ValidationError
-from config import API_ENDPOINTS, COMBINED_COLLECTION_GLOB, COLLECTIONS_DIR, ANALYSIS_BASE
+from config import (
+    API_ENDPOINTS, COMBINED_COLLECTION_GLOB, COLLECTIONS_DIR, ANALYSIS_BASE,
+    ANALYSIS_FILE_PATTERN, ANALYSIS_SUMMARY_PATTERN, DEFAULT_RATE_LIMIT,
+    DEFAULT_SESSION_COOLDOWN, DEFAULT_DB_URL
+)
 
 # Constants
 DEFAULT_CHUNK_SIZE = 10000
-DEFAULT_MEMORY_LIMIT = 100000  # messages
+DEFAULT_MEMORY_LIMIT = 100000
 DEFAULT_TIMEOUT = 30
 DEFAULT_RETRY_ATTEMPTS = 3
 DEFAULT_RETRY_DELAY = 1.0
-
-# Performance monitoring
-class PerformanceMonitor:
-    def __init__(self):
-        self.start_time = None
-        self.memory_start = None
-    
-    def start(self):
-        self.start_time = time.time()
-        self.memory_start = psutil.Process().memory_info().rss / 1024 / 1024  # MB
-    
-    def get_stats(self):
-        if self.start_time is None:
-            return {}
-        
-        elapsed = time.time() - self.start_time
-        current_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
-        memory_delta = current_memory - self.memory_start
-        
-        return {
-            "elapsed_time": elapsed,
-            "memory_usage_mb": current_memory,
-            "memory_delta_mb": memory_delta
-        }
 ```
 
-#### 1.4 Logging Configuration
-```python
-# Configure comprehensive logging
-def setup_logging(verbose: bool = False):
-    """Setup logging configuration with performance monitoring."""
-    level = logging.DEBUG if verbose else logging.INFO
-    
-    # Create formatter
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
-    )
-    
-    # Console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(level)
-    console_handler.setFormatter(formatter)
-    
-    # File handler
-    file_handler = logging.FileHandler('analysis.log')
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(formatter)
-    
-    # Configure root logger
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)
-    root_logger.addHandler(console_handler)
-    root_logger.addHandler(file_handler)
-    
-    return root_logger
-
-# Initialize logging
-logger = setup_logging()
-```
-
-#### 1.5 Configuration Implementation
+#### 1.3 Configuration Implementation
 ```python
 class AnalysisConfig(BaseModel):
     """Configuration for analysis execution with comprehensive validation."""
     enable_file_source: bool = True
-    enable_api_source: bool = True
-    enable_diff_analysis: bool = True
+    enable_api_source: bool = False  # Default to file source
     channels: List[str] = Field(default_factory=list)
     verbose: bool = False
     output_dir: str = ANALYSIS_BASE
@@ -248,11 +138,6 @@ class AnalysisConfig(BaseModel):
                 logger.error("At least one data source must be enabled")
                 return False
             
-            # Check diff analysis configuration
-            if self.enable_diff_analysis and not (self.enable_file_source and self.enable_api_source):
-                logger.error("Diff analysis requires both file and API sources")
-                return False
-            
             # Validate output directory
             output_path = Path(self.output_dir)
             if not output_path.parent.exists():
@@ -296,20 +181,12 @@ class AnalysisConfig(BaseModel):
 **Dependencies**: Phase 1 complete (foundation setup)
 **Completion Criteria**: All models implemented, tested, and validated
 
-#### 2.1 Core Models Implementation Order
-1. `DataSource` - Data source representation with metadata
-2. `MessageRecord` - Individual message structure with validation
-3. `FilenameAnalysisResult` - Filename analysis results with statistics
-4. `FilesizeAnalysisResult` - Filesize analysis results with distributions
-5. `MessageAnalysisResult` - Message analysis results with language detection
-6. `AnalysisResult` - Complete analysis results with metadata
-
-#### 2.2 Detailed Model Implementation
+#### 2.1 Core Models Implementation
 ```python
 # Data Source Model
 class DataSource(BaseModel):
     """Represents a data source for analysis with comprehensive metadata."""
-    source_type: str = Field(..., pattern="^(file|api|dual)$")
+    source_type: str = Field(..., pattern="^(file|api)$")
     channel_name: str = Field(..., min_length=1, max_length=100)
     total_records: int = Field(ge=0, description="Total number of records")
     date_range: Tuple[Optional[datetime], Optional[datetime]] = Field(
@@ -435,31 +312,26 @@ class AnalysisResult(BaseModel):
         return v
 ```
 
-#### 2.3 Comprehensive Model Testing
+#### 2.2 Model Testing
 ```python
 # tests/unit/test_data_models.py
 import pytest
 from datetime import datetime, timedelta
-from modules.analysis import DataSource, MessageRecord, AnalysisResult
+from modules.analysis_processor import DataSource, MessageRecord, AnalysisResult
 
 class TestDataSource:
     def test_valid_data_source(self):
-        """Test valid DataSource creation."""
         source = DataSource(
             source_type="file",
             channel_name="@test_channel",
             total_records=100,
             date_range=(datetime.now() - timedelta(days=30), datetime.now()),
-            quality_score=0.95,
-            metadata={"file_path": "/path/to/file.json"}
+            quality_score=0.95
         )
         assert source.source_type == "file"
         assert source.channel_name == "@test_channel"
-        assert source.total_records == 100
-        assert source.quality_score == 0.95
     
     def test_invalid_channel_name(self):
-        """Test invalid channel name validation."""
         with pytest.raises(ValueError, match="Channel name must start with '@'"):
             DataSource(
                 source_type="file",
@@ -468,97 +340,6 @@ class TestDataSource:
                 date_range=(datetime.now(), datetime.now()),
                 quality_score=0.95
             )
-    
-    def test_invalid_date_range(self):
-        """Test invalid date range validation."""
-        with pytest.raises(ValueError, match="Start date must be before end date"):
-            DataSource(
-                source_type="file",
-                channel_name="@test_channel",
-                total_records=100,
-                date_range=(datetime.now(), datetime.now() - timedelta(days=1)),
-                quality_score=0.95
-            )
-
-class TestMessageRecord:
-    def test_valid_message_record(self):
-        """Test valid MessageRecord creation."""
-        record = MessageRecord(
-            message_id=12345,
-            channel_username="@test_channel",
-            date=datetime.now() - timedelta(days=1),
-            text="Test message",
-            source="file"
-        )
-        assert record.message_id == 12345
-        assert record.channel_username == "@test_channel"
-        assert record.text == "Test message"
-    
-    def test_future_date_validation(self):
-        """Test future date validation."""
-        with pytest.raises(ValueError, match="Message date cannot be in the future"):
-            MessageRecord(
-                message_id=12345,
-                channel_username="@test_channel",
-                date=datetime.now() + timedelta(days=1),
-                source="file"
-            )
-    
-    def test_large_file_warning(self):
-        """Test large file size warning."""
-        with pytest.warns(UserWarning):
-            MessageRecord(
-                message_id=12345,
-                channel_username="@test_channel",
-                date=datetime.now(),
-                file_size=200 * 1024 * 1024,  # 200MB
-                source="file"
-            )
-
-class TestAnalysisResult:
-    def test_complete_analysis_result(self):
-        """Test complete AnalysisResult creation."""
-        result = AnalysisResult(
-            source="file",
-            channel_name="@test_channel",
-            total_records_analyzed=1000,
-            performance_metrics={"elapsed_time": 5.2, "memory_usage": 150.5}
-        )
-        assert result.source == "file"
-        assert result.channel_name == "@test_channel"
-        assert result.total_records_analyzed == 1000
-        assert result.performance_metrics["elapsed_time"] == 5.2
-```
-
-#### 2.4 Sample Data Generation
-```python
-# Utility function for generating test data
-def generate_sample_message_records(count: int = 100) -> List[MessageRecord]:
-    """Generate sample message records for testing."""
-    import random
-    from datetime import datetime, timedelta
-    
-    records = []
-    base_date = datetime.now() - timedelta(days=30)
-    
-    for i in range(count):
-        record = MessageRecord(
-            message_id=i + 1,
-            channel_username="@test_channel",
-            date=base_date + timedelta(hours=i),
-            text=f"Test message {i + 1}",
-            media_type=random.choice([None, "photo", "document", "video"]),
-            file_name=f"test_file_{i + 1}.pdf" if random.random() > 0.7 else None,
-            file_size=random.randint(1000, 1000000) if random.random() > 0.7 else None,
-            views=random.randint(0, 1000),
-            forwards=random.randint(0, 100),
-            replies=random.randint(0, 50),
-            is_forwarded=random.random() > 0.8,
-            source="file"
-        )
-        records.append(record)
-    
-    return records
 ```
 
 **Phase 2 Deliverables**:
@@ -569,10 +350,15 @@ def generate_sample_message_records(count: int = 100) -> List[MessageRecord]:
 - [ ] Performance tests for model operations
 - [ ] Documentation for all model fields and validation rules
 
-### Phase 3: Base Data Loader (Days 5-6)
-**Goal**: Implement the foundation for data loading with comprehensive error handling
+### Phase 3: Data Loading Classes (Days 5-7)
+**Goal**: Implement file and API data loaders with async operations
 **Dependencies**: Phase 2 complete (data models)
-**Completion Criteria**: Base loader implemented, tested, and memory optimization working
+**Completion Criteria**: Both loaders working with proper async/sync handling
+
+#### 3.1 Data Loading Implementation
+- **FileDataLoader**: File discovery, chunked processing, memory optimization
+- **ApiDataLoader**: Async operations, pagination, retry logic
+- **BaseDataLoader**: Common functionality, error handling, performance monitoring
 
 #### 3.1 BaseDataLoader Implementation
 ```python
@@ -679,93 +465,20 @@ class BaseDataLoader:
         raise NotImplementedError("Subclasses must implement discover_sources method")
 ```
 
-#### 3.2 BaseDataLoader Testing
+#### 3.2 Data Loader Testing
 ```python
-# tests/unit/test_base_data_loader.py
+# tests/unit/test_data_loaders.py
 import pytest
 import pandas as pd
-from unittest.mock import Mock, patch
-from modules.analysis import BaseDataLoader, AnalysisConfig
+from modules.analysis_processor import BaseDataLoader, AnalysisConfig
 
 class TestBaseDataLoader:
-    def setup_method(self):
-        """Setup test fixtures."""
-        self.config = AnalysisConfig(
-            enable_file_source=True,
-            enable_api_source=True,
-            channels=["@test_channel"]
-        )
-        self.loader = BaseDataLoader(self.config)
-    
     def test_memory_optimization(self):
-        """Test DataFrame memory optimization."""
-        # Create test DataFrame with inefficient types
-        df = pd.DataFrame({
-            'id': [1, 2, 3, 4, 5],
-            'category': ['A', 'B', 'A', 'C', 'B'],
-            'value': [1.0, 2.0, 3.0, 4.0, 5.0]
-        })
-        
-        original_memory = df.memory_usage(deep=True).sum()
-        optimized_df = self.loader._optimize_dataframe_memory(df.copy())
-        optimized_memory = optimized_df.memory_usage(deep=True).sum()
-        
-        # Memory should be reduced
-        assert optimized_memory < original_memory
-        # Data should be preserved
+        config = AnalysisConfig()
+        loader = BaseDataLoader(config)
+        df = pd.DataFrame({'id': [1, 2, 3], 'category': ['A', 'B', 'A']})
+        optimized_df = loader._optimize_dataframe_memory(df.copy())
         assert len(optimized_df) == len(df)
-        assert list(optimized_df['id']) == list(df['id'])
-    
-    def test_dataframe_validation_success(self):
-        """Test successful DataFrame validation."""
-        df = pd.DataFrame({
-            'message_id': [1, 2, 3],
-            'channel_username': ['@test1', '@test2', '@test3'],
-            'date': pd.to_datetime(['2023-01-01', '2023-01-02', '2023-01-03'])
-        })
-        
-        expected_columns = ['message_id', 'channel_username', 'date']
-        result = self.loader._validate_dataframe(df, expected_columns)
-        assert result is True
-    
-    def test_dataframe_validation_missing_columns(self):
-        """Test DataFrame validation with missing columns."""
-        df = pd.DataFrame({
-            'message_id': [1, 2, 3],
-            'channel_username': ['@test1', '@test2', '@test3']
-            # Missing 'date' column
-        })
-        
-        expected_columns = ['message_id', 'channel_username', 'date']
-        result = self.loader._validate_dataframe(df, expected_columns)
-        assert result is False
-    
-    def test_dataframe_validation_empty(self):
-        """Test DataFrame validation with empty DataFrame."""
-        df = pd.DataFrame()
-        expected_columns = ['message_id', 'channel_username', 'date']
-        result = self.loader._validate_dataframe(df, expected_columns)
-        assert result is False
-    
-    def test_error_handling(self):
-        """Test error handling functionality."""
-        with patch('modules.analysis.logging.getLogger') as mock_logger:
-            mock_logger_instance = Mock()
-            mock_logger.return_value = mock_logger_instance
-            
-            # Test different error types
-            test_errors = [
-                (pd.errors.EmptyDataError("No data"), "Data parsing error"),
-                (OSError("File not found"), "File system error"),
-                (MemoryError("Out of memory"), "Memory error"),
-                (ValueError("Invalid value"), "Data validation error"),
-                (Exception("Unexpected error"), "Unexpected error")
-            ]
-            
-            for error, expected_context in test_errors:
-                self.loader._handle_loading_error(error, expected_context)
-                # Verify error was logged
-                assert mock_logger_instance.error.called
 ```
 
 **Phase 3 Deliverables**:
@@ -777,12 +490,35 @@ class TestBaseDataLoader:
 - [ ] Unit tests with edge cases
 - [ ] Documentation for all methods
 
-### Phase 4: File Data Loader (Days 7-9)
-**Goal**: Implement file-based data loading with chunked processing
-**Dependencies**: Phase 3 complete (base data loader)
-**Completion Criteria**: File loader working with large files, chunked processing tested
+### Phase 4: Analysis Classes (Days 8-12)
+**Goal**: Implement all analysis engines with comprehensive algorithms
+**Dependencies**: Phase 3 complete (data loading classes)
+**Completion Criteria**: All analyzers working with standardized method signatures
 
-#### 4.1 FileDataLoader Implementation
+#### 4.1 Analysis Classes Implementation
+- **FilenameAnalyzer**: Duplicate detection, pattern analysis, quality assessment
+- **FilesizeAnalyzer**: Duplicate detection, distribution analysis, size bins
+- **LanguageAnalyzer**: Language detection and distribution
+- **PatternRecognitionAnalyzer**: Hashtags, mentions, URLs, emojis
+- **MessageAnalyzer**: Content statistics, creator analysis, engagement metrics
+
+All analyzers use standardized method signature:
+```python
+def analyze(self, df: pd.DataFrame, source: DataSource) -> AnalysisResult:
+    """Perform analysis with standardized signature."""
+```
+
+**Phase 4 Deliverables**:
+- [ ] Complete FilenameAnalyzer implementation
+- [ ] Complete FilesizeAnalyzer implementation  
+- [ ] Complete LanguageAnalyzer implementation
+- [ ] Complete PatternRecognitionAnalyzer implementation
+- [ ] Complete MessageAnalyzer implementation
+- [ ] Standardized method signatures across all analyzers
+- [ ] Comprehensive error handling for all analyzers
+- [ ] Unit tests for all analysis algorithms
+
+#### 3.3 FileDataLoader Implementation
 ```python
 class FileDataLoader(BaseDataLoader):
     """File-based data loader with chunked processing for large files."""
@@ -799,249 +535,67 @@ class FileDataLoader(BaseDataLoader):
     
     def discover_sources(self) -> List[str]:
         """Discover available JSON files matching the pattern."""
-        try:
-            self.performance_monitor.start()
-            
-            if not self.collections_dir.exists():
-                self.logger.error(f"Collections directory does not exist: {self.collections_dir}")
-                return []
-            
-            # Find all matching files
-            matching_files = list(self.collections_dir.glob(self.file_pattern))
-            
-            if not matching_files:
-                self.logger.warning(f"No files found matching pattern: {self.file_pattern}")
-                return []
-            
-            # Filter by channel if specified
-            if self.config.channels:
-                filtered_files = []
-                for file_path in matching_files:
-                    if any(channel in file_path.name for channel in self.config.channels):
-                        filtered_files.append(str(file_path))
-                matching_files = filtered_files
-            else:
-                matching_files = [str(f) for f in matching_files]
-            
-            self.logger.info(f"Discovered {len(matching_files)} data sources")
-            
-            # Log performance
-            stats = self.performance_monitor.get_stats()
-            self.logger.debug(f"Source discovery performance: {stats}")
-            
-            return matching_files
-            
-        except (OSError, ValueError, TypeError) as e:
-            self._handle_loading_error(e, "source discovery")
+        if not self.collections_dir.exists():
             return []
+        
+        matching_files = list(self.collections_dir.glob(self.file_pattern))
+        if self.config.channels:
+            matching_files = [f for f in matching_files 
+                            if any(channel in f.name for channel in self.config.channels)]
+        
+        return [str(f) for f in matching_files]
     
     def load_data(self, source: str) -> pd.DataFrame:
         """Load data from JSON file with chunked processing for large files."""
-        try:
-            self.performance_monitor.start()
-            file_path = Path(source)
-            
-            if not file_path.exists():
-                raise FileNotFoundError(f"File not found: {file_path}")
-            
-            # Check file size for chunked processing
-            file_size_mb = file_path.stat().st_size / (1024 * 1024)
-            
-            if file_size_mb > 100:  # Large file threshold
-                self.logger.info(f"Large file detected ({file_size_mb:.1f} MB), using chunked processing")
-                df = self._load_large_file_chunked(file_path)
-            else:
-                self.logger.info(f"Loading file: {file_path}")
-                df = pd.read_json(file_path, lines=True)
-            
-            # Validate and optimize
-            if not self._validate_dataframe(df, self.required_columns):
-                raise ValueError("DataFrame validation failed")
-            
-            df = self._optimize_dataframe_memory(df)
-            
-            # Log performance
-            stats = self.performance_monitor.get_stats()
-            self.logger.info(f"Loaded {len(df)} records in {stats['elapsed_time']:.2f}s")
-            
-            return df
-            
-        except (pd.errors.EmptyDataError, pd.errors.ParserError, OSError, ValueError, TypeError, MemoryError) as e:
-            self._handle_loading_error(e, f"file loading: {source}")
-            return pd.DataFrame()
+        file_path = Path(source)
+        if not file_path.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+        
+        file_size_mb = file_path.stat().st_size / (1024 * 1024)
+        if file_size_mb > 100:  # Large file threshold
+            df = self._load_large_file_chunked(file_path)
+        else:
+            df = pd.read_json(file_path, lines=True)
+        
+        if not self._validate_dataframe(df, self.required_columns):
+            raise ValueError("DataFrame validation failed")
+        
+        return self._optimize_dataframe_memory(df)
     
     def _load_large_file_chunked(self, file_path: Path) -> pd.DataFrame:
         """Load large file in chunks to manage memory usage."""
         chunks = []
-        chunk_size = self.config.chunk_size
-        
-        try:
-            # Read file in chunks
-            for chunk_df in pd.read_json(file_path, lines=True, chunksize=chunk_size):
-                # Process each chunk
-                chunk_df = self._process_chunk(chunk_df)
-                chunks.append(chunk_df)
-                
-                # Memory management
-                if len(chunks) * chunk_size > self.config.memory_limit:
-                    self.logger.warning("Memory limit approaching, processing chunks")
-                    # Combine and optimize existing chunks
-                    combined_df = pd.concat(chunks, ignore_index=True)
-                    combined_df = self._optimize_dataframe_memory(combined_df)
-                    chunks = [combined_df]
+        for chunk_df in pd.read_json(file_path, lines=True, chunksize=self.config.chunk_size):
+            chunk_df = self._process_chunk(chunk_df)
+            chunks.append(chunk_df)
             
-            # Combine all chunks
-            if chunks:
-                final_df = pd.concat(chunks, ignore_index=True)
-                return self._optimize_dataframe_memory(final_df)
-            else:
-                return pd.DataFrame()
-                
-        except (pd.errors.EmptyDataError, pd.errors.ParserError, MemoryError) as e:
-            self._handle_loading_error(e, f"chunked loading: {file_path}")
-            return pd.DataFrame()
+            if len(chunks) * self.config.chunk_size > self.config.memory_limit:
+                combined_df = pd.concat(chunks, ignore_index=True)
+                combined_df = self._optimize_dataframe_memory(combined_df)
+                chunks = [combined_df]
+        
+        return pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame()
     
     def _process_chunk(self, chunk_df: pd.DataFrame) -> pd.DataFrame:
         """Process individual chunk with data cleaning and validation."""
-        # Remove completely empty rows
         chunk_df = chunk_df.dropna(how='all')
-        
-        # Convert date column if present
         if 'date' in chunk_df.columns:
             chunk_df['date'] = pd.to_datetime(chunk_df['date'], errors='coerce')
         
-        # Fill missing values with appropriate defaults
         chunk_df['source'] = 'file'
-        chunk_df['media_type'] = chunk_df['media_type'].fillna('')
-        chunk_df['file_name'] = chunk_df['file_name'].fillna('')
-        chunk_df['file_size'] = chunk_df['file_size'].fillna(0)
-        chunk_df['views'] = chunk_df['views'].fillna(0)
-        chunk_df['forwards'] = chunk_df['forwards'].fillna(0)
-        chunk_df['replies'] = chunk_df['replies'].fillna(0)
+        for col in ['media_type', 'file_name', 'forwarded_from']:
+            chunk_df[col] = chunk_df[col].fillna('')
+        for col in ['file_size', 'views', 'forwards', 'replies']:
+            chunk_df[col] = chunk_df[col].fillna(0)
         chunk_df['is_forwarded'] = chunk_df['is_forwarded'].fillna(False)
-        chunk_df['forwarded_from'] = chunk_df['forwarded_from'].fillna('')
         
         return chunk_df
 ```
 
-#### 4.2 FileDataLoader Testing
-```python
-# tests/unit/test_file_data_loader.py
-import pytest
-import pandas as pd
-import tempfile
-import json
-from pathlib import Path
-from unittest.mock import patch, Mock
-from modules.analysis import FileDataLoader, AnalysisConfig
-
-class TestFileDataLoader:
-    def setup_method(self):
-        """Setup test fixtures."""
-        self.config = AnalysisConfig(
-            enable_file_source=True,
-            channels=["@test_channel"],
-            chunk_size=1000,
-            memory_limit=10000
-        )
-        self.loader = FileDataLoader(self.config)
-    
-    def test_discover_sources_success(self):
-        """Test successful source discovery."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Create test files
-            test_files = [
-                "test_channel_2023-01-01.json",
-                "test_channel_2023-01-02.json",
-                "other_channel_2023-01-01.json"
-            ]
-            
-            for filename in test_files:
-                file_path = Path(temp_dir) / filename
-                file_path.write_text('{"test": "data"}')
-            
-            with patch('modules.analysis.COLLECTIONS_DIR', temp_dir):
-                with patch('modules.analysis.COMBINED_COLLECTION_GLOB', "*.json"):
-                    sources = self.loader.discover_sources()
-                    
-                    # Should find files matching channel filter
-                    assert len(sources) == 2
-                    assert all("@test_channel" in source for source in sources)
-    
-    def test_load_data_success(self):
-        """Test successful data loading."""
-        # Create test data
-        test_data = [
-            {
-                "message_id": 1,
-                "channel_username": "@test_channel",
-                "date": "2023-01-01T00:00:00Z",
-                "text": "Test message 1",
-                "source": "file"
-            },
-            {
-                "message_id": 2,
-                "channel_username": "@test_channel", 
-                "date": "2023-01-01T01:00:00Z",
-                "text": "Test message 2",
-                "source": "file"
-            }
-        ]
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            for record in test_data:
-                f.write(json.dumps(record) + '\n')
-            temp_file = f.name
-        
-        try:
-            df = self.loader.load_data(temp_file)
-            
-            assert len(df) == 2
-            assert 'message_id' in df.columns
-            assert 'channel_username' in df.columns
-            assert 'date' in df.columns
-            assert df['source'].iloc[0] == 'file'
-        finally:
-            Path(temp_file).unlink()
-    
-    def test_load_data_file_not_found(self):
-        """Test loading non-existent file."""
-        df = self.loader.load_data("/nonexistent/file.json")
-        assert df.empty
-    
-    def test_chunked_processing(self):
-        """Test chunked processing for large files."""
-        # Create large test data
-        test_data = []
-        for i in range(5000):  # Large dataset
-            test_data.append({
-                "message_id": i,
-                "channel_username": "@test_channel",
-                "date": "2023-01-01T00:00:00Z",
-                "text": f"Test message {i}",
-                "source": "file"
-            })
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            for record in test_data:
-                f.write(json.dumps(record) + '\n')
-            temp_file = f.name
-        
-        try:
-            # Mock file size to trigger chunked processing
-            with patch('pathlib.Path.stat') as mock_stat:
-                mock_stat.return_value.st_size = 200 * 1024 * 1024  # 200MB
-                
-                df = self.loader.load_data(temp_file)
-                
-                assert len(df) == 5000
-                assert 'message_id' in df.columns
-        finally:
-            Path(temp_file).unlink()
-```
-
-**Phase 4 Deliverables**:
+**Phase 3 Deliverables**:
+- [ ] Complete BaseDataLoader implementation with error handling
 - [ ] Complete FileDataLoader implementation
+- [ ] Complete ApiDataLoader implementation
 - [ ] Chunked processing for large files
 - [ ] Source discovery with filtering
 - [ ] Data validation and cleaning
@@ -1050,12 +604,17 @@ class TestFileDataLoader:
 - [ ] Unit tests with large file scenarios
 - [ ] Performance benchmarks
 
-### Phase 5: API Data Loader (Days 10-12)
-**Goal**: Implement API-based data loading with async operations and retry logic
-**Dependencies**: Phase 4 complete (file data loader)
-**Completion Criteria**: API loader working with async operations, retry logic tested
+### Phase 5: Output Management (Days 13-14)
+**Goal**: Implement comprehensive output generation and management
+**Dependencies**: Phase 4 complete (analysis classes)
+**Completion Criteria**: Output manager working with standardized file naming
 
-#### 5.1 ApiDataLoader Implementation
+#### 5.1 JsonOutputManager Implementation
+- **Pandas JSON Operations**: Use pandas for all JSON I/O
+- **Standardized Naming**: `{channel_name}_` prefix for all files
+- **File Organization**: Proper directory structure and metadata
+
+#### 5.2 ApiDataLoader Implementation
 ```python
 class ApiDataLoader(BaseDataLoader):
     """API-based data loader with async operations and retry logic."""
@@ -1072,99 +631,50 @@ class ApiDataLoader(BaseDataLoader):
     
     def discover_sources(self) -> List[str]:
         """Discover available API endpoints."""
-        try:
-            self.performance_monitor.start()
-            
-            available_sources = []
-            for endpoint_name, endpoint_config in self.endpoints.items():
-                if self._is_endpoint_available(endpoint_name, endpoint_config):
-                    available_sources.append(endpoint_name)
-            
-            self.logger.info(f"Discovered {len(available_sources)} API sources")
-            
-            # Log performance
-            stats = self.performance_monitor.get_stats()
-            self.logger.debug(f"API source discovery performance: {stats}")
-            
-            return available_sources
-            
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:
-            self._handle_loading_error(e, "API source discovery")
-            return []
+        available_sources = []
+        for endpoint_name, endpoint_config in self.endpoints.items():
+            if self._is_endpoint_available(endpoint_name, endpoint_config):
+                available_sources.append(endpoint_name)
+        return available_sources
     
     def load_data(self, source: str) -> pd.DataFrame:
         """Load data from API with synchronous wrapper."""
-        try:
-            # Use ThreadPoolExecutor to run async method in sync context
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(asyncio.run, self.load_data_async(source))
-                return future.result(timeout=self.timeout * 2)
-        except (asyncio.TimeoutError, ValueError, OSError) as e:
-            self._handle_loading_error(e, f"API loading: {source}")
-            return pd.DataFrame()
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(asyncio.run, self.load_data_async(source))
+            return future.result(timeout=self.timeout * 2)
     
     async def load_data_async(self, source: str) -> pd.DataFrame:
         """Load data from API asynchronously with pagination and retry logic."""
-        try:
-            self.performance_monitor.start()
-            
-            if source not in self.endpoints:
-                raise ValueError(f"Unknown API source: {source}")
-            
-            endpoint_config = self.endpoints[source]
-            all_data = []
-            page = 1
-            total_loaded = 0
-            
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.timeout)) as session:
-                while total_loaded < self.max_messages:
-                    # Fetch page with retry logic
-                    page_data = await self._fetch_page_with_retry(
-                        session, endpoint_config, page
-                    )
-                    
-                    if not page_data:
-                        break  # No more data
-                    
-                    all_data.extend(page_data)
-                    total_loaded += len(page_data)
-                    page += 1
-                    
-                    # Log progress
-                    if page % 10 == 0:
-                        self.logger.info(f"Loaded {total_loaded} records from {source}")
-            
-            # Convert to DataFrame
-            if all_data:
-                df = pd.DataFrame(all_data)
-                df = self._process_api_data(df)
+        if source not in self.endpoints:
+            raise ValueError(f"Unknown API source: {source}")
+        
+        endpoint_config = self.endpoints[source]
+        all_data = []
+        page = 1
+        total_loaded = 0
+        
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.timeout)) as session:
+            while total_loaded < self.max_messages:
+                page_data = await self._fetch_page_with_retry(session, endpoint_config, page)
+                if not page_data:
+                    break
                 
-                if not self._validate_dataframe(df, self.required_columns):
-                    raise ValueError("DataFrame validation failed")
-                
-                df = self._optimize_dataframe_memory(df)
-                
-                # Log performance
-                stats = self.performance_monitor.get_stats()
-                self.logger.info(f"Loaded {len(df)} records from API in {stats['elapsed_time']:.2f}s")
-                
-                return df
-            else:
-                return pd.DataFrame()
-                
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, MemoryError) as e:
-            self._handle_loading_error(e, f"async API loading: {source}")
+                all_data.extend(page_data)
+                total_loaded += len(page_data)
+                page += 1
+        
+        if all_data:
+            df = pd.DataFrame(all_data)
+            df = self._process_api_data(df)
+            return self._optimize_dataframe_memory(df)
+        else:
             return pd.DataFrame()
     
     async def _fetch_page_with_retry(self, session: aiohttp.ClientSession, 
                                    endpoint_config: dict, page: int) -> List[dict]:
         """Fetch a single page with retry logic."""
         url = f"{self.base_url}{endpoint_config['path']}"
-        params = {
-            'page': page,
-            'per_page': self.items_per_page,
-            **endpoint_config.get('params', {})
-        }
+        params = {'page': page, 'per_page': self.items_per_page, **endpoint_config.get('params', {})}
         
         for attempt in range(self.retry_attempts):
             try:
@@ -1173,23 +683,19 @@ class ApiDataLoader(BaseDataLoader):
                         data = await response.json()
                         return data.get('data', [])
                     elif response.status == 404:
-                        return []  # No more pages
+                        return []
                     else:
                         response.raise_for_status()
-                        
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 if attempt < self.retry_attempts - 1:
-                    self.logger.warning(f"API request failed (attempt {attempt + 1}), retrying: {e}")
-                    await asyncio.sleep(self.retry_delay * (2 ** attempt))  # Exponential backoff
+                    await asyncio.sleep(self.retry_delay * (2 ** attempt))
                 else:
                     raise e
-        
         return []
     
     def _is_endpoint_available(self, endpoint_name: str, endpoint_config: dict) -> bool:
         """Check if API endpoint is available."""
         try:
-            # Simple health check
             url = f"{self.base_url}{endpoint_config.get('health_path', '/health')}"
             response = requests.get(url, timeout=5)
             return response.status_code == 200
@@ -1198,368 +704,74 @@ class ApiDataLoader(BaseDataLoader):
     
     def _process_api_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Process API data with cleaning and normalization."""
-        # Convert date columns
         if 'date' in df.columns:
             df['date'] = pd.to_datetime(df['date'], errors='coerce')
-        
-        # Add source column
         df['source'] = 'api'
-        
-        # Fill missing values
-        df['media_type'] = df['media_type'].fillna('')
-        df['file_name'] = df['file_name'].fillna('')
-        df['file_size'] = df['file_size'].fillna(0)
-        df['views'] = df['views'].fillna(0)
-        df['forwards'] = df['forwards'].fillna(0)
-        df['replies'] = df['replies'].fillna(0)
+        for col in ['media_type', 'file_name', 'forwarded_from']:
+            df[col] = df[col].fillna('')
+        for col in ['file_size', 'views', 'forwards', 'replies']:
+            df[col] = df[col].fillna(0)
         df['is_forwarded'] = df['is_forwarded'].fillna(False)
-        df['forwarded_from'] = df['forwarded_from'].fillna('')
-        
         return df
 ```
 
-#### 5.2 ApiDataLoader Testing
-```python
-# tests/unit/test_api_data_loader.py
-import pytest
-import asyncio
-import aiohttp
-from unittest.mock import AsyncMock, patch, Mock
-from modules.analysis import ApiDataLoader, AnalysisConfig
-
-class TestApiDataLoader:
-    def setup_method(self):
-        """Setup test fixtures."""
-        self.config = AnalysisConfig(
-            enable_api_source=True,
-            api_base_url="http://localhost:8000",
-            api_timeout=30,
-            items_per_page=100,
-            retry_attempts=3,
-            retry_delay=1.0,
-            memory_limit=10000
-        )
-        self.loader = ApiDataLoader(self.config)
-    
-    @pytest.mark.asyncio
-    async def test_load_data_async_success(self):
-        """Test successful async data loading."""
-        # Mock API response
-        mock_data = [
-            {
-                "message_id": 1,
-                "channel_username": "@test_channel",
-                "date": "2023-01-01T00:00:00Z",
-                "text": "Test message 1",
-                "source": "api"
-            },
-            {
-                "message_id": 2,
-                "channel_username": "@test_channel",
-                "date": "2023-01-01T01:00:00Z", 
-                "text": "Test message 2",
-                "source": "api"
-            }
-        ]
-        
-        with patch('aiohttp.ClientSession') as mock_session:
-            # Mock response
-            mock_response = AsyncMock()
-            mock_response.status = 200
-            mock_response.json = AsyncMock(return_value={"data": mock_data})
-            
-            # Mock session context manager
-            mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_response
-            
-            df = await self.loader.load_data_async("test_endpoint")
-            
-            assert len(df) == 2
-            assert 'message_id' in df.columns
-            assert 'channel_username' in df.columns
-            assert df['source'].iloc[0] == 'api'
-    
-    @pytest.mark.asyncio
-    async def test_fetch_page_with_retry_success(self):
-        """Test successful page fetching with retry logic."""
-        mock_data = [{"message_id": 1, "text": "test"}]
-        
-        with patch('aiohttp.ClientSession') as mock_session:
-            mock_response = AsyncMock()
-            mock_response.status = 200
-            mock_response.json = AsyncMock(return_value={"data": mock_data})
-            
-            mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_response
-            
-            endpoint_config = {"path": "/api/messages", "params": {}}
-            result = await self.loader._fetch_page_with_retry(
-                mock_session.return_value.__aenter__.return_value,
-                endpoint_config,
-                1
-            )
-            
-            assert result == mock_data
-    
-    def test_load_data_sync_wrapper(self):
-        """Test synchronous wrapper for async method."""
-        with patch.object(self.loader, 'load_data_async') as mock_async:
-            mock_async.return_value = pd.DataFrame({"test": [1, 2, 3]})
-            
-            result = self.loader.load_data("test_endpoint")
-            
-            assert len(result) == 3
-            mock_async.assert_called_once_with("test_endpoint")
-```
-
-**Phase 5 Deliverables**:
-- [ ] Complete ApiDataLoader implementation
-- [ ] Async operations with proper error handling
-- [ ] Retry logic with exponential backoff
-- [ ] Pagination support for large datasets
-- [ ] Memory management and limits
-- [ ] Health check functionality
-- [ ] Comprehensive error handling
-- [ ] Unit tests with async scenarios
-- [ ] Performance benchmarks
-
-### Phase 6: Analysis Engines (Days 13-16)
-**Goal**: Implement all three analysis engines with comprehensive algorithms
-**Dependencies**: Phase 5 complete (API data loader)
-**Completion Criteria**: All analyzers working with comprehensive algorithms and chunked processing
-
-#### 6.1 Analysis Engine Implementation Strategy
-- **FilenameAnalyzer**: Duplicate detection, pattern analysis, quality assessment
-- **FilesizeAnalyzer**: Duplicate detection, distribution analysis, size bins
-- **MessageAnalyzer**: Content statistics, pattern recognition, language detection
-- **Chunked Processing**: Handle large datasets efficiently
-- **Performance Monitoring**: Track analysis performance and memory usage
-
-**Phase 6 Deliverables**:
-- [ ] Complete FilenameAnalyzer with duplicate detection and pattern analysis
-- [ ] Complete FilesizeAnalyzer with distribution analysis and bins
-- [ ] Complete MessageAnalyzer with content, pattern, creator, and language analysis
-- [ ] Chunked processing for large datasets
-- [ ] Comprehensive error handling for all analyzers
-- [ ] Performance optimization and monitoring
-- [ ] Unit tests for all analysis algorithms
-- [ ] Integration tests with real data
-- [ ] Performance benchmarks for each analyzer
-
-### Phase 7: Output Management (Days 17-18)
-**Goal**: Implement comprehensive output generation and management
-**Dependencies**: Phase 6 complete (analysis engines)
-**Completion Criteria**: Output manager working with JSON generation and file management
-
-#### 7.1 JsonOutputManager Implementation
-- **JSON Generation**: Use pandas for all JSON I/O operations
-- **File Management**: Organized output with timestamps and metadata
-- **Error Handling**: Comprehensive error handling for output operations
-- **Performance**: Efficient JSON serialization and file writing
-
-**Phase 7 Deliverables**:
-- [ ] Complete JsonOutputManager implementation
-- [ ] Pandas-based JSON I/O operations
-- [ ] File organization and metadata management
-- [ ] Error handling for output operations
-- [ ] Performance optimization for large outputs
-- [ ] Unit tests for output generation
-- [ ] Integration tests with analysis results
-
-### Phase 8: Main Orchestration (Days 19-20)
+### Phase 6: Main Orchestration (Days 15-16)
 **Goal**: Implement main analysis orchestration with concurrent processing
-**Dependencies**: Phase 7 complete (output management)
+**Dependencies**: Phase 5 complete (output management)
 **Completion Criteria**: Main orchestration working with concurrent data loading and analysis
 
-#### 8.1 Main Orchestration Features
+#### 6.1 Main Orchestration Features
 - **Concurrent Processing**: Use asyncio.gather for parallel operations
 - **Error Recovery**: Graceful handling of failures and partial results
 - **Progress Tracking**: Real-time progress monitoring and logging
 - **Resource Management**: Memory and CPU resource optimization
 
-**Phase 8 Deliverables**:
-- [ ] Complete main orchestration function
-- [ ] Concurrent data loading and analysis
-- [ ] Error recovery and partial result handling
-- [ ] Progress tracking and logging
-- [ ] Resource management and optimization
-- [ ] Integration tests for end-to-end workflows
-- [ ] Performance benchmarks for orchestration
-
-### Phase 9: Testing and Validation (Days 21-24)
+### Phase 7: Testing and Validation (Days 17-18)
 **Goal**: Comprehensive testing and quality assurance
-**Dependencies**: Phase 8 complete (main orchestration)
+**Dependencies**: Phase 6 complete (main orchestration)
 **Completion Criteria**: All tests passing, performance benchmarks met
 
-#### 9.1 Testing Strategy
+#### 7.1 Testing Strategy
 - **Unit Tests**: Individual component testing with edge cases
 - **Integration Tests**: End-to-end workflow testing
 - **Performance Tests**: Memory usage and execution time benchmarks
 - **Edge Case Tests**: Error scenarios and boundary conditions
 
-**Phase 9 Deliverables**:
-- [ ] Comprehensive unit test suite
-- [ ] Integration test suite
-- [ ] Performance test suite
-- [ ] Edge case and error scenario tests
-- [ ] Test data generation and management
-- [ ] Test coverage reporting
-- [ ] Performance benchmarking results
 
-### Phase 10: Integration and CLI (Days 25-26)
-**Goal**: Final integration and CLI implementation
-**Dependencies**: Phase 9 complete (testing and validation)
-**Completion Criteria**: Complete CLI working with all features
-
-#### 10.1 CLI Integration
-- **Command Structure**: `getMedia analysis` command implementation
-- **Argument Parsing**: Comprehensive argument validation and help
-- **Error Handling**: User-friendly error messages and recovery
-- **Documentation**: Complete usage documentation and examples
-
-**Phase 10 Deliverables**:
-- [ ] Complete CLI command implementation
-- [ ] Argument parsing and validation
-- [ ] User-friendly error handling
-- [ ] Help documentation and examples
-- [ ] Integration with existing getMedia CLI
-- [ ] End-to-end testing
-- [ ] User acceptance testing
-
-## Quality Gates and Testing
+## Quality Gates and Development
 
 ### Phase Completion Criteria
 Each phase must meet these criteria before proceeding:
-
 1. **Code Quality**: All code passes linting and type checking
 2. **Test Coverage**: Minimum 80% test coverage for new code
 3. **Documentation**: All public methods have docstrings
 4. **Error Handling**: All error paths are handled appropriately
 5. **Performance**: No obvious performance bottlenecks
 
-### Final Quality Gates
-Before production deployment:
-
-1. **All Tests Pass**: 100% test suite success
-2. **Performance Benchmarks**: Meet performance requirements
-3. **Memory Usage**: Within acceptable limits
-4. **Error Handling**: Comprehensive error coverage
-5. **Documentation**: Complete and accurate
-
-## Risk Mitigation
-
-### Technical Risks
-- **Memory Issues**: Implement chunked processing and memory monitoring
-- **Performance Degradation**: Use performance profiling and optimization
-- **Async Complexity**: Thorough testing of async operations
-- **Data Validation**: Comprehensive input validation and error handling
-
-### Timeline Risks
-- **Scope Creep**: Strict adherence to phase deliverables
-- **Dependency Delays**: Buffer time built into timeline
-- **Testing Gaps**: Comprehensive testing strategy
-- **Integration Issues**: Early integration testing
-
-## Development Environment
-
-### Required Tools
-```bash
-# Core development tools
-uv --version  # Package management (required)
-python --version  # Python 3.9+
-git --version  # Version control
-
-# Verify uv installation
-uv --version
-# Should show: uv 0.x.x
-```
-
 ### Development Workflow
 ```bash
 # All development commands use uv run
 uv run pytest tests/ -v                    # Run tests
-uv run pytest tests/ --cov=modules.analysis  # Run with coverage
+uv run pytest tests/ --cov=modules.analysis_processor  # Run with coverage
 uv run black modules/                       # Format code
 uv run flake8 modules/                      # Lint code
 uv run mypy modules/                        # Type check
-
-# Run specific test categories
-uv run pytest tests/ -m "not slow"
-uv run pytest tests/ -m "integration"
 
 # Add new dependencies during development
 uv add requests>=2.28.0                    # Add runtime dependency
 uv add --dev pytest-mock>=3.10.0          # Add dev dependency
 ```
 
-### Virtual Environment Management
-```bash
-# uv automatically manages virtual environments
-# No need to manually activate - uv run handles this
-
-# Check current environment
-uv pip list
-
-# Sync dependencies from pyproject.toml
-uv sync
-
-# Update all dependencies
-uv lock --upgrade
-```
-
-### Dependency Management Best Practices
-```bash
-# 1. Always use uv for package management
-# ❌ DON'T: pip install package
-# ✅ DO: uv add package
-
-# 2. Pin dependency versions for reproducibility
-# ❌ DON'T: uv add pandas
-# ✅ DO: uv add pandas>=1.5.0,<2.0.0
-
-# 3. Separate runtime and dev dependencies
-# Runtime dependencies (needed in production)
-uv add pandas>=1.5.0
-uv add pydantic>=2.0.0
-
-# Development dependencies (only needed for development)
-uv add --dev pytest>=7.0.0
-uv add --dev black>=23.0.0
-
-# 4. Use uv run for all commands
-# ❌ DON'T: pytest tests/
-# ✅ DO: uv run pytest tests/
-
-# 5. Keep pyproject.toml in version control
-# This ensures reproducible builds across environments
-```
-
-### Troubleshooting Dependency Issues
-```bash
-# If you encounter dependency conflicts:
-uv lock --upgrade  # Update lock file
-uv sync --reinstall  # Reinstall all packages
-
-# If virtual environment gets corrupted:
-rm -rf .venv
-uv sync  # Recreate environment
-
-# Check for outdated packages:
-uv pip list --outdated
-
-# Update specific package:
-uv add package@latest
-```
-
 ## Conclusion
 
-This revised implementation guideline provides a comprehensive, realistic roadmap for building the analysis command. The 26-day timeline allows for proper development, testing, and quality assurance while addressing all critical issues identified in the review.
+This implementation plan provides a comprehensive roadmap for building the analysis command based on the updated requirements and design documents. The 18-day timeline allows for proper development, testing, and quality assurance.
 
-Key improvements:
-- **Realistic Timeline**: 26 days instead of 7 days
-- **Sequential Phases**: No overlapping dependencies
-- **Detailed Implementation**: Specific guidance for complex components
+Key features:
+- **Single Module Architecture**: All functionality consolidated in `modules/analysis_processor.py`
+- **File Source Default**: Default behavior uses file source with API as optional
+- **Advanced Analysis**: Language detection, pattern recognition, comprehensive content analysis
+- **Standardized Output**: Consistent file naming with `{channel_name}_` prefix
+- **Modern Dependencies**: Includes `langdetect`, `emoji`, `requests` libraries
 - **Comprehensive Testing**: Full test coverage strategy
-- **Quality Gates**: Clear completion criteria
-- **Risk Mitigation**: Identified risks and mitigation strategies
-- **Modern Tooling**: Using uv for package management
 
-With this guideline, the implementation should proceed smoothly and result in a production-ready system.
+The implementation should proceed smoothly and result in a production-ready system that meets all requirements.

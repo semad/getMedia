@@ -9,22 +9,25 @@ The `analysis` command is a data analysis tool for Telegram channel data, provid
 ### High-Level Components
 
 ```
-┌─────────────────┐    ┌─────────────────────────────────────────┐    ┌─────────────────┐
-│   CLI Layer     │    │         Single Analysis Module          │    │   Output Layer  │
-│                 │    │                                         │    │                 │
-│ - Command       │───▶│ ┌─────────────┐ ┌─────────────────────┐ │───▶│ - JSON Format   │
-│ - Options       │    │ │Data Loading │ │   Analysis Core     │ │    │ - File Writing  │
-│ - Validation    │    │ │- File       │ │ - Message           │ │    │ - Summary Gen   │
-└─────────────────┘    │ │- API        │ │                     │ │    └─────────────────┘
-                       │ │             │ │                     │ │
-                       │ └─────────────┘ └─────────────────────┘ │
-                       │ ┌─────────────┐ ┌─────────────────────┐ │
-                       │ │Orchestrator │ │   Output Formatter  │ │
-                       │ │- Pipeline   │ │ - JSON Generation   │ │
-                       │ │- Validation │ │ - File Management   │ │
-                       │ │- Progress   │ └─────────────────────┘ │
-                       │ └─────────────┘                         │
-                       └─────────────────────────────────────────┘
+┌─────────────────┐    ┌─────────────────────────────────────────────────────────┐    ┌─────────────────┐
+│   CLI Layer     │    │              Single Analysis Module                     │    │   Output Layer  │
+│                 │    │                                                         │    │                 │
+│ - Command       │───▶│ ┌─────────────┐ ┌─────────────────────────────────────┐ │───▶│ - JSON Format   │
+│ - Options       │    │ │Data Loading │ │         Analysis Core               │ │    │ - File Writing  │
+│ - Validation    │    │ │- File       │ │ - Message Analysis                  │ │    │ - Summary Gen   │
+└─────────────────┘    │ │- API        │ │ - Media Analysis                    │ │    └─────────────────┘
+                       │ │             │ │ - Filename Analysis                 │ │
+                       │ └─────────────┘ │ - Filesize Analysis                 │ │
+                       │ ┌─────────────┐ │ - Language Analysis                 │ │
+                       │ │Orchestrator │ │ - Pattern Recognition               │ │
+                       │ │- Pipeline   │ └─────────────────────────────────────┘ │
+                       │ │- Validation │ ┌─────────────────────────────────────┐ │
+                       │ │- Progress   │ │   Output Formatter                  │ │
+                       │ └─────────────┘ │ - JSON Generation                   │ │
+                       │                 │ - File Management                   │ │
+                       │                 │ - Metadata Generation               │ │
+                       │                 └─────────────────────────────────────┘ │
+                       └─────────────────────────────────────────────────────────┘
 ```
 
 ### Data Flow Architecture
@@ -52,7 +55,7 @@ The analysis command follows the pattern: `python main.py analysis [options]`
 |--------|-------|------|---------|-------------|
 | `--channels` | `-c` | string | `all` | Comma-separated channel list or `all`, default is all |
 | `--verbose` | `-v` | flag | `False` | Enable verbose logging |
-| `--api` | | flag | `True` | Use API source only, no file source |
+| `--api` | | flag | `False` | Use API source only, no file source |
 | `--file` | | flag | `False` | Use file source only, no API source |
 | `--help` | `-h` | flag | | Show help message |
 
@@ -60,7 +63,7 @@ The analysis command follows the pattern: `python main.py analysis [options]`
 ### Usage Examples
 
 ```bash
-# Default behavior (API with file fallback)
+# Default behavior (file source only)
 python main.py analysis
 
 # Analysis with specific channels
@@ -82,7 +85,8 @@ python main.py analysis --channels @SherwinVakiliLibrary --file
 ## Data Discovery and Sources
 
 The analysis command first determines what data is available using concrete metrics:
-- Analysis is done by default via API, unless the API is not available or the `--file` option is specified, then the analysis is from combined message file only.
+- Analysis is done by default via file source, unless the `--api` option is specified, then the analysis uses API source only.
+- When `--api` is specified, only API source is used (file source is disabled).
 - When `--file` is specified, only file source is used (API source is disabled).
 
 - **API Discovery**: When API source exists, 
@@ -137,10 +141,10 @@ Data Sources → Channel Discovery → Channel Deduplication → Individual Repo
 Each channel directory contains:
 
 - **Comprehensive Report**: `{channel_name}_analysis.json` - Complete analysis results
-- **Filename Analysis**: `filename_analysis.json` - Filename patterns and duplicates
-- **Filesize Analysis**: `filesize_analysis.json` - File size distributions and duplicates
-- **Message Analysis**: `message_analysis.json` - Message content and engagement analysis
-- **Summary Report**: `analysis_summary.json` - High-level metrics and insights
+- **Filename Analysis**: `{channel_name}_filename_analysis.json` - Filename patterns and duplicates
+- **Filesize Analysis**: `{channel_name}_filesize_analysis.json` - File size distributions and duplicates
+- **Message Analysis**: `{channel_name}_message_analysis.json` - Message content and engagement analysis
+- **Summary Report**: `{channel_name}_analysis_summary.json` - High-level metrics and insights
 
 ## Data Input Formats
 
@@ -304,6 +308,12 @@ The analysis system normalizes data from both sources into a common schema:
   - Word count (min, max, mean, median)
   - Message length categories (short: <50 chars, medium: 50-200, long: >200)
 - **Content Type Distribution**: Text-only, media-only, text+media, empty messages
+
+#### **Language Analysis**
+- **Primary Language Detection**: Most common language in the channel
+- **Language Distribution**: Count and percentage of messages by detected language
+- **Language Detection Coverage**: Percentage of messages successfully analyzed
+- **Multi-language Channels**: Identification of channels with significant multiple languages
 
 #### **Pattern Recognition**
 - **Hashtag Analysis**: 
@@ -589,7 +599,7 @@ The analysis system generates reports in the following structure following `conf
 | Error Code | Description | Example | Suggested Action |
 |------------|-------------|---------|------------------|
 | `CLI_MUTUALLY_EXCLUSIVE` | Both --api and --file specified | `--api --file` | Use only one source option |
-| `CLI_NO_SOURCES` | Both file and API sources disabled | `--file --api` | Enable at least one source |
+| `CLI_NO_SOURCES` | No data sources available | No files found, API unavailable | Check data availability |
 | `API_TIMEOUT` | API request timeout | API response >30 seconds | Check API status, retry |
 | `API_CONNECTION_ERROR` | Cannot connect to API | Connection refused | Check API server status |
 | `API_HTTP_ERROR` | API returns error status | HTTP 500, 404, etc. | Check API endpoint |
@@ -689,10 +699,39 @@ The `modules/analysis_processor.py` file will be organized into logical sections
 - **Error Tests**: Test error handling with invalid data and network failures
 - **Performance Tests**: Test with large datasets to verify memory management
 
+## Implementation Requirements
+
+### Technology Stack
+- **Package Management**: `uv` (fast, reliable Python package management)
+- **pandas**: >=1.5.0 (primary data processing and JSON operations)
+- **pydantic**: >=2.0.0 (data validation and models)
+- **aiohttp**: >=3.8.0 (async HTTP client for API operations)
+- **psutil**: >=5.9.0 (system and process monitoring)
+- **langdetect**: >=1.0.9 (language detection for message analysis)
+- **emoji**: >=2.0.0 (emoji analysis for pattern recognition)
+- **requests**: >=2.28.0 (fallback HTTP client for API operations)
+- **asyncio**: Built-in (async operations and concurrency)
+- **logging**: Built-in (logging functionality)
+- **pathlib**: Built-in (file path operations)
+- **typing**: Built-in (type hints)
+- **datetime**: Built-in (date/time operations)
+- **re**: Built-in (regular expressions)
+- **time**: Built-in (performance measurement)
+- **urllib.parse**: Built-in (URL parsing and validation)
+
+### Architecture Constraints
+1. **Single Module**: All code in `modules/analysis_processor.py`
+2. **Pandas-Centric**: All data operations use pandas DataFrames
+3. **Pydantic Models**: Data validation and serialization
+4. **Pandas JSON Operations**: All JSON file read/write operations must use pandas
+5. **Async-First**: All I/O operations use async/await patterns
+6. **Error Resilience**: Comprehensive error handling with specific exception types
+7. **Configuration-Driven**: All endpoints, constants, and file patterns must come from `config.py`
+
 
 ## Conclusion
 
-The `analysis` command design provides an advanced intermediate analysis system for analyzing Telegram channel data. By delivering pattern recognition, statistical analysis, language detection, and engagement analysis, it addresses the limitations of the old `report` command while providing comprehensive insights and detailed reporting.
+The `analysis` command design provides an advanced intermediate analysis system for analyzing Telegram channel data. By delivering pattern recognition, statistical analysis, language detection, and engagement analysis.
 
 The design emphasizes comprehensive analytics with pattern recognition, structured data processing, detailed JSON output, and clear development guidance.
 

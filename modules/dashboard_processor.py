@@ -173,49 +173,113 @@ class DashboardProcessor:
     
     def _transform_message_analysis(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Transform message analysis data for charts."""
-        # Create a line chart for temporal patterns (hourly)
-        temporal_patterns = data.get('temporal_patterns', {})
-        hourly_data = temporal_patterns.get('hourly', {})
+        # Extract pattern recognition data
+        pattern_recognition = data.get('pattern_recognition', {})
+        hashtags = pattern_recognition.get('hashtags', {})
+        emojis = pattern_recognition.get('emojis', {})
         
-        hours = []
-        counts = []
+        # Create a bar chart for top hashtags
+        top_hashtags = hashtags.get('top_hashtags', [])[:10]  # Top 10 hashtags
         
-        for hour in range(24):
-            hours.append(f"{hour:02d}:00")
-            counts.append(hourly_data.get(str(hour), 0))
-        
-        return {
-            'type': 'line',
-            'data': {
-                'labels': hours,
-                'datasets': [{
-                    'label': 'Messages per Hour',
-                    'data': counts,
-                    'borderColor': '#007bff',
-                    'backgroundColor': 'rgba(0, 123, 255, 0.1)',
-                    'borderWidth': 2,
-                    'fill': True,
-                    'tension': 0.4
-                }]
-            },
-            'options': {
-                'responsive': True,
-                'plugins': {
-                    'title': {
-                        'display': True,
-                        'text': 'Message Activity by Hour'
-                    },
-                    'legend': {
-                        'display': False
-                    }
+        if top_hashtags:
+            labels = [tag['tag'] for tag in top_hashtags]
+            counts = [tag['count'] for tag in top_hashtags]
+            
+            return {
+                'type': 'bar',
+                'data': {
+                    'labels': labels,
+                    'datasets': [{
+                        'label': 'Hashtag Usage',
+                        'data': counts,
+                        'backgroundColor': '#007bff',
+                        'borderColor': '#0056b3',
+                        'borderWidth': 1
+                    }]
                 },
-                'scales': {
-                    'y': {
-                        'beginAtZero': True
+                'options': {
+                    'responsive': True,
+                    'plugins': {
+                        'title': {
+                            'display': True,
+                            'text': 'Top Hashtags'
+                        },
+                        'legend': {
+                            'display': False
+                        }
+                    },
+                    'scales': {
+                        'y': {
+                            'beginAtZero': True
+                        },
+                        'x': {
+                            'ticks': {
+                                'maxRotation': 45
+                            }
+                        }
                     }
                 }
             }
-        }
+        else:
+            # Fallback to emoji chart if no hashtags
+            top_emojis = emojis.get('top_emojis', [])[:10]  # Top 10 emojis
+            
+            if top_emojis:
+                labels = [emoji['emoji'] for emoji in top_emojis]
+                counts = [emoji['count'] for emoji in top_emojis]
+                
+                return {
+                    'type': 'bar',
+                    'data': {
+                        'labels': labels,
+                        'datasets': [{
+                            'label': 'Emoji Usage',
+                            'data': counts,
+                            'backgroundColor': '#28a745',
+                            'borderColor': '#1e7e34',
+                            'borderWidth': 1
+                        }]
+                    },
+                    'options': {
+                        'responsive': True,
+                        'plugins': {
+                            'title': {
+                                'display': True,
+                                'text': 'Top Emojis'
+                            },
+                            'legend': {
+                                'display': False
+                            }
+                        },
+                        'scales': {
+                            'y': {
+                                'beginAtZero': True
+                            }
+                        }
+                    }
+                }
+            else:
+                # Fallback to empty chart
+                return {
+                    'type': 'bar',
+                    'data': {
+                        'labels': ['No Data'],
+                        'datasets': [{
+                            'label': 'No Data Available',
+                            'data': [0],
+                            'backgroundColor': '#6c757d'
+                        }]
+                    },
+                    'options': {
+                        'responsive': True,
+                        'plugins': {
+                            'title': {
+                                'display': True,
+                                'text': 'Message Analysis - No Data Available'
+                            }
+                        }
+                    }
+                }
 
     def _transform_timeline_data(self, timeline_data: Dict[str, int]) -> Dict[str, Any]:
         """Transform timeline data into a line chart format."""
@@ -722,7 +786,7 @@ class DashboardProcessor:
                         
                         # Process message analysis
                         if 'message_analysis' in analysis_results:
-                            channel_data[channel_name]['message_analysis'] = analysis_results['message_analysis']
+                            channel_data[channel_name]['message_analysis'] = self._transform_message_analysis(analysis_results['message_analysis'])
                         
                         # Update summary data
                         data_summary = data.get('data_summary', {})
@@ -737,7 +801,7 @@ class DashboardProcessor:
                         elif analysis_type == 'filesize_analysis':
                             channel_data[channel_name]['filesize_analysis'] = self._transform_filesize_analysis(data)
                         elif analysis_type == 'message_analysis':
-                            channel_data[channel_name]['message_analysis'] = data
+                            channel_data[channel_name]['message_analysis'] = self._transform_message_analysis(data)
                 
                 elif isinstance(data, list):
                     # Handle old format with list of reports

@@ -530,11 +530,20 @@ class DashboardProcessor:
             self.logger.warning(f"Input directory does not exist: {input_path}")
             return files
         
+        # First, look for files in subdirectories (original behavior)
         for source_type in DASHBOARD_SUPPORTED_SOURCE_TYPES:
             source_path = input_path / source_type
             if source_path.exists():
                 files[source_type] = list(source_path.rglob("*.json"))
                 self.logger.debug(f"Found {len(files[source_type])} files in {source_type}")
+        
+        # If no files found in subdirectories, look directly in input directory
+        if not any(files.values()):
+            self.logger.info("No files found in subdirectories, looking directly in input directory")
+            direct_files = list(input_path.glob("*.json"))
+            if direct_files:
+                files["file_messages"] = direct_files
+                self.logger.debug(f"Found {len(direct_files)} files directly in input directory")
         
         return files
 
@@ -544,15 +553,23 @@ class DashboardProcessor:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
-            # Validate required fields
-            if not isinstance(data, list) or not data:
+            # Handle our analysis file format (array with single object)
+            if isinstance(data, list) and len(data) == 1:
+                data = data[0]
+            
+            # Validate required fields for our format
+            if not isinstance(data, dict):
                 self.logger.warning(f"Invalid data format in {file_path}")
                 return None
             
-            for item in data:
-                if not all(key in item for key in ['report_type', 'generated_at']):
-                    self.logger.warning(f"Missing required fields in {file_path}")
-                    return None
+            # Check for our analysis file format
+            if 'channel_name' in data and 'analysis_type' in data:
+                return data
+            
+            # Check for old format
+            if not all(key in data for key in ['report_type', 'generated_at']):
+                self.logger.warning(f"Missing required fields in {file_path}")
+                return None
             
             return data
             
@@ -573,6 +590,18 @@ class DashboardProcessor:
                 if part in DASHBOARD_SUPPORTED_SOURCE_TYPES:
                     if i + 1 < len(parts):
                         return parts[i + 1]
+            
+            # If no source type found, extract from filename directly
+            # Files like "SherwinVakiliLibrary_analysis.json" -> "SherwinVakiliLibrary"
+            filename = file_path.stem
+            if '_' in filename:
+                # Remove common suffixes like _analysis, _filename_analysis, etc.
+                suffixes_to_remove = ['_analysis', '_filename_analysis', '_filesize_analysis', '_message_analysis']
+                for suffix in suffixes_to_remove:
+                    if filename.endswith(suffix):
+                        filename = filename[:-len(suffix)]
+                        break
+                return filename
         except Exception as e:
             self.logger.error(f"Error extracting channel name from {file_path}: {e}")
         return None
@@ -675,18 +704,53 @@ class DashboardProcessor:
                         }
                     }
                 
-                # Process each report in the data
-                for report in data:
-                    report_type = report.get('report_type', '')
-                    if report_type in DASHBOARD_SUPPORTED_ANALYSIS_TYPES:
-                        # Extract data from the appropriate field based on report type
-                        if report_type == 'analysis_summary':
-                            report_data = report.get('summary', {})
-                        else:
-                            # For other analysis types, the data is directly in the report object
-                            # Remove metadata fields to get the actual analysis data
-                            report_data = {k: v for k, v in report.items() 
-                                         if k not in ['report_type', 'generated_at', 'analysis_version']}
+                # Process the analysis data
+                if isinstance(data, dict):
+                    # Handle our analysis file format
+                    if 'analysis_type' in data:
+                        # This is our comprehensive analysis file
+                        analysis_results = data.get('analysis_results', {})
+                        
+                        # Process filename analysis
+                        if 'filename_analysis' in analysis_results:
+                            channel_data[channel_name]['filename_analysis'] = analysis_results['filename_analysis']
+                        
+                        # Process filesize analysis
+                        if 'filesize_analysis' in analysis_results:
+                            channel_data[channel_name]['filesize_analysis'] = analysis_results['filesize_analysis']
+                        
+                        # Process message analysis
+                        if 'message_analysis' in analysis_results:
+                            channel_data[channel_name]['message_analysis'] = analysis_results['message_analysis']
+                        
+                        # Update summary data
+                        data_summary = data.get('data_summary', {})
+                        channel_data[channel_name]['messages'] = data_summary.get('total_records', 0)
+                        channel_data[channel_name]['files'] = data_summary.get('total_records', 0)  # Assuming files = messages for now
+                        
+                    else:
+                        # Handle individual analysis files (filename, filesize, message)
+                        analysis_type = data.get('analysis_type', '')
+                        if analysis_type == 'filename_analysis':
+                            channel_data[channel_name]['filename_analysis'] = data
+                        elif analysis_type == 'filesize_analysis':
+                            channel_data[channel_name]['filesize_analysis'] = data
+                        elif analysis_type == 'message_analysis':
+                            channel_data[channel_name]['message_analysis'] = data
+                
+                elif isinstance(data, list):
+                    # Handle old format with list of reports
+                    for report in data:
+                        report_type = report.get('report_type', '')
+                        if report_type in DASHBOARD_SUPPORTED_ANALYSIS_TYPES:
+                            # Extract data from the appropriate field based on report type
+                            if report_type == 'analysis_summary':
+                                report_data = report.get('summary', {})
+                            else:
+                                # For other analysis types, the data is directly in the report object
+                                # Remove metadata fields to get the actual analysis data
+                                report_data = {k: v for k, v in report.items() 
+                                             if k not in ['report_type', 'generated_at', 'analysis_version']}
                         
                         # Validate and limit data size for performance
                         if self._validate_and_limit_data(report_data, report_type):

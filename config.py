@@ -14,12 +14,12 @@ REPORTS_BASE = f"{BASE_DIR}/reports"
 # File paths and directories
 REPORTS_DIR = REPORTS_BASE
 
-COLLECTIONS_DIR = f"{REPORTS_BASE}/collections"
-RAW_COLLECTIONS_DIR = f"{REPORTS_BASE}/raw"
-COMBINED_DIR = f"{REPORTS_BASE}/combined"
+COLLECTIONS_DIR = f"{REPORTS_BASE}/0_collections"
+RAW_COLLECTIONS_DIR = COLLECTIONS_DIR
+COMBINED_DIR = f"{REPORTS_BASE}/1_combined"
 
 # Analysis structure (new nested organization)
-ANALYSIS_BASE = f"{REPORTS_BASE}/analysis"
+ANALYSIS_BASE = f"{REPORTS_BASE}/2_analysis"
 
 # Analysis file patterns
 ANALYSIS_FILE_PATTERN = "{channel}_analysis.json"        # Analysis report files
@@ -30,7 +30,7 @@ ANALYSIS_FILE_GLOB = "*_analysis.json"                   # Analysis file discove
 ANALYSIS_SUMMARY_GLOB = "*_analysis_summary.txt"          # Summary file discovery
 
 # Dashboard structure (nested organization)
-DASHBOARDS_BASE = f"{REPORTS_BASE}/dashboards"
+DASHBOARDS_BASE = f"{REPORTS_BASE}/3_dashboards"
 DASHBOARDS_DIR = f"{DASHBOARDS_BASE}/html"               # HTML dashboards
 
 # Default export path

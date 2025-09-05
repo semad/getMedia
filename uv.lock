@@ -306,6 +306,15 @@ toml = [
 ]
 
 [[package]]
+name = "emoji"
+version = "2.14.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/cb/7d/01cddcbb6f5cc0ba72e00ddf9b1fa206c802d557fd0a20b18e130edf1336/emoji-2.14.1.tar.gz", hash = "sha256:f8c50043d79a2c1410ebfae833ae1868d5941a67a6cd4d18377e2eb0bd79346b", size = 597182, upload-time = "2025-01-16T06:31:24.983Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/91/db/a0335710caaa6d0aebdaa65ad4df789c15d89b7babd9a30277838a7d9aac/emoji-2.14.1-py3-none-any.whl", hash = "sha256:35a8a486c1460addb1499e3bf7929d3889b2e2841a57401903699fef595e942b", size = 590617, upload-time = "2025-01-16T06:31:23.526Z" },
+]
+
+[[package]]
 name = "et-xmlfile"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -434,6 +443,15 @@ sdist = { url = "https://files.pythonhosted.org/packages/f2/97/ebf4da567aa6827c9
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2c/e1/e6716421ea10d38022b952c159d5161ca1193197fb744506875fbb87ea7b/iniconfig-2.1.0-py3-none-any.whl", hash = "sha256:9deba5723312380e77435581c6bf4935c94cbfab9b1ed33ef8d238ea168eb760", size = 6050, upload-time = "2025-03-19T20:10:01.071Z" },
 ]
+
+[[package]]
+name = "langdetect"
+version = "1.0.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "six" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0e/72/a3add0e4eec4eb9e2569554f7c70f4a3c27712f40e3284d483e88094cc0e/langdetect-1.0.9.tar.gz", hash = "sha256:cbc1fef89f8d062739774bd51eda3da3274006b3661d199c2655f6b3f6d605a0", size = 981474, upload-time = "2021-05-07T07:54:13.562Z" }
 
 [[package]]
 name = "mccabe"
@@ -1080,7 +1098,9 @@ source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
     { name = "click" },
+    { name = "emoji" },
     { name = "faker" },
+    { name = "langdetect" },
     { name = "numpy" },
     { name = "openpyxl" },
     { name = "pandas" },
@@ -1100,7 +1120,10 @@ dev = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "black" },
+    { name = "flake8" },
     { name = "mypy" },
+    { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
 ]
@@ -1110,23 +1133,28 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.8.0" },
     { name = "black", marker = "extra == 'dev'", specifier = ">=23.0.0" },
     { name = "click", specifier = ">=8.1.0" },
+    { name = "emoji", specifier = ">=2.0.0" },
     { name = "faker", specifier = ">=37.6.0" },
     { name = "flake8", marker = "extra == 'dev'", specifier = ">=6.0.0" },
+    { name = "langdetect", specifier = ">=1.0.9" },
     { name = "numpy", specifier = ">=1.23.0" },
     { name = "openpyxl", specifier = ">=3.1.0" },
-    { name = "pandas", specifier = ">=2.0.0" },
+    { name = "pandas", specifier = ">=1.5.0" },
     { name = "plotly", specifier = ">=5.0.0" },
     { name = "psutil", specifier = ">=5.9.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
-    { name = "requests", specifier = ">=2.32.5" },
+    { name = "requests", specifier = ">=2.28.0" },
     { name = "telethon", specifier = ">=1.28.0" },
 ]
 provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "black", specifier = ">=23.0.0" },
+    { name = "flake8", specifier = ">=6.0.0" },
     { name = "mypy", specifier = ">=1.0.0" },
+    { name = "pytest", specifier = ">=7.0.0" },
     { name = "pytest-asyncio", specifier = ">=0.21.0" },
     { name = "pytest-cov", specifier = ">=4.0.0" },
 ]

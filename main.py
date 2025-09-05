@@ -262,6 +262,96 @@ def combine_collections(channels, verbose):
     logger.info("🎯 Combine operation completed!")
 
 
+@cli.command(name="analysis")
+@click.option("--channels", "-c", 
+              default="all",
+              help="Comma-separated channel list or 'all'")
+@click.option("--verbose", "-v", 
+              is_flag=True, 
+              help="Enable verbose logging")
+@click.option("--api", 
+              is_flag=True, 
+              help="Use API source only, no file source")
+@click.option("--file", 
+              is_flag=True, 
+              help="Use file source only, no API source")
+@click.help_option("-h", "--help")
+def analysis(channels, verbose, api, file):
+    """Run comprehensive analysis on Telegram channel data.
+    
+    This command analyzes collected Telegram channel data for filename patterns,
+    filesize distributions, and message content patterns.
+    
+    Examples:
+        python main.py analysis                           # Default behavior (file source only)
+        python main.py analysis --channels @SherwinVakiliLibrary  # Analysis with specific channels
+        python main.py analysis --verbose                 # Analysis with verbose logging
+        python main.py analysis --channels @SherwinVakiliLibrary --verbose  # Analysis with specific channels and verbose logging
+        python main.py analysis --file                   # Analysis using file source only 
+        python main.py analysis --channels @SherwinVakiliLibrary --file  # Analysis with specific channels using file source only
+        python main.py analysis --api                    # Analysis using API source only
+    """
+    setup_logging(verbose)
+    logger = logging.getLogger(__name__)
+    
+    if verbose:
+        logger.info("Verbose logging enabled")
+    
+    try:
+        # Import analysis modules
+        from modules.analysis_processor import create_analysis_config, run_advanced_intermediate_analysis
+        
+        # Create configuration
+        config_kwargs = {
+            "verbose": verbose,
+            "enable_file_source": not api,  # Default to file source unless --api is specified
+            "enable_api_source": api
+        }
+        
+        # Add channels if specified
+        if channels and channels != "all":
+            channel_list = [ch.strip() for ch in channels.split(",")]
+            config_kwargs["channels"] = channel_list
+        
+        # Create configuration
+        config = create_analysis_config(**config_kwargs)
+        logger.info(f"Analysis configuration: {config}")
+        
+        # Run analysis
+        logger.info("🚀 Starting comprehensive analysis...")
+        results = asyncio.run(run_advanced_intermediate_analysis(config))
+        
+        if "error" in results:
+            logger.error(f"❌ Analysis failed: {results['error']}")
+            return
+        
+        # Display summary
+        logger.info("✅ Analysis completed successfully!")
+        logger.info(f"📊 Channels processed: {len(results)}")
+        
+        # Show analysis results
+        for channel_name, result in results.items():
+            if "error" in result:
+                logger.error(f"❌ Error processing {channel_name}: {result['error']}")
+                continue
+            
+            logger.info(f"📈 {channel_name}:")
+            logger.info(f"   📄 Files analyzed: {result.get('metadata', {}).get('total_records', 'N/A')}")
+            
+            # Show output paths
+            output_files = result.get('output_files', {})
+            if output_files:
+                logger.info(f"   📁 Output files:")
+                for report_type, path in output_files.items():
+                    logger.info(f"      📄 {report_type}: {path}")
+        
+    except Exception as e:
+        logger.error(f"❌ Analysis command failed: {e}")
+        if verbose:
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+
+
 @cli.command(name="import")
 @click.argument("import_file", type=click.Path(exists=True), required=False)
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging output")

@@ -27,6 +27,7 @@ from config import (
     DEFAULT_RATE_LIMIT,
     DEFAULT_SESSION_COOLDOWN,
     DEFAULT_SESSION_NAME,
+    RAW_COLLECTIONS_DIR,
 )
 from modules.combine_processor import ( auto_detect_channels_from_raw_advanced,
     combine_existing_collections,
@@ -240,7 +241,7 @@ def combine_collections(channels, verbose):
     else:
         logger.info("🔄 Auto-detecting channels from raw directory...")
         auto_detected_channels = auto_detect_channels_from_raw_advanced(
-            Path("reports/collections/raw")
+            Path(RAW_COLLECTIONS_DIR)
         )
         if auto_detected_channels:
             logger.info(

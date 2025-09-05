@@ -17,6 +17,7 @@ import pandas as pd
 from config import (
     RAW_COLLECTIONS_DIR,
     COLLECTIONS_DIR,
+    COMBINED_DIR,
     F_PREFIX,
     COMBINED_FILE_PATTERN,
     RAW_COLLECTION_GLOB,
@@ -36,7 +37,7 @@ def auto_detect_channels_from_raw(logger=None) -> list[str]:
     Returns:
         List of detected channel names
     """
-    raw_dir = Path("reports/collections/raw")
+    raw_dir = Path(RAW_COLLECTIONS_DIR)
     detected_channels = set()
 
     if not raw_dir.exists():
@@ -182,7 +183,7 @@ def combine_existing_collections(
 
     # Setup paths
     raw_dir = Path(RAW_COLLECTIONS_DIR)
-    output_dir = Path(COLLECTIONS_DIR)
+    output_dir = Path(COMBINED_DIR)
 
     if not raw_dir.exists():
         logger.error(f"❌ Raw directory {raw_dir} does not exist")

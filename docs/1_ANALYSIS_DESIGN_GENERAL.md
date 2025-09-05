@@ -2,175 +2,7 @@
 
 ## Overview
 
-The `analysis` command is an data analysis tool for Telegram channel data, providing comprehensive data analysis capabilities via multiple sources. It supports file-based data, but by default  it uses the REST API for fetching data from Telegram's public.
-
-## Design Goals
-
-1. **Data Analysis Tool**: Comprehensive data analysis with pattern recognition, statistical analysis, and detailed insights
-2. **Single Module Architecture**: All analysis functionality consolidated into one module for simplicity and maintainability
-3. **Flexible Data Sources**: Support for file-based data, API endpoint.
-4. **Provide Analytics**: Pattern recognition, language detection, engagement analysis, and statistical metrics
-5. **Performance Optimization**: Efficient data processing using pandas DataFrames with vectorized operations
-6. **Detailed Output**: JSON reports with comprehensive analysis results and metadata
-7. **Extensibility**: Easy to add new analysis types and advanced features in future versions
-8. **Error Handling**: Comprehensive error handling and validation throughout the pipeline
-
-## Requirements
-
-### Functional Requirements
-
-#### **REQ-004: Data Source Integration**
-The analysis command MUST support multiple data sources:
-
-- **REQ-004.1**: **File Source Support**
-  - Read from combined JSON files in `reports/collections/` directory
-  - Support files matching `tg_*_combined.json` pattern
-  - Handle both small and large files efficiently
-  - Provide data quality assessment for file sources
-
-- **REQ-004.2**: **API Source Support**
-  - Fetch data from REST API endpoints
-  - Support pagination for large datasets
-  - Handle API timeouts and connection errors gracefully
-  - Provide real-time data availability checks
-
-
-#### **REQ-006: Output Requirements**
-- **REQ-006.1**: Generate structured JSON output with comprehensive analysis results
-- **REQ-006.2**: Include detailed metadata and processing statistics
-- **REQ-006.3**: Provide actionable insights for media library optimization
-- **REQ-006.4**: Support both individual channel and summary reports
-
-#### ** **Individual Channel Directory Structure**: Create separate folders for each channel when analyzing all channels
-  - All channels analysis is localed in `reports/analysis/all_channels/`
-Individual folders for each discovered channel
-  - Each channel gets its own directory: `reports/analysis/{channel_name}/`
-  Example:
-  `reports/analysis/channel1`, `reports/analysis/channel2`, ...
-
-- **REQ-006.6**: **Channel-Specific File Naming**: Use channel names in output file names
-  - Comprehensive report: `{channel_name}_analysis.json`
-  - Filename analysis: `{channel_name}_filename_analysis.json`
-  - Filesize analysis: `{channel_name}_filesize_analysis.json`
-  - Message analysis: `{channel_name}_message_analysis.json`
-  - Summary report: `{channel_name}_analysis_summary.json`
-
-Requirement:
-
-  - Summary report: the all report analysis is in 'reports/analysis/ 
-  - It does not filter on channel name and makes all the same analysis on all data: `all_channels_analysis_summary.json`
-   - **REQ-006.7**: **Config.py Compliance**: All output paths must follow patterns defined in `config.py`
-  - Use `FILE_MESSAGES_DIR` for base directory
-  - Use `ANALYSIS_FILE_PATTERN` and `ANALYSIS_SUMMARY_PATTERN` for file naming
-  - Ensure directory structure matches configuration requirements
-
-
-#### **REQ-001: Filename Analysis**
-The analysis command MUST provide comprehensive filename analysis capabilities including:
-
-- **REQ-001.1**: **Duplicate Filename Detection**
-  - Identify files with identical names (exact matches)
-  - Count the number of files sharing each filename
-  - Generate a list of most common filenames (top 10)
-  - Calculate the ratio of unique filenames vs total files
-  - Provide actionable data for duplicate file cleanup
-
-- **REQ-001.2**: **Filename Pattern Analysis**
-  - Analyze filename length distribution (min, max, mean, median)
-  - Identify common filename patterns and extensions
-  - Detect files with special characters or unusual naming conventions
-  - Categorize files by extension type and frequency
-  - Generate statistics on naming convention compliance
-
-- **REQ-001.3**: **Filename Quality Assessment**
-  - Identify files with problematic naming patterns
-  - Flag files with spaces, special characters, or non-standard formats
-  - Provide recommendations for filename standardization
-  - Generate quality scores for filename consistency
-
-#### **REQ-002: Filesize Analysis**
-The analysis command MUST provide comprehensive filesize analysis capabilities including:
-
-- **REQ-002.1**: **Duplicate Filesize Detection**
-  - Identify files with identical sizes (exact byte matches)
-  - Count the number of files sharing each filesize
-  - Generate a list of most common filesizes (top 10)
-  - Calculate the ratio of unique filesizes vs total files
-  - Provide potential duplicate file identification based on size
-
-- **REQ-002.2**: **Filesize Distribution Analysis**
-  - Create meaningful size bins (0-1MB, 1-5MB, 5-10MB, 10MB+)
-  - Analyze filesize frequency distribution
-  - Identify size clusters and patterns
-  - Generate storage optimization recommendations
-
-#### **REQ-003: Language Analysis**
-The analysis command MUST provide comprehensive language analysis capabilities including:
-
-- **REQ-003.1**: **Language Detection**
-  - Detect primary language of message content
-  - Identify language distribution across all messages
-  - Handle unknown or mixed language content gracefully
-  - Provide fallback mechanisms for detection failures
-
-- **REQ-003.2**: **Language Statistics**
-  - Calculate percentage distribution of detected languages
-  - Identify most common languages (top 5)
-  - Generate language diversity metrics
-  - Provide language-specific content analysis
-
-### Non-Functional Requirements
-
-#### **REQ-005: Performance Requirements**
-- **REQ-005.2**: Use memory-efficient pandas operations for large datasets
-- **REQ-005.3**: Support chunked processing for files exceeding available memory
-- **REQ-005.4**: Provide progress indicators for operations longer than 30 seconds
-
-#### **REQ-007: Error Handling Requirements**
-- **REQ-007.1**: Continue processing with partial data when possible
-- **REQ-007.2**: Provide clear, actionable error messages with specific error codes
-- **REQ-007.3**: Log all errors with timestamps and context
-- **REQ-007.4**: Generate error summaries in output metadata
-
-## Design Constraints
-
-### Technology Constraints
-- **Pandas Library**: All data processing and analysis must use the Pandas library for:
-  - Data loading from JSON files and API responses
-  - Data manipulation and transformation
-  - Statistical calculations and aggregations
-  - Data filtering and grouping operations
-  - Performance optimization through vectorized operations
-- **Python 3.8+**: Minimum Python version requirement for Pandas compatibility
-- **Memory Efficiency**: Large dataset handling through Pandas chunking and memory management
-
-### Dependencies
-The analysis module requires the following Python packages:
-
-#### **Core Dependencies**
-- **pandas**: >=1.5.0 (data manipulation and analysis)
-- **numpy**: >=1.21.0 (numerical operations)
-- **aiohttp**: >=3.8.0 (async HTTP client for API calls)
-- **asyncio**: built-in (async programming support)
-- **json**: built-in (JSON processing)
-- **pathlib**: built-in (file path handling)
-- **logging**: built-in (logging functionality)
-- **datetime**: built-in (date/time operations)
-
-#### **Required Dependencies**
-- **langdetect**: >=1.0.9 (language detection)
-- **emoji**: >=2.0.0 (emoji analysis)
-
-#### **Installation Requirements**
-```bash
-pip install pandas>=1.5.0 numpy>=1.21.0 aiohttp>=3.8.0
-pip install langdetect>=1.0.9 emoji>=2.0.0
-```
-
-### Performance Constraints
-- **DataFrame Operations**: Leverage Pandas' optimized C-based operations for large datasets
-- **Chunked Processing**: Use Pandas chunking for files exceeding available memory
-- **Vectorized Operations**: Prefer Pandas vectorized operations over Python loops
+The `analysis` command is a data analysis tool for Telegram channel data, providing comprehensive data analysis capabilities via multiple sources. It supports file-based data, but by default it uses the REST API for fetching data from Telegram's public channels.
 
 ## Architecture Overview
 
@@ -178,13 +10,13 @@ pip install langdetect>=1.0.9 emoji>=2.0.0
 
 ```
 ┌─────────────────┐    ┌─────────────────────────────────────────┐    ┌─────────────────┐
-│   CLI Layer     │    │         Single Analysis Module         │    │   Output Layer  │
+│   CLI Layer     │    │         Single Analysis Module          │    │   Output Layer  │
 │                 │    │                                         │    │                 │
 │ - Command       │───▶│ ┌─────────────┐ ┌─────────────────────┐ │───▶│ - JSON Format   │
 │ - Options       │    │ │Data Loading │ │   Analysis Core     │ │    │ - File Writing  │
 │ - Validation    │    │ │- File       │ │ - Message           │ │    │ - Summary Gen   │
-└─────────────────┘    │ │- API        │ │ - Media             │ │    └─────────────────┘
-                       │ │- Dual       │ │ - Diff              │ │
+└─────────────────┘    │ │- API        │ │                     │ │    └─────────────────┘
+                       │ │             │ │                     │ │
                        │ └─────────────┘ └─────────────────────┘ │
                        │ ┌─────────────┐ ┌─────────────────────┐ │
                        │ │Orchestrator │ │   Output Formatter  │ │
@@ -199,7 +31,7 @@ pip install langdetect>=1.0.9 emoji>=2.0.0
 
 1. **Input**: CLI arguments and configuration
 2. **Data Discovery**: Determine available data from API endpoints or combined collections directory
-3. **Data Loading**: Source-specific data loaders within the single module (file, API, or dual-source)
+3. **Data Loading**: Source-specific data loaders within the single module (file or API)
 4. **Validation**: Data quality checks and validation
 5. **Analysis**: Execution of selected analysis types
 6. **Output**: JSON formatting and file generation
@@ -209,41 +41,26 @@ pip install langdetect>=1.0.9 emoji>=2.0.0
 
 ### Command Structure
 
-```bash
-python main.py analysis [options]
-```
-
-### Analysis Type
-The analysis command runs **various data analysis** providing comprehensive data analysis capabilities:
-
-#### **Core Analysis Types (Always Executed)**
-- **Message Analysis**: Comprehensive content statistics and pattern recognition
-- **Media Analysis**: Detailed file type distribution and storage metrics
-- **File name Analysis**: How many, what types, for each type how many
-- **Contributer Analysis**: Who has contibuted the most
-- **Note**: Additional advanced features (sentiment analysis, topic modeling, network analysis, etc.) will be added in future versions.
+The analysis command follows the pattern: `python main.py analysis [options]`
+- **Required**: None (uses default behavior)
+- **Optional**: Channel selection, verbosity, source selection
+- **Mutually Exclusive**: `--api` and `--file` cannot both be used
 
 ### Command Options
 
 | Option | Short | Type | Default | Description |
 |--------|-------|------|---------|-------------|
-| `--channels` | `-c` | string | `all` | Comma-separated channel list or `all` |
+| `--channels` | `-c` | string | `all` | Comma-separated channel list or `all`, default is all |
 | `--verbose` | `-v` | flag | `False` | Enable verbose logging |
+| `--api` | | flag | `True` | Use API source only, no file source |
+| `--file` | | flag | `False` | Use file source only, no API source |
 | `--help` | `-h` | flag | | Show help message |
 
-### Flag Validation Rules
-
-The CLI enforces these validation rules:
-
-1. **Default behavior**: API is enabled by default
-2. **Individual source control**: Each source can be disabled with its respective `--no-*` flag
-3. **Diff validation**: Diff analysis requires both file and API sources to be available
-4. **Minimum source requirement**: At least one source (file or API) must be enabled
 
 ### Usage Examples
 
 ```bash
-# Default behavior (all sources and diff analysis)
+# Default behavior (API with file fallback)
 python main.py analysis
 
 # Analysis with specific channels
@@ -255,144 +72,35 @@ python main.py analysis --verbose
 # Analysis with specific channels and verbose logging
 python main.py analysis --channels @SherwinVakiliLibrary --verbose
 
-# Analysis without file source (API only)
-python main.py analysis --from-file
+# Analysis using file source only 
+python main.py analysis --file
 
+# Analysis with specific channels using file source only
+python main.py analysis --channels @SherwinVakiliLibrary --file
 ```
 
 ## Data Discovery and Sources
 
-### Data Discovery Phase
 The analysis command first determines what data is available using concrete metrics:
+- Analysis is done by default via API, unless the API is not available or the `--file` option is specified, then the analysis is from combined message file only.
+- When `--file` is specified, only file source is used (API source is disabled).
 
-- Analysis is done by default via api, unless the API is not available --from-file is specified, the analysis is from file only.
-
-- **API Discovery**: When API source existsn, 
+- **API Discovery**: When API source exists, 
 queries available endpoints to find:
-      - Available channels (`/api/v1/telegram/channels`) - must return HTTP 200
-  - Message counts and data ranges from `/api/v1/telegram/messages` endpoint
-  - API health check - response time <30 seconds, no HTTP errors
+  - Available channels (`API_ENDPOINTS['channels']`)
+  - Message counts and data ranges from `API_ENDPOINTS['messages']` endpoint
+  - API health check - response time and HTTP status
   - Comprehensive data availability check
+- Supports async operations for better performance
 
-- **File Discovery**: When file source is enabled, or no API available(not disabled with `--no-file`), scans the combined collections directory to find:
-  - Available combined JSON files matching `*_combined.json` pattern
+- **File Discovery**: When file source is enabled, or no API available, scans the combined collections directory to find:
+  - Available combined JSON files matching `COMBINED_COLLECTION_GLOB` pattern
   - Channel names extracted from file metadata
+  - channel names are filtered for '@'
   - Message counts from file metadata (any files with messages)
   - File sizes and modification dates (no age restrictions)
+  - Using pandas read in combined files as DataFrames
 
-- **Dual Source Discovery**: When diff analysis is enabled (not disabled with `--no-diff`), performs both API and file discovery to compare:
-  - Channel overlap between sources
-  - Message count differences
-  - Data freshness comparison
-  - Quality score comparison
-
-### File Source (`--no-file`)
-- Reads from combined JSON files in `COLLECTIONS_DIR`
-- Uses pandas for efficient JSON processing
-- Supports both small and large files with appropriate strategies
-- Can be disabled with `--no-file` flag
-
-### API Source (`--no-api`)
-- Fetches data from REST API endpoints
-- Converts API responses to pandas DataFrames
-- Supports async operations for better performance
-- Can be disabled with `--no-api` flag
-
-### Diff Source (`--no-diff`)
-- **Requires both file and API sources** to be available (not disabled with `--no-file` or `--no-api`)
-- Loads data from both file and API sources
-- Adds source identifiers to distinguish data origins
-- Enables comparison and validation between sources
-- Generates comparison reports showing differences and sync status
-- Can be disabled with `--no-diff` flag
-
-## Analysis Types
-
-### Message Analysis (Advanced Intermediate Scope)
-
-#### **Comprehensive Content Statistics**
-- **Message Count**: Total messages, messages with text, empty messages
-- **Text Length Analysis**: 
-  - Character count (min, max, mean, median)
-  - Word count (min, max, mean, median)
-  - Message length categories (short: <50 chars, medium: 50-200, long: >200)
-- **Content Type Distribution**: Text-only, media-only, text+media, empty messages
-
-#### **Pattern Recognition**
-- **Hashtag Analysis**: 
-  - Most common hashtags (top 10)
-  - Total unique hashtags count
-- **Mention Analysis**:
-  - Most mentioned usernames (top 10)
-  - Total unique mentions count
-- **URL Analysis**:
-  - Total URL count
-  - Most common domains (top 5)
-- **Emoji Analysis**:
-  - Most used emojis (top 10)
-  - Total unique emojis count
-
-#### **Creator Analysis**
-- **Active Contributors**: Top contributors by message count (top 10)
-- **Creator Message Counts**: Detailed count per creator with engagement metrics
-
-### Media Analysis (Advanced Intermediate Scope)
-
-#### **File Size Analysis**
-- **Storage Usage**: Total storage consumed, average file size
-- **Size Distribution**: 
-  - File size categories (small: <1MB, medium: 1-10MB, large: >10MB)
-  - Size percentiles (50th, 75th, 90th)
-- **Large File Identification**: Top 10 largest files
-
-#### **Media Type Analysis**
-- **File Format Distribution**: 
-  - Document types (PDF, DOC, TXT, etc.)
-  - Image types (JPG, PNG, GIF, etc.)
-  - Video types (MP4, AVI, etc.)
-  - Audio types (MP3, WAV, etc.)
-- **MIME Type Analysis**: Most common MIME types (top 10)
-- **Average File Sizes by Type**: Detailed size metrics per media type
-
-#### **Filename Analysis**
-- **Duplicate Filename Detection**:
-  - Files with identical names (exact matches)
-  - Count of files sharing each filename
-  - Most common filenames (top 10)
-  - Total unique filenames vs total files
-- **Filename Pattern Analysis**:
-  - Filename length distribution (min, max, mean, median)
-  - Common filename patterns and extensions
-  - Files with special characters or unusual naming conventions
-
-#### **Filesize Analysis**
-- **Duplicate Filesize Detection**:
-  - Files with identical sizes (exact byte matches)
-  - Count of files sharing each filesize
-  - Most common filesizes (top 10)
-  - Total unique filesizes vs total files
-- **Filesize Distribution Analysis**:
-  - Filesize frequency distribution
-  - Size clusters and patterns
-  - Potential duplicate file identification based on size
-
-#### **Media Content Analysis**
-- **Caption Analysis**: 
-  - Caption presence (with/without captions)
-  - Caption length (min, max, mean, median)
-- **Media Engagement**: 
-  - Views, forwards, replies by media type (if available)
-  - Most popular media files (top 10)
-
-### Diff Analysis (Advanced Intermediate Scope)
-- **Source Comparison**: Detailed record count comparison between file and API sources
-- **Sync Status**: Comprehensive sync percentage and status calculation:
-  - **synced**: 100% match between sources (sync_percentage = 100)
-  - **partially_synced**: 90-99% match between sources (sync_percentage >= 90)
-  - **not_synced**: <90% match between sources (sync_percentage < 90)
-- **Discrepancy Reporting**: Detailed count of missing records in each source:
-  - **missing_in_api**: Records present in file but not in API (by message_id comparison)
-  - **missing_in_file**: Records present in API but not in file (by message_id comparison)
 
 ## Data Processing Pipeline
 
@@ -415,131 +123,29 @@ The analysis system implements a sophisticated report generation strategy that c
 ```
 Data Sources → Channel Discovery → Channel Deduplication → Individual Report Generation
      ↓              ↓                    ↓                        ↓
-8 sources    → 5 unique channels  →  Remove duplicates  →  5 channel folders
+8 sources    → 4 unique channels  →  Remove duplicates  →  4 channel folders
 ```
 
-#### **Report Generation Methods**
+### **Report Generation Methods**
+
 - **`_generate_individual_channel_reports`**: Main method for creating individual channel reports
 - **`_get_output_paths`**: Generates channel-specific output paths following `config.py` patterns
 - **Channel-specific directory creation**: Each channel gets its own folder with all analysis types
 
 #### **Output File Types per Channel**
+
 Each channel directory contains:
+
 - **Comprehensive Report**: `{channel_name}_analysis.json` - Complete analysis results
 - **Filename Analysis**: `filename_analysis.json` - Filename patterns and duplicates
 - **Filesize Analysis**: `filesize_analysis.json` - File size distributions and duplicates
 - **Message Analysis**: `message_analysis.json` - Message content and engagement analysis
 - **Summary Report**: `analysis_summary.json` - High-level metrics and insights
 
-## Output Structure
-
-### Directory Organization
-
-The analysis command generates output in a structured directory hierarchy that follows the `config.py` patterns and creates individual folders for each channel.
-
-#### **Individual Channel Directory Structure**
-When analyzing all channels (no specific channels provided), the system creates separate folders for each discovered channel:
-
-```
-reports/analysis/file_messages/
-├── books/                           # @books channel
-│   ├── books_analysis.json         # Comprehensive analysis report
-│   ├── filename_analysis.json      # Filename analysis results
-│   ├── filesize_analysis.json      # Filesize analysis results
-│   ├── message_analysis.json       # Message analysis results
-│   └── analysis_summary.json       # Summary report
-├── books_magazine/                  # @books_magazine channel
-│   ├── books_magazine_analysis.json
-│   ├── filename_analysis.json
-│   ├── filesize_analysis.json
-│   ├── message_analysis.json
-│   └── analysis_summary.json
-├── Free/                           # @Free channel
-│   ├── Free_analysis.json
-│   ├── filename_analysis.json
-│   ├── filesize_analysis.json
-│   ├── message_analysis.json
-│   └── analysis_summary.json
-├── Free_Books_life/                # @Free_Books_life channel
-│   ├── Free_Books_life_analysis.json
-│   ├── filename_analysis.json
-│   ├── filesize_analysis.json
-│   ├── message_analysis.json
-│   └── analysis_summary.json
-└── SherwinVakiliLibrary/           # @SherwinVakiliLibrary channel
-    ├── SherwinVakiliLibrary_analysis.json
-    ├── filename_analysis.json
-    ├── filesize_analysis.json
-    ├── message_analysis.json
-    └── analysis_summary.json
-```
-
-#### **Single Channel Analysis**
-When analyzing a specific channel, files are created in that channel's directory:
-
-```bash
-# Command: python main.py analysis --channels @books
-reports/analysis/file_messages/books/
-├── books_analysis.json
-├── filename_analysis.json
-├── filesize_analysis.json
-├── message_analysis.json
-└── analysis_summary.json
-```
-
-#### **Multiple Channel Analysis**
-When analyzing multiple specific channels, files are created in a combined directory:
-
-```bash
-# Command: python main.py analysis --channels @books,@Free
-reports/analysis/file_messages/combined_2_channels/
-├── combined_2_channels_analysis.json
-├── filename_analysis.json
-├── filesize_analysis.json
-├── message_analysis.json
-└── analysis_summary.json
-```
-
-#### **Diff Analysis Output Structure**
-When diff analysis is enabled (both file and API sources present), output is generated in the `diff_messages` directory:
-
-```bash
-# Command: python main.py analysis --channels @books (with both file and API sources)
-reports/analysis/diff_messages/books/
-├── books_analysis.json              # Comprehensive diff analysis report
-├── filename_analysis.json           # Filename analysis from combined sources
-├── filesize_analysis.json           # Filesize analysis from combined sources
-├── message_analysis.json            # Message analysis from combined sources
-└── analysis_summary.json            # Summary of diff analysis results
-```
-
-#### **Data Source-Specific Output Structure**
-The system automatically routes output based on data source types:
-
-- **File-only sources**: `reports/analysis/file_messages/{channel_name}/`
-- **API-only sources**: `reports/analysis/db_messages/{channel_name}/`
-- **Mixed sources (diff analysis)**: `reports/analysis/diff_messages/{channel_name}/`
-
-#### **Legacy Structure (Deprecated)**
-The old structure is no longer used but documented for reference:
-
-```
-reports/analysis/
-├── messages/
-│   ├── {channel_name}_messages.json
-│   └── messages_summary.json
-├── media/
-│   ├── {channel_name}_media.json
-│   └── media_summary.json
-└── diff/
-    ├── {channel_name}_diff.json
-    └── diff_summary.json
-```
-
 ## Data Input Formats
 
 ### File Source Data Format
-The analysis command reads from combined JSON files in the `reports/collections/` directory:
+The analysis command reads from combined JSON files in the `COLLECTIONS_DIR` directory:
 
 ```json
 [
@@ -584,7 +190,7 @@ The analysis command reads from combined JSON files in the `reports/collections/
 ### API Source Data Format
 The analysis command fetches data from REST API endpoints:
 
-**Channels Endpoint** (`/api/v1/telegram/channels`):
+**Channels Endpoint** (`API_ENDPOINTS['channels']`):
 ```json
 [
   {
@@ -597,7 +203,7 @@ The analysis command fetches data from REST API endpoints:
 ]
 ```
 
-**Messages Endpoint** (`/api/v1/telegram/messages`):
+**Messages Endpoint** (`API_ENDPOINTS['messages']`):
 ```json
 {
   "data": [
@@ -687,16 +293,86 @@ The analysis system normalizes data from both sources into a common schema:
 - **Optional but recommended**: `text`, `creator_username`, `media_type`, `file_name`, `file_size`
 - **Engagement metrics**: `views`, `forwards`, `replies` (if available)
 
-#### **Validation Rules**
-- **message_id**: Must be present and non-empty
-- **channel_username**: Must be present and start with '@'
-- **date**: Must be valid ISO timestamp format
-- **source**: Must be either "file" or "api"
-- **file_size**: If present, must be positive integer
-- **views/forwards/replies**: If present, must be non-negative integers
-- **is_forwarded**: If present, must be boolean
+## Analysis Types
 
-### JSON Output Structure
+### Message Analysis (Advanced Intermediate Scope)
+
+#### **Comprehensive Content Statistics**
+- **Message Count**: Total messages, messages with text, empty messages
+- **Text Length Analysis**: 
+  - Character count (min, max, mean, median)
+  - Word count (min, max, mean, median)
+  - Message length categories (short: <50 chars, medium: 50-200, long: >200)
+- **Content Type Distribution**: Text-only, media-only, text+media, empty messages
+
+#### **Pattern Recognition**
+- **Hashtag Analysis**: 
+  - Most common hashtags (top 10)
+  - Total unique hashtags count
+- **Mention Analysis**:
+  - Most mentioned usernames (top 10)
+  - Total unique mentions count
+- **URL Analysis**:
+  - Total URL count
+  - Most common domains (top 5)
+- **Emoji Analysis**:
+  - Most used emojis (top 10)
+  - Total unique emojis count
+
+#### **Creator Analysis**
+- **Active Contributors**: Top contributors by message count (top 10)
+- **Creator Message Counts**: Detailed count per creator with engagement metrics
+
+### Media Analysis (Advanced Intermediate Scope)
+
+#### **File Size Analysis**
+- **Storage Usage**: Total storage consumed, average file size
+- **Size Distribution**: 
+  - File size categories (small: <1MB, medium: 1-10MB, large: >10MB)
+  - Size percentiles (50th, 75th, 90th)
+- **Large File Identification**: Top 10 largest files
+
+#### **Media Type Analysis**
+- **File Format Distribution**: 
+  - Document types (PDF, DOC, TXT, etc.)
+  - Image types (JPG, PNG, GIF, etc.)
+  - Video types (MP4, AVI, etc.)
+  - Audio types (MP3, WAV, etc.)
+- **MIME Type Analysis**: Most common MIME types (top 10)
+- **Average File Sizes by Type**: Detailed size metrics per media type
+
+#### **Filename Analysis**
+- **Duplicate Filename Detection**:
+  - Files with identical names (exact matches)
+  - Count of files sharing each filename
+  - Most common filenames (top 10)
+  - Total unique filenames vs total files
+- **Filename Pattern Analysis**:
+  - Filename length distribution (min, max, mean, median)
+  - Common filename patterns and extensions
+  - Files with special characters or unusual naming conventions
+
+#### **Filesize Analysis**
+- **Duplicate Filesize Detection**:
+  - Files with identical sizes (exact byte matches)
+  - Count of files sharing each filesize
+  - Most common filesizes (top 10)
+  - Total unique filesizes vs total files
+- **Filesize Distribution Analysis**:
+  - Filesize frequency distribution
+  - Size clusters and patterns
+  - Potential duplicate file identification based on size
+
+#### **Media Content Analysis**
+- **Caption Analysis**: 
+  - Caption presence (with/without captions)
+  - Caption length (min, max, mean, median)
+- **Media Engagement**: 
+  - Views, forwards, replies by media type (if available)
+  - Most popular media files (top 10)
+
+
+## JSON Output Structure
 
 #### Message Analysis Output
 ```json
@@ -865,71 +541,32 @@ The analysis system normalizes data from both sources into a common schema:
 }
 ```
 
-#### Diff Analysis Output
-```json
-{
-  "channel_name": "@SherwinVakiliLibrary",
-  "analysis_type": "diff",
-  "generated_at": "2024-01-15T10:30:00Z",
-  "comparison_summary": {
-    "file_records": 1000,
-    "api_records": 998,
-    "sync_percentage": 99.5
-  },
-  "differences": {
-    "missing_in_api": 5,
-    "missing_in_file": 2
-  },
-  "sync_status": "partially_synced"
-}
-```
-
 ## Configuration
 
 ### Environment Configuration
-The analysis module will use configuration constants defined in `config.py`:
+The analysis module uses configuration constants defined in `config.py`:
 
-- **ANALYSIS_BASE**: "reports/analysis" (base directory for analysis reports)
-- **COLLECTIONS_DIR**: "reports/collections" (source directory for combined JSON files)
-- **COMBINED_COLLECTION_GLOB**: "tg_*_combined.json" (file discovery pattern)
+- **ANALYSIS_BASE**: `f"{REPORTS_BASE}/analysis"` (base directory for analysis reports)
+- **COLLECTIONS_DIR**: `f"{REPORTS_BASE}/collections"` (source directory for combined JSON files)
+- **COMBINED_COLLECTION_GLOB**: `"tg_*_combined.json"` (file discovery pattern)
 - **API_ENDPOINTS**: Dictionary of API endpoints for data fetching:
-  - `channels`: "/api/v1/telegram/channels" (list available channels)
-  - `messages`: "/api/v1/telegram/messages" (fetch messages with pagination)
-  - `stats`: "/api/v1/telegram/stats" (channel statistics)
-- **DEFAULT_DB_URL**: "http://localhost:8000" (API base URL, configurable via environment)
-- **DEFAULT_RATE_LIMIT**: 5000 (messages per minute for API calls)
-- **DEFAULT_SESSION_COOLDOWN**: 30 (seconds between API sessions)
+  - `channels`: `f"{API_BASE_PATH}/channels"` (list available channels)
+  - `messages`: `f"{API_BASE_PATH}/messages"` (fetch messages with pagination)
+  - `stats`: `f"{API_BASE_PATH}/stats"` (channel statistics)
+- **DEFAULT_DB_URL**: `"http://localhost:8000"` (API base URL, configurable via environment)
+- **DEFAULT_RATE_LIMIT**: `5000` (messages per minute for API calls)
+- **DEFAULT_SESSION_COOLDOWN**: `30` (seconds between API sessions)
 
 ### Output Configuration
 The analysis system generates reports in the following structure following `config.py` patterns:
 
-#### **Base Configuration**
-- **Base Directory**: `reports/analysis/` (from `ANALYSIS_BASE`)
-- **File Messages Directory**: `reports/analysis/file_messages/` (from `FILE_MESSAGES_DIR`)
-- **Files Channels Directory**: `reports/analysis/files_channels/` (from `FILES_CHANNELS_DIR`)
-
-#### **File Naming Patterns**
-- **Analysis File Pattern**: `{channel}_analysis.json` (from `ANALYSIS_FILE_PATTERN`)
-- **Summary File Pattern**: `analysis_summary.json` (from `ANALYSIS_SUMMARY_PATTERN`)
-
 #### **Directory Structure Rules**
-- **Single Channel**: `reports/analysis/file_messages/{channel_name}/`
-- **Multiple Channels**: `reports/analysis/file_messages/combined_X_channels/`
+- **Single Channel**: `{ANALYSIS_BASE}/{channel_name}/`
+- **Multiple Channels**: `{ANALYSIS_BASE}/combined_X_channels/`
 - **All Channels**: Individual folders for each discovered channel
 - **Channel Name Processing**: Remove '@' prefix from channel names for directory names
 
-#### **Legacy Structure (Deprecated)**
-- **Message Reports**: `reports/analysis/messages/` (no longer used)
-- **Media Reports**: `reports/analysis/media/` (no longer used)
-- **Diff Reports**: `reports/analysis/diff/` (no longer used)
-
 ## Error Handling and Validation
-
-### CLI Validation
-- **Default Behavior**: All sources (file, API, diff) are enabled by default
-- **Individual Source Control**: Each source can be disabled with its respective `--no-*` flag
-- **Minimum Source Requirement**: At least one source (file or API) must be enabled
-- **Clear Error Messages**: Provide actionable error messages for invalid channel specifications and flag combinations
 
 ### Data Validation
 - **Schema Validation**: Ensure data structure consistency
@@ -938,13 +575,6 @@ The analysis system generates reports in the following structure following `conf
 
 ### Error Recovery
 - **Graceful Degradation**: Continue processing with partial data when possible
-  - If API fails, continue with file data only
-  - If file parsing fails, skip that file and continue with others
-  - If advanced analysis fails, continue with core analysis only
-- **Error Reporting**: Comprehensive error logging and reporting
-  - Log all errors with timestamps and context
-  - Generate error summary in output metadata
-  - Provide actionable error messages to users
 - **Fallback Strategies**: Alternative approaches when primary methods fail
   - API timeout: Retry with exponential backoff (max 3 retries)
   - File corruption: Skip corrupted files and continue
@@ -952,21 +582,14 @@ The analysis system generates reports in the following structure following `conf
 
 ### User Feedback
 - **Progress Indicators**: Show processing progress for long operations
-  - Display current phase (Discovery, Loading, Analysis, Output)
-  - Show percentage complete for each phase
-  - Estimate remaining time for operations >30 seconds
 - **Error Messages**: Clear, actionable error messages with specific error codes
 - **Validation Reports**: Summary of data quality and validation results
-  - Data quality score (0-100%)
-  - Missing field counts and percentages
-  - Validation warnings and recommendations
 
 ### Error Taxonomy
 | Error Code | Description | Example | Suggested Action |
 |------------|-------------|---------|------------------|
-| `CLI_NO_SOURCES` | Both file and API sources disabled | `--no-file --no-api` | Enable at least one source |
-| `CLI_DIFF_NO_FILE` | Diff enabled but file source disabled | `--no-file` (with diff enabled) | Enable file source or disable diff |
-| `CLI_DIFF_NO_API` | Diff enabled but API source disabled | `--no-api` (with diff enabled) | Enable API source or disable diff |
+| `CLI_MUTUALLY_EXCLUSIVE` | Both --api and --file specified | `--api --file` | Use only one source option |
+| `CLI_NO_SOURCES` | Both file and API sources disabled | `--file --api` | Enable at least one source |
 | `API_TIMEOUT` | API request timeout | API response >30 seconds | Check API status, retry |
 | `API_CONNECTION_ERROR` | Cannot connect to API | Connection refused | Check API server status |
 | `API_HTTP_ERROR` | API returns error status | HTTP 500, 404, etc. | Check API endpoint |
@@ -979,7 +602,7 @@ The analysis system generates reports in the following structure following `conf
 
 ## Single Module Architecture
 
-The analysis functionality is consolidated into a single `modules/analysis.py` file for an advanced intermediate analysis system. This approach provides several benefits:
+The analysis functionality is consolidated into a single `modules/analysis_processor.py` file for an advanced intermediate analysis system. This approach provides several benefits:
 
 ### Advantages of Single Module Design
 
@@ -991,22 +614,22 @@ The analysis functionality is consolidated into a single `modules/analysis.py` f
 
 ### Module Organization
 
-The `analysis.py` module will contain:
+The `analysis_processor.py` module will contain:
 
-- **Data Loaders**: File, API, and dual-source data loading classes
-- **Analyzers**: Core analysis type implementations (messages, media, diff)
+- **Data Loaders**: File and API data loading classes
+- **Analyzers**: Core analysis type implementations (messages, media)
 - **Output Formatters**: JSON formatting and file writing utilities
 - **Orchestrator**: Main coordination logic for the analysis pipeline
 - **Utilities**: Validation, progress tracking, and helper functions
 
 ### Code Structure Within the Module
 
-The `modules/analysis.py` file will be organized into logical sections with clear separation:
+The `modules/analysis_processor.py` file will be organized into logical sections with clear separation:
 
 ```python
 # Configuration and Constants
-# Data Loading Classes (FileDataLoader, ApiDataLoader, DualSourceDataLoader)
-# Analysis Classes (MessageAnalyzer, MediaAnalyzer, DiffAnalyzer)
+# Data Loading Classes (FileDataLoader, ApiDataLoader)
+# Analysis Classes (MessageAnalyzer, MediaAnalyzer)
 # Output Classes (JsonFormatter, FileManager, MetadataGenerator)
 # Orchestration Classes (AnalysisOrchestrator, ProgressTracker, ErrorHandler)
 # Utility Functions (validation, helpers, common operations)
@@ -1023,14 +646,12 @@ The `modules/analysis.py` file will be organized into logical sections with clea
 #### **Development Phases**
 1. **Phase 1**: Data loading and validation (FileDataLoader, ApiDataLoader, validation)
 2. **Phase 2**: Core analysis implementations (MessageAnalyzer, MediaAnalyzer)
-3. **Phase 3**: Diff analysis and output formatting (DiffAnalyzer, JsonFormatter)
+3. **Phase 3**: Output formatting and file management (JsonFormatter, FileManager)
 4. **Phase 4**: Error handling and user feedback (ErrorHandler, ProgressTracker)
 
 #### **Implementation Details for Complex Features**
 
 **Pattern Recognition Implementation**:
-- **Hashtag Analysis**: Use regex pattern `r'#\w+'` to find hashtags, then `value_counts()` for frequency
-- **Mention Analysis**: Use regex pattern `r'@\w+'` to find mentions, then `value_counts()` for frequency
 - **URL Analysis**: Use regex pattern `r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'` to find URLs, extract domains with `urlparse()`
 - **Emoji Analysis**: Use `emoji.emoji_list()` to find emojis, then `value_counts()` for frequency
 
@@ -1062,38 +683,18 @@ The `modules/analysis.py` file will be organized into logical sections with clea
 - Use `page` parameter to fetch next page
 - Continue until `has_more` is false
 
-**Diff Analysis Implementation**:
-- Compare message_id sets between file and API sources using pandas set operations
-- Calculate sync_percentage as: `(common_records / total_unique_records) * 100`
-- Determine sync_status based on sync_percentage thresholds:
-  - synced: sync_percentage == 100
-  - partially_synced: 90 <= sync_percentage < 100
-  - not_synced: sync_percentage < 90
-- Identify missing records using set difference operations:
-  - missing_in_api = file_message_ids - api_message_ids
-  - missing_in_file = api_message_ids - file_message_ids
-
 #### **Testing Strategy**
 - **Unit Tests**: Test each class independently with mock data
 - **Integration Tests**: Test full pipeline with sample files and API responses
 - **Error Tests**: Test error handling with invalid data and network failures
 - **Performance Tests**: Test with large datasets to verify memory management
 
-#### **Code Quality Standards**
-- **Documentation**: Every class and method must have docstrings
-- **Type Hints**: Use Python type hints for all function parameters and returns
-- **Error Handling**: All external operations (file I/O, API calls) must have try/catch blocks
-- **Logging**: Use structured logging with appropriate levels (DEBUG, INFO, WARNING, ERROR)
 
 ## Conclusion
 
 The `analysis` command design provides an advanced intermediate analysis system for analyzing Telegram channel data. By delivering pattern recognition, statistical analysis, language detection, and engagement analysis, it addresses the limitations of the old `report` command while providing comprehensive insights and detailed reporting.
 
-The design emphasizes:
-- **Advanced Intermediate Analysis System**: Comprehensive analytics with pattern recognition, language detection, and statistical metrics
-- **Structured Data Processing**: Field mapping, validation rules, and comprehensive error handling
-- **Detailed Output**: JSON reports with comprehensive analysis results and metadata
-- **Clear Development Guidance**: Phased implementation approach with testing strategy
+The design emphasizes comprehensive analytics with pattern recognition, structured data processing, detailed JSON output, and clear development guidance.
 
-The single-module architecture ensures simplicity and maintainability while providing clear internal organization. The system delivers advanced intermediate analysis capabilities including hashtag analysis, mention tracking, URL analysis, emoji detection, creator analysis, engagement analysis, and comprehensive diff analysis.
+The single-module architecture ensures simplicity and maintainability while providing clear internal organization.
 

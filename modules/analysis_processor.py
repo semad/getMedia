@@ -521,7 +521,9 @@ class FileDataLoader(BaseDataLoader):
         if file_size_mb > 100:  # Large file threshold
             df = self._load_large_file_chunked(file_path)
         else:
-            df = pd.read_json(file_path, lines=False)
+            # Load JSON and process the nested structure
+            raw_df = pd.read_json(file_path, lines=False)
+            df = self._process_chunk(raw_df)
         
         if not self._validate_dataframe(df, self.required_columns):
             raise ValueError("DataFrame validation failed")

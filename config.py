@@ -60,6 +60,7 @@ DEFAULT_API_URL = "http://localhost:80"
 
 # Channel defaults
 DEFAULT_CHANNEL = ("@SherwinVakiliLibrary", "@books_magazine", "@books", "@Free_Books_life")
+DEFAULT_CHANNEL = ("@books_magazine", "@books", "@Free_Books_life")
 # other channels
 DEFAULT_CHANNEL_PRIORITY = 1
 

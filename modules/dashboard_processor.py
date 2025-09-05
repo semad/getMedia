@@ -1117,15 +1117,19 @@ function initializeCharts() {{
     
     chartElements.forEach((element, index) => {{
         const chartType = element.dataset.chartType;
+        console.log('Processing chart element:', chartType, 'element:', element);
         
         if (chartType && chartData[chartType]) {{
             try {{
                 const chartConfig = chartData[chartType];
+                console.log('Chart config for', chartType, ':', chartConfig);
                 new Chart(element, chartConfig);
-                console.log('Chart initialized:', chartType);
+                console.log('Chart initialized successfully:', chartType);
             }} catch (error) {{
                 console.error('Error creating chart for', chartType, ':', error);
             }}
+        }} else {{
+            console.warn('No chart data found for type:', chartType, 'Available types:', Object.keys(chartData));
         }}
     }});
 }}

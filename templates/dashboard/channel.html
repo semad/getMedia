@@ -45,12 +45,6 @@
         </div>
 
         <!-- Charts Section -->
-        {% if channel_data.source_breakdown_chart %}
-        <div class="chart-section">
-            <h2>Data Source Breakdown</h2>
-            <canvas class="chart-container" data-chart-type="source_breakdown_chart"></canvas>
-        </div>
-        {% endif %}
 
         {% if channel_data.filename_analysis %}
         <div class="chart-section">
@@ -90,7 +84,6 @@
         <!-- Chart Data Script -->
         <script type="application/json" id="chart-data">
         {
-            "source_breakdown_chart": {{ channel_data.source_breakdown_chart|tojson|safe if channel_data.source_breakdown_chart else 'null' }},
             "filename_analysis": {{ channel_data.filename_analysis|tojson|safe if channel_data.filename_analysis else 'null' }},
             "filesize_analysis": {{ channel_data.filesize_analysis|tojson|safe if channel_data.filesize_analysis else 'null' }},
             "timeline_chart": {{ channel_data.timeline_chart|tojson|safe if channel_data.timeline_chart else 'null' }},

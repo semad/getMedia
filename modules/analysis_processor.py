@@ -151,6 +151,7 @@ class AnalysisConfig(BaseModel):
     memory_limit: int = DEFAULT_MEMORY_LIMIT
     retry_attempts: int = DEFAULT_RETRY_ATTEMPTS
     retry_delay: float = DEFAULT_RETRY_DELAY
+    enable_language_detection: bool = False  # Default to disabled for performance
     
     def __init__(self, **data):
         super().__init__(**data)
@@ -1021,11 +1022,18 @@ class MessageAnalyzer:
                 language_analysis={}
             )
         
+        # Conditionally run language analysis based on config
+        language_analysis = None
+        if self.config.enable_language_detection:
+            language_analysis = self.language_analyzer.analyze(df, source)
+        else:
+            self.logger.info("⏭️  Skipping language detection (disabled by config)")
+        
         return MessageAnalysisResult(
             content_statistics=self._analyze_content_statistics(df),
             pattern_recognition=self.pattern_analyzer.analyze(df, source),
             creator_analysis=self._analyze_creators(df),
-            language_analysis=self.language_analyzer.analyze(df, source)
+            language_analysis=language_analysis
         )
     
     def _analyze_content_statistics(self, df: pd.DataFrame) -> Dict[str, Any]:

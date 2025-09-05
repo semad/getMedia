@@ -188,6 +188,10 @@ def combine_existing_collections(
     if not raw_dir.exists():
         logger.error(f"❌ Raw directory {raw_dir} does not exist")
         return {"success": False, "error": f"Raw directory {raw_dir} does not exist"}
+    
+    # Ensure output directory exists
+    output_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(f"📁 Output directory: {output_dir}")
 
     # Auto-detect channels if not provided
     if channels is None:

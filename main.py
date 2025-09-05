@@ -276,8 +276,11 @@ def combine_collections(channels, verbose):
 @click.option("--file", 
               is_flag=True, 
               help="Use file source only, no API source")
+@click.option("--language-detection", 
+              is_flag=True, 
+              help="Enable language detection (disabled by default for performance)")
 @click.help_option("-h", "--help")
-def analysis(channels, verbose, api, file):
+def analysis(channels, verbose, api, file, language_detection):
     """Run comprehensive analysis on Telegram channel data.
     
     This command analyzes collected Telegram channel data for filename patterns,
@@ -306,7 +309,8 @@ def analysis(channels, verbose, api, file):
         config_kwargs = {
             "verbose": verbose,
             "enable_file_source": not api,  # Default to file source unless --api is specified
-            "enable_api_source": api
+            "enable_api_source": api,
+            "enable_language_detection": language_detection  # Enable language detection if flag is set
         }
         
         # Add channels if specified

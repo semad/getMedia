@@ -15,6 +15,7 @@ REPORTS_BASE = f"{BASE_DIR}/reports"
 REPORTS_DIR = REPORTS_BASE
 
 COLLECTIONS_DIR = f"{REPORTS_BASE}/collections"
+RAW_COLLECTIONS_DIR = f"{REPORTS_BASE}/raw"
 COMBINED_DIR = f"{REPORTS_BASE}/combined"
 
 # Analysis structure (new nested organization)

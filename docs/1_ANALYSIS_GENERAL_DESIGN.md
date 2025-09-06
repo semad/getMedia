@@ -572,7 +572,6 @@ The analysis system generates reports in the following structure following `conf
 
 #### **Directory Structure Rules**
 - **Single Channel**: `{ANALYSIS_BASE}/{channel_name}/`
-- **Multiple Channels**: `{ANALYSIS_BASE}/combined_X_channels/`
 - **All Channels**: Individual folders for each discovered channel
 - **Channel Name Processing**: Remove '@' prefix from channel names for directory names
 

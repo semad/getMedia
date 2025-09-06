@@ -1113,9 +1113,16 @@ def create_analysis_config(**kwargs) -> AnalysisConfig:
 class JsonOutputManager:
     """Manages JSON output operations using pandas."""
     
-    def __init__(self, config: AnalysisConfig):
+    def __init__(self, config: AnalysisConfig, channel_name: Optional[str] = None):
         self.config = config
-        self.output_dir = Path(config.output_dir)
+        self.channel_name = channel_name
+        # Create channel-specific output directory: {ANALYSIS_BASE}/{channel_name}/
+        if channel_name:
+            # Remove @ prefix from channel name for directory name
+            channel_clean = channel_name.replace('@', '')
+            self.output_dir = Path(config.output_dir) / channel_clean
+        else:
+            self.output_dir = Path(config.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.logger = logging.getLogger(__name__)
     
@@ -1254,7 +1261,7 @@ async def run_advanced_intermediate_analysis(config: AnalysisConfig) -> Dict[str
                 
                 # Generate output files with standardized naming
                 channel_name_clean = source.channel_name.replace('@', '')
-                output_manager = JsonOutputManager(config)
+                output_manager = JsonOutputManager(config, source.channel_name)
                 
                 # Save individual analysis files
                 filename_output = output_manager.save_analysis_results(

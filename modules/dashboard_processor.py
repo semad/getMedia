@@ -106,6 +106,8 @@ class DashboardProcessor:
             },
             'options': {
                 'responsive': True,
+                'maintainAspectRatio': False,
+                'aspectRatio': 1,
                 'plugins': {
                     'title': {
                         'display': True,
@@ -171,6 +173,99 @@ class DashboardProcessor:
             }
         }
     
+    def _transform_file_types_analysis(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Transform file types analysis data for charts."""
+        # Extract file extensions data from nested structure
+        filename_pattern_analysis = data.get('filename_pattern_analysis', {})
+        common_extensions = filename_pattern_analysis.get('common_extensions', [])
+        
+        if not common_extensions:
+            return {
+                'type': 'bar',
+                'data': {
+                    'labels': ['No Data'],
+                    'datasets': [{
+                        'label': 'No File Types Available',
+                        'data': [0],
+                        'backgroundColor': '#6c757d'
+                    }]
+                },
+                'options': {
+                    'responsive': True,
+                    'plugins': {
+                        'title': {
+                            'display': True,
+                            'text': 'File Types - No Data Available'
+                        }
+                    }
+                }
+            }
+        
+        # Get top 10 file types
+        top_extensions = common_extensions[:10]
+        
+        labels = []
+        values = []
+        colors = []
+        
+        # Color map for different file types
+        color_map = {
+            '.pdf': '#dc3545',    # Red for PDFs
+            '.epub': '#007bff',   # Blue for EPUBs
+            '.mp3': '#28a745',    # Green for MP3s
+            '.mp4': '#ffc107',    # Yellow for MP4s
+            '.zip': '#6c757d',    # Gray for ZIPs
+            '.rar': '#6c757d',    # Gray for RARs
+            '.apk': '#17a2b8',    # Cyan for APKs
+            '.png': '#fd7e14',    # Orange for PNGs
+            '.jpg': '#fd7e14',    # Orange for JPGs
+            '.jpeg': '#fd7e14',   # Orange for JPEGs
+        }
+        
+        for ext_data in top_extensions:
+            ext = ext_data.get('ext', '')
+            count = ext_data.get('count', 0)
+            
+            labels.append(ext)
+            values.append(count)
+            colors.append(color_map.get(ext, '#6c757d'))  # Default gray for unknown types
+        
+        return {
+            'type': 'bar',
+            'data': {
+                'labels': labels,
+                'datasets': [{
+                    'label': 'Number of Files',
+                    'data': values,
+                    'backgroundColor': colors,
+                    'borderColor': colors,
+                    'borderWidth': 1
+                }]
+            },
+            'options': {
+                'responsive': True,
+                'plugins': {
+                    'title': {
+                        'display': True,
+                        'text': 'File Types Distribution'
+                    },
+                    'legend': {
+                        'display': False
+                    }
+                },
+                'scales': {
+                    'y': {
+                        'beginAtZero': True
+                    },
+                    'x': {
+                        'ticks': {
+                            'maxRotation': 45
+                        }
+                    }
+                }
+            }
+        }
+
     def _transform_message_analysis(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Transform message analysis data for charts."""
         # Extract pattern recognition data
@@ -459,56 +554,52 @@ class DashboardProcessor:
         """Get timeline data for a specific channel from collection files."""
         try:
             # Find the collection file for this channel
-            collections_dir = Path("reports/collections")
-            collection_files = list(collections_dir.glob(f"*{channel_name}*combined.json"))
+            collections_dir = Path("reports/0_collections")
+            collection_files = list(collections_dir.glob(f"*{channel_name}*.json"))
             
             if not collection_files:
                 self.logger.warning(f"Collection file not found for {channel_name}")
                 return None
             
-            collection_file = collection_files[0]
+            # Process all collection files for this channel
+            all_dates = []
+            for collection_file in collection_files:
+                with open(collection_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                
+                if not data or len(data) == 0:
+                    continue
+                
+                # Extract messages from the collection data
+                messages = data[0].get('messages', [])
+                if not messages:
+                    continue
+                
+                # Process dates
+                for message in messages:
+                    if 'date' in message:
+                        try:
+                            # Parse the date string
+                            date_str = message['date']
+                            if isinstance(date_str, str):
+                                # Handle different date formats
+                                if '+' in date_str:
+                                    date_str = date_str.split('+')[0]  # Remove timezone
+                                date_obj = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+                                all_dates.append(date_obj)
+                        except Exception as e:
+                            self.logger.debug(f"Error parsing date {date_str}: {e}")
+                            continue
             
-            with open(collection_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            
-            if not data or len(data) == 0:
-                return None
-            
-            # Extract messages from the collection data
-            messages = data[0].get('messages', [])
-            if not messages:
-                return None
-            
-            # Process dates and create timeline data
-            from datetime import datetime
-            import pandas as pd
-            
-            # Extract dates and sort them
-            dates = []
-            for message in messages:
-                if 'date' in message:
-                    try:
-                        # Parse the date string
-                        date_str = message['date']
-                        if isinstance(date_str, str):
-                            # Handle different date formats
-                            if '+' in date_str:
-                                date_str = date_str.split('+')[0]  # Remove timezone
-                            date_obj = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
-                            dates.append(date_obj)
-                    except Exception as e:
-                        self.logger.debug(f"Error parsing date {date_str}: {e}")
-                        continue
-            
-            if not dates:
+            if not all_dates:
                 return None
             
             # Sort dates
-            dates.sort()
+            all_dates.sort()
             
             # Create timeline data (daily aggregation)
             timeline_data = {}
-            for date in dates:
+            for date in all_dates:
                 date_key = date.strftime('%Y-%m-%d')
                 timeline_data[date_key] = timeline_data.get(date_key, 0) + 1
             
@@ -520,26 +611,57 @@ class DashboardProcessor:
             return None
 
     def _get_monthly_histogram_for_channel(self, channel_name: str) -> Optional[Dict[str, Any]]:
-        """Get monthly histogram data for a specific channel from diff_messages source."""
+        """Get monthly histogram data for a specific channel from collection files."""
         try:
-            # Use diff_messages as the primary source for monthly data
-            message_analysis_file = Path(self.input_dir) / "diff_messages" / channel_name / "message_analysis.json"
+            # Find the collection file for this channel
+            collections_dir = Path("reports/0_collections")
+            collection_files = list(collections_dir.glob(f"*{channel_name}*.json"))
             
-            if not message_analysis_file.exists():
-                self.logger.warning(f"Message analysis file not found for {channel_name}")
+            if not collection_files:
+                self.logger.warning(f"Collection file not found for {channel_name}")
                 return None
             
-            with open(message_analysis_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+            # Process all collection files for this channel
+            all_dates = []
+            for collection_file in collection_files:
+                with open(collection_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                
+                if not data or len(data) == 0:
+                    continue
+                
+                # Extract messages from the collection data
+                messages = data[0].get('messages', [])
+                if not messages:
+                    continue
+                
+                # Process dates
+                for message in messages:
+                    if 'date' in message:
+                        try:
+                            # Parse the date string
+                            date_str = message['date']
+                            if isinstance(date_str, str):
+                                # Handle different date formats
+                                if '+' in date_str:
+                                    date_str = date_str.split('+')[0]  # Remove timezone
+                                date_obj = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+                                all_dates.append(date_obj)
+                        except Exception as e:
+                            self.logger.debug(f"Error parsing date {date_str}: {e}")
+                            continue
             
-            if not data or len(data) == 0:
+            if not all_dates:
                 return None
             
-            # The data is a list, get the first item
-            message_data = data[0] if isinstance(data, list) else data
+            # Create monthly data
+            monthly_data = {}
+            for date in all_dates:
+                month_key = date.strftime('%Y-%m')
+                monthly_data[month_key] = monthly_data.get(month_key, 0) + 1
             
             # Transform the monthly data
-            return self._transform_monthly_histogram(message_data)
+            return self._transform_monthly_histogram({'monthly': monthly_data})
             
         except Exception as e:
             self.logger.error(f"Error getting monthly histogram for {channel_name}: {e}")
@@ -602,9 +724,27 @@ class DashboardProcessor:
                 files[source_type] = list(source_path.rglob("*.json"))
                 self.logger.debug(f"Found {len(files[source_type])} files in {source_type}")
         
-        # If no files found in subdirectories, look directly in input directory
+        # If no files found in subdirectories, look for channel-specific directories
         if not any(files.values()):
-            self.logger.info("No files found in subdirectories, looking directly in input directory")
+            self.logger.info("No files found in subdirectories, looking for channel-specific directories")
+            # Look for channel directories (e.g., books/, books_magazine/, etc.)
+            channel_dirs = [d for d in input_path.iterdir() if d.is_dir() and not d.name.startswith('.')]
+            
+            if channel_dirs:
+                # Collect all JSON files from channel directories
+                all_channel_files = []
+                for channel_dir in channel_dirs:
+                    channel_files = list(channel_dir.glob("*.json"))
+                    all_channel_files.extend(channel_files)
+                    self.logger.debug(f"Found {len(channel_files)} files in channel directory: {channel_dir.name}")
+                
+                if all_channel_files:
+                    files["file_messages"] = all_channel_files
+                    self.logger.debug(f"Found {len(all_channel_files)} files in channel directories")
+        
+        # If still no files found, look directly in input directory
+        if not any(files.values()):
+            self.logger.info("No files found in channel directories, looking directly in input directory")
             direct_files = list(input_path.glob("*.json"))
             if direct_files:
                 files["file_messages"] = direct_files
@@ -631,10 +771,23 @@ class DashboardProcessor:
             if 'channel_name' in data and 'analysis_type' in data:
                 return data
             
+            # Check for comprehensive analysis format (array with single object)
+            if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict):
+                analysis_obj = data[0]
+                if 'channel_name' in analysis_obj and 'analysis_type' in analysis_obj:
+                    return analysis_obj
+            
             # Check for old format
             if not all(key in data for key in ['report_type', 'generated_at']):
-                self.logger.warning(f"Missing required fields in {file_path}")
-                return None
+                # Check if this is a raw analysis data file (individual analysis files)
+                if any(field in data for field in ['duplicate_filename_detection', 'filesize_distribution_analysis', 'content_statistics']):
+                    # This is a raw analysis data file, add minimal metadata
+                    data['analysis_type'] = self._infer_analysis_type_from_data(data)
+                    data['channel_name'] = self._extract_channel_name_from_path(file_path)
+                    return data
+                else:
+                    self.logger.warning(f"Missing required fields in {file_path}")
+                    return None
             
             return data
             
@@ -644,6 +797,33 @@ class DashboardProcessor:
         except Exception as e:
             self.logger.error(f"Error loading {file_path}: {e}")
             return None
+
+    def _infer_analysis_type_from_data(self, data: Dict[str, Any]) -> str:
+        """Infer analysis type from data structure."""
+        if 'duplicate_filename_detection' in data or 'common_extensions' in data:
+            return 'filename_analysis'
+        elif 'filesize_distribution_analysis' in data or 'size_frequency_distribution' in data:
+            return 'filesize_analysis'
+        elif 'content_statistics' in data or 'pattern_recognition' in data:
+            return 'message_analysis'
+        else:
+            return 'unknown'
+    
+    def _extract_channel_name_from_path(self, file_path: Path) -> str:
+        """Extract channel name from file path."""
+        # For channel-specific directories, extract from parent directory name
+        if file_path.parent.name != self.input_dir.split('/')[-1]:  # Not in root analysis directory
+            return file_path.parent.name
+        
+        # For files in root directory, extract from filename
+        filename = file_path.stem
+        # Remove common suffixes to get the base channel name
+        suffixes_to_remove = ['_analysis', '_filename_analysis', '_filesize_analysis', '_message_analysis']
+        for suffix in suffixes_to_remove:
+            if filename.endswith(suffix):
+                filename = filename[:-len(suffix)]
+                break
+        return filename
 
     def _extract_channel_name(self, file_path: Path) -> Optional[str]:
         """Extract channel name from file path."""
@@ -706,13 +886,17 @@ class DashboardProcessor:
                     self.logger.warning(f"Missing required fields in {report_type}")
                     return False
             elif report_type == 'filename_analysis':
-                # Validate filename analysis has basic fields
-                if not any(field in data for field in ['total_files', 'unique_filenames', 'duplicate_filenames']):
+                # Validate filename analysis has basic fields (check nested structure)
+                has_nested_fields = any(field in data for field in ['duplicate_filename_detection', 'common_extensions'])
+                has_top_level_fields = any(field in data for field in ['total_files', 'unique_filenames', 'duplicate_filenames'])
+                if not (has_nested_fields or has_top_level_fields):
                     self.logger.warning(f"Missing required fields in {report_type}")
                     return False
             elif report_type == 'filesize_analysis':
-                # Validate filesize analysis has basic fields
-                if not any(field in data for field in ['total_size_bytes', 'total_size_mb', 'avg_file_size_mb']):
+                # Validate filesize analysis has basic fields (check nested structure)
+                has_nested_fields = any(field in data for field in ['filesize_distribution_analysis', 'size_frequency_distribution'])
+                has_top_level_fields = any(field in data for field in ['total_size_bytes', 'total_size_mb', 'avg_file_size_mb'])
+                if not (has_nested_fields or has_top_level_fields):
                     self.logger.warning(f"Missing required fields in {report_type}")
                     return False
             
@@ -742,7 +926,12 @@ class DashboardProcessor:
         
         for source_type, file_list in files.items():
             for file_path in file_list:
-                channel_name = self._extract_channel_name(file_path)
+                # For individual analysis files, extract the base channel name
+                if source_type == 'file_messages' and any(suffix in file_path.name for suffix in ['_filename_analysis', '_filesize_analysis', '_message_analysis']):
+                    channel_name = self._extract_channel_name_from_path(file_path)
+                else:
+                    channel_name = self._extract_channel_name(file_path)
+                
                 if not channel_name:
                     continue
                 
@@ -778,26 +967,55 @@ class DashboardProcessor:
                         
                         # Process filename analysis
                         if 'filename_analysis' in analysis_results:
-                            channel_data[channel_name]['filename_analysis'] = self._transform_filename_analysis(analysis_results['filename_analysis'])
+                            filename_data = analysis_results['filename_analysis']
+                            channel_data[channel_name]['filename_analysis'] = self._transform_filename_analysis(filename_data)
+                            # Also process file types from filename analysis
+                            channel_data[channel_name]['file_types_analysis'] = self._transform_file_types_analysis(filename_data)
+                            # Add detailed filename metrics
+                            channel_data[channel_name]['filename_metrics'] = self._extract_filename_metrics(filename_data)
                         
                         # Process filesize analysis
                         if 'filesize_analysis' in analysis_results:
-                            channel_data[channel_name]['filesize_analysis'] = self._transform_filesize_analysis(analysis_results['filesize_analysis'])
+                            filesize_data = analysis_results['filesize_analysis']
+                            channel_data[channel_name]['filesize_analysis'] = self._transform_filesize_analysis(filesize_data)
+                            # Add detailed filesize metrics
+                            channel_data[channel_name]['filesize_metrics'] = self._extract_filesize_metrics(filesize_data)
                         
                         # Process message analysis
                         if 'message_analysis' in analysis_results:
-                            channel_data[channel_name]['message_analysis'] = self._transform_message_analysis(analysis_results['message_analysis'])
+                            message_data = analysis_results['message_analysis']
+                            channel_data[channel_name]['message_analysis'] = self._transform_message_analysis(message_data)
+                            # Add detailed message metrics
+                            channel_data[channel_name]['message_metrics'] = self._extract_message_metrics(message_data)
+                            # Add additional message charts
+                            channel_data[channel_name]['mentions_analysis'] = self._transform_mentions_analysis(message_data)
+                            channel_data[channel_name]['urls_analysis'] = self._transform_urls_analysis(message_data)
+                            channel_data[channel_name]['language_analysis'] = self._transform_language_analysis(message_data)
+                            # Add creator analysis
+                            channel_data[channel_name]['creator_analysis'] = self._transform_creator_analysis(message_data)
+                            channel_data[channel_name]['creator_metrics'] = self._extract_creator_metrics(message_data)
                         
-                        # Update summary data
+                        # Update summary data only if we have actual records
                         data_summary = data.get('data_summary', {})
-                        channel_data[channel_name]['messages'] = data_summary.get('total_records', 0)
-                        channel_data[channel_name]['files'] = data_summary.get('total_records', 0)  # Assuming files = messages for now
+                        total_records = data_summary.get('total_records', 0)
+                        self.logger.debug(f"Processing comprehensive analysis for {channel_name}: {total_records} records")
+                        if total_records > 0:
+                            channel_data[channel_name]['messages'] = total_records
+                            
+                            # Get actual file count from filename analysis
+                            analysis_results = data.get('analysis_results', {})
+                            filename_analysis = analysis_results.get('filename_analysis', {})
+                            duplicate_detection = filename_analysis.get('duplicate_filename_detection', {})
+                            total_files = duplicate_detection.get('total_files', 0)
+                            channel_data[channel_name]['files'] = total_files
                         
                     else:
                         # Handle individual analysis files (filename, filesize, message)
                         analysis_type = data.get('analysis_type', '')
                         if analysis_type == 'filename_analysis':
                             channel_data[channel_name]['filename_analysis'] = self._transform_filename_analysis(data)
+                            # Also process file types from filename analysis
+                            channel_data[channel_name]['file_types_analysis'] = self._transform_file_types_analysis(data)
                         elif analysis_type == 'filesize_analysis':
                             channel_data[channel_name]['filesize_analysis'] = self._transform_filesize_analysis(data)
                         elif analysis_type == 'message_analysis':
@@ -1061,10 +1279,17 @@ body {
 }
 
 .chart-container {
-    height: 300px;
+    height: 300px !important;
     width: 100%;
     max-width: 600px;
     margin: 0 auto;
+    display: block;
+}
+
+/* Force Chart.js to respect container height */
+.chart-container canvas {
+    height: 300px !important;
+    width: 100% !important;
 }
 
 @media (max-width: 768px) {
@@ -1221,3 +1446,242 @@ function handleChartInteraction(chartType, action, channelName) {{
         except Exception as e:
             self.logger.error(f"Error generating HTML pages: {e}")
             raise
+    
+    def _extract_filename_metrics(self, filename_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract detailed filename metrics for display."""
+        duplicate_detection = filename_data.get('duplicate_filename_detection', {})
+        pattern_analysis = filename_data.get('filename_pattern_analysis', {})
+        
+        return {
+            'duplicate_ratio': duplicate_detection.get('duplicate_ratio', 0),
+            'files_with_duplicate_names': duplicate_detection.get('files_with_duplicate_names', 0),
+            'total_unique_filenames': duplicate_detection.get('total_unique_filenames', 0),
+            'total_files': duplicate_detection.get('total_files', 0),
+            'most_common_filenames': duplicate_detection.get('most_common_filenames', [])[:10],  # Top 10
+            'files_with_special_chars': pattern_analysis.get('files_with_special_chars', 0),
+            'files_with_spaces': pattern_analysis.get('files_with_spaces', 0),
+            'filename_length_stats': pattern_analysis.get('filename_length', {})
+        }
+    
+    def _extract_filesize_metrics(self, filesize_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract detailed filesize metrics for display."""
+        duplicate_detection = filesize_data.get('duplicate_filesize_detection', {})
+        distribution_analysis = filesize_data.get('filesize_distribution_analysis', {})
+        
+        return {
+            'duplicate_ratio': duplicate_detection.get('duplicate_ratio', 0),
+            'files_with_duplicate_sizes': duplicate_detection.get('files_with_duplicate_sizes', 0),
+            'total_unique_filesizes': duplicate_detection.get('total_unique_filesizes', 0),
+            'total_files': duplicate_detection.get('total_files', 0),
+            'most_common_filesizes': duplicate_detection.get('most_common_filesizes', [])[:10],  # Top 10
+            'size_frequency_distribution': distribution_analysis.get('size_frequency_distribution', {}),
+            'potential_duplicates_by_size': distribution_analysis.get('potential_duplicates_by_size', [])[:10]
+        }
+    
+    def _extract_message_metrics(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract detailed message metrics for display."""
+        content_stats = message_data.get('content_statistics', {})
+        pattern_recognition = message_data.get('pattern_recognition', {})
+        language_detection = message_data.get('language_detection', {})
+        
+        return {
+            'total_messages': content_stats.get('total_messages', 0),
+            'messages_with_text': content_stats.get('messages_with_text', 0),
+            'media_messages': content_stats.get('media_messages', 0),
+            'forwarded_messages': content_stats.get('forwarded_messages', 0),
+            'text_length_stats': content_stats.get('text_length_stats', {}),
+            'hashtags_count': pattern_recognition.get('hashtags', {}).get('total_unique_hashtags', 0),
+            'mentions_count': pattern_recognition.get('mentions', {}).get('total_unique_mentions', 0),
+            'urls_count': pattern_recognition.get('urls', {}).get('total_unique_urls', 0),
+            'emojis_count': pattern_recognition.get('emojis', {}).get('total_unique_emojis', 0),
+            'detected_languages': language_detection.get('detected_languages', []),
+            'primary_language': language_detection.get('primary_language', 'Unknown'),
+            'language_confidence': language_detection.get('confidence', 0)
+        }
+    
+    def _transform_mentions_analysis(self, message_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Transform mentions analysis data for charts."""
+        mentions_data = message_data.get('pattern_recognition', {}).get('mentions', {})
+        top_mentions = mentions_data.get('top_mentions', [])[:15]  # Top 15
+        
+        if not top_mentions:
+            return None
+        
+        return {
+            'type': 'bar',
+            'data': {
+                'labels': [mention['username'] for mention in top_mentions],
+                'datasets': [{
+                    'label': 'Mention Count',
+                    'data': [mention['count'] for mention in top_mentions],
+                    'backgroundColor': '#17a2b8',
+                    'borderColor': '#138496',
+                    'borderWidth': 1
+                }]
+            },
+            'options': {
+                'responsive': True,
+                'plugins': {
+                    'title': {
+                        'display': True,
+                        'text': 'Top Mentions'
+                    },
+                    'legend': {
+                        'display': False
+                    }
+                },
+                'scales': {
+                    'y': {
+                        'beginAtZero': True
+                    },
+                    'x': {
+                        'ticks': {
+                            'maxRotation': 45
+                        }
+                    }
+                }
+            }
+        }
+    
+    def _transform_urls_analysis(self, message_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Transform URLs analysis data for charts."""
+        urls_data = message_data.get('pattern_recognition', {}).get('urls', {})
+        top_urls = urls_data.get('top_urls', [])[:15]  # Top 15
+        
+        if not top_urls:
+            return None
+        
+        return {
+            'type': 'bar',
+            'data': {
+                'labels': [url['url'] for url in top_urls],
+                'datasets': [{
+                    'label': 'URL Count',
+                    'data': [url['count'] for url in top_urls],
+                    'backgroundColor': '#28a745',
+                    'borderColor': '#1e7e34',
+                    'borderWidth': 1
+                }]
+            },
+            'options': {
+                'responsive': True,
+                'plugins': {
+                    'title': {
+                        'display': True,
+                        'text': 'Top URLs'
+                    },
+                    'legend': {
+                        'display': False
+                    }
+                },
+                'scales': {
+                    'y': {
+                        'beginAtZero': True
+                    },
+                    'x': {
+                        'ticks': {
+                            'maxRotation': 45
+                        }
+                    }
+                }
+            }
+        }
+    
+    def _transform_language_analysis(self, message_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Transform language detection data for charts."""
+        language_data = message_data.get('language_detection', {})
+        detected_languages = language_data.get('detected_languages', [])
+        
+        if not detected_languages:
+            return None
+        
+        # Take top 10 languages
+        top_languages = detected_languages[:10]
+        
+        return {
+            'type': 'doughnut',
+            'data': {
+                'labels': [lang['language'] for lang in top_languages],
+                'datasets': [{
+                    'label': 'Message Count',
+                    'data': [lang['count'] for lang in top_languages],
+                    'backgroundColor': [
+                        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                        '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#FF6384'
+                    ],
+                    'borderWidth': 2
+                }]
+            },
+            'options': {
+                'responsive': True,
+                'maintainAspectRatio': False,
+                'aspectRatio': 1,
+                'plugins': {
+                    'title': {
+                        'display': True,
+                        'text': 'Language Distribution'
+                    },
+                    'legend': {
+                        'position': 'bottom'
+                    }
+                }
+            }
+        }
+    def _extract_creator_metrics(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract detailed creator metrics for display."""
+        creator_data = message_data.get('creator_analysis', {})
+        
+        return {
+            'total_creators': creator_data.get('total_creators', 0),
+            'most_active_creators': creator_data.get('most_active_creators', [])[:10],  # Top 10
+            'creator_message_stats': creator_data.get('creator_message_stats', {}),
+            'total_messages': creator_data.get('creator_message_stats', {}).get('total_messages', 0),
+            'avg_messages_per_creator': creator_data.get('creator_message_stats', {}).get('avg_messages_per_creator', 0)
+        }
+    
+    def _transform_creator_analysis(self, message_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Transform creator analysis data for charts."""
+        creator_data = message_data.get('creator_analysis', {})
+        most_active_creators = creator_data.get('most_active_creators', [])
+        
+        if not most_active_creators:
+            return None
+        
+        # Take top 15 creators
+        top_creators = most_active_creators[:15]
+        
+        return {
+            'type': 'bar',
+            'data': {
+                'labels': [creator['username'] for creator in top_creators],
+                'datasets': [{
+                    'label': 'Message Count',
+                    'data': [creator['message_count'] for creator in top_creators],
+                    'backgroundColor': '#6f42c1',
+                    'borderColor': '#5a32a3',
+                    'borderWidth': 1
+                }]
+            },
+            'options': {
+                'responsive': True,
+                'plugins': {
+                    'title': {
+                        'display': True,
+                        'text': 'Top Contributors by Message Count'
+                    },
+                    'legend': {
+                        'display': False
+                    }
+                },
+                'scales': {
+                    'y': {
+                        'beginAtZero': True
+                    },
+                    'x': {
+                        'ticks': {
+                            'maxRotation': 45
+                        }
+                    }
+                }
+            }
+        }

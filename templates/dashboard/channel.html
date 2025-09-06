@@ -42,6 +42,16 @@
                 <div class="metric-value">{{ "{:,}".format(channel_data.files) }}</div>
                 <div class="metric-label">Total Files</div>
             </div>
+            {% if channel_data.message_metrics %}
+            <div class="metric-card">
+                <div class="metric-value">{{ "{:,}".format(channel_data.message_metrics.forwarded_messages) }}</div>
+                <div class="metric-label">Forwarded Messages</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">{{ "{:.1f}%".format((channel_data.message_metrics.media_messages / channel_data.message_metrics.total_messages * 100) if channel_data.message_metrics.total_messages > 0 else 0) }}</div>
+                <div class="metric-label">Media Messages</div>
+            </div>
+            {% endif %}
         </div>
 
         <!-- Charts Section -->
@@ -57,6 +67,13 @@
         <div class="chart-section">
             <h2>File Size Distribution</h2>
             <canvas class="chart-container" data-chart-type="filesize_analysis"></canvas>
+        </div>
+        {% endif %}
+
+        {% if channel_data.file_types_analysis %}
+        <div class="chart-section">
+            <h2>File Types Distribution</h2>
+            <canvas class="chart-container" data-chart-type="file_types_analysis"></canvas>
         </div>
         {% endif %}
 
@@ -81,14 +98,202 @@
         </div>
         {% endif %}
 
+        {% if channel_data.mentions_analysis %}
+        <div class="chart-section">
+            <h2>Top Mentions</h2>
+            <canvas class="chart-container" data-chart-type="mentions_analysis"></canvas>
+        </div>
+        {% endif %}
+
+        {% if channel_data.urls_analysis %}
+        <div class="chart-section">
+            <h2>Top URLs</h2>
+            <canvas class="chart-container" data-chart-type="urls_analysis"></canvas>
+        </div>
+        {% endif %}
+
+        {% if channel_data.language_analysis %}
+        <div class="chart-section">
+            <h2>Language Distribution</h2>
+            <canvas class="chart-container" data-chart-type="language_analysis"></canvas>
+        </div>
+        {% endif %}
+
+        {% if channel_data.creator_analysis %}
+        <div class="chart-section">
+            <h2>Top Contributors</h2>
+            <canvas class="chart-container" data-chart-type="creator_analysis"></canvas>
+        </div>
+        {% endif %}
+
+        <!-- Detailed Metrics Sections -->
+        {% if channel_data.filename_metrics %}
+        <div class="metrics-section">
+            <h2>File Analysis Details</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value">{{ "{:.1f}%".format(channel_data.filename_metrics.duplicate_ratio * 100) }}</div>
+                    <div class="metric-label">Duplicate Ratio</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">{{ "{:,}".format(channel_data.filename_metrics.files_with_special_chars) }}</div>
+                    <div class="metric-label">Files with Special Chars</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">{{ "{:,}".format(channel_data.filename_metrics.files_with_spaces) }}</div>
+                    <div class="metric-label">Files with Spaces</div>
+                </div>
+            </div>
+            
+            {% if channel_data.filename_metrics.most_common_filenames %}
+            <div class="details-section">
+                <h3>Most Common Filenames</h3>
+                <div class="details-list">
+                    {% for filename in channel_data.filename_metrics.most_common_filenames %}
+                    <div class="detail-item">
+                        <span class="detail-label">{{ filename.filename }}</span>
+                        <span class="detail-value">{{ filename.count }} times</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if channel_data.filesize_metrics %}
+        <div class="metrics-section">
+            <h2>File Size Analysis Details</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value">{{ "{:.1f}%".format(channel_data.filesize_metrics.duplicate_ratio * 100) }}</div>
+                    <div class="metric-label">Size Duplicate Ratio</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">{{ "{:,}".format(channel_data.filesize_metrics.files_with_duplicate_sizes) }}</div>
+                    <div class="metric-label">Files with Duplicate Sizes</div>
+                </div>
+            </div>
+            
+            {% if channel_data.filesize_metrics.most_common_filesizes %}
+            <div class="details-section">
+                <h3>Most Common File Sizes</h3>
+                <div class="details-list">
+                    {% for size in channel_data.filesize_metrics.most_common_filesizes %}
+                    <div class="detail-item">
+                        <span class="detail-label">{{ "{:.1f} MB".format(size.size_mb) }}</span>
+                        <span class="detail-value">{{ size.count }} files</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if channel_data.message_metrics %}
+        <div class="metrics-section">
+            <h2>Message Analysis Details</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value">{{ "{:,}".format(channel_data.message_metrics.hashtags_count) }}</div>
+                    <div class="metric-label">Unique Hashtags</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">{{ "{:,}".format(channel_data.message_metrics.mentions_count) }}</div>
+                    <div class="metric-label">Unique Mentions</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">{{ "{:,}".format(channel_data.message_metrics.urls_count) }}</div>
+                    <div class="metric-label">Unique URLs</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">{{ "{:,}".format(channel_data.message_metrics.emojis_count) }}</div>
+                    <div class="metric-label">Unique Emojis</div>
+                </div>
+            </div>
+            
+            {% if channel_data.message_metrics.text_length_stats %}
+            <div class="details-section">
+                <h3>Text Length Statistics</h3>
+                <div class="details-list">
+                    <div class="detail-item">
+                        <span class="detail-label">Average Length</span>
+                        <span class="detail-value">{{ "{:.1f} characters".format(channel_data.message_metrics.text_length_stats.mean) }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Median Length</span>
+                        <span class="detail-value">{{ "{:.0f} characters".format(channel_data.message_metrics.text_length_stats.median) }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Shortest Message</span>
+                        <span class="detail-value">{{ "{:,} characters".format(channel_data.message_metrics.text_length_stats.min) }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Longest Message</span>
+                        <span class="detail-value">{{ "{:,} characters".format(channel_data.message_metrics.text_length_stats.max) }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if channel_data.message_metrics.primary_language != 'Unknown' %}
+            <div class="details-section">
+                <h3>Language Detection</h3>
+                <div class="details-list">
+                    <div class="detail-item">
+                        <span class="detail-label">Primary Language</span>
+                        <span class="detail-value">{{ channel_data.message_metrics.primary_language }} ({{ "{:.1f}%".format(channel_data.message_metrics.language_confidence * 100) }} confidence)</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if channel_data.creator_metrics %}
+        <div class="metrics-section">
+            <h2>Contributor Analysis Details</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value">{{ "{:,}".format(channel_data.creator_metrics.total_creators) }}</div>
+                    <div class="metric-label">Total Contributors</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">{{ "{:.1f}".format(channel_data.creator_metrics.avg_messages_per_creator) }}</div>
+                    <div class="metric-label">Avg Messages per Contributor</div>
+                </div>
+            </div>
+            
+            {% if channel_data.creator_metrics.most_active_creators %}
+            <div class="details-section">
+                <h3>Top Contributors</h3>
+                <div class="details-list">
+                    {% for creator in channel_data.creator_metrics.most_active_creators %}
+                    <div class="detail-item">
+                        <span class="detail-label">{{ creator.username }}</span>
+                        <span class="detail-value">{{ "{:,} messages ({}%)".format(creator.message_count, creator.percentage) }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
         <!-- Chart Data Script -->
         <script type="application/json" id="chart-data">
         {
             "filename_analysis": {{ channel_data.filename_analysis|tojson|safe if channel_data.filename_analysis else 'null' }},
             "filesize_analysis": {{ channel_data.filesize_analysis|tojson|safe if channel_data.filesize_analysis else 'null' }},
+            "file_types_analysis": {{ channel_data.file_types_analysis|tojson|safe if channel_data.file_types_analysis else 'null' }},
             "timeline_chart": {{ channel_data.timeline_chart|tojson|safe if channel_data.timeline_chart else 'null' }},
             "monthly_histogram": {{ channel_data.monthly_histogram|tojson|safe if channel_data.monthly_histogram else 'null' }},
-            "message_analysis": {{ channel_data.message_analysis|tojson|safe if channel_data.message_analysis else 'null' }}
+            "message_analysis": {{ channel_data.message_analysis|tojson|safe if channel_data.message_analysis else 'null' }},
+            "mentions_analysis": {{ channel_data.mentions_analysis|tojson|safe if channel_data.mentions_analysis else 'null' }},
+            "urls_analysis": {{ channel_data.urls_analysis|tojson|safe if channel_data.urls_analysis else 'null' }},
+            "language_analysis": {{ channel_data.language_analysis|tojson|safe if channel_data.language_analysis else 'null' }},
+            "creator_analysis": {{ channel_data.creator_analysis|tojson|safe if channel_data.creator_analysis else 'null' }}
         }
         </script>
     </main>

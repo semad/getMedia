@@ -80,6 +80,13 @@
             </div>
             {% endif %}
 
+            {% if channel_data.filename_language_analysis %}
+            <div class="chart-section">
+                <h3>File Language Distribution</h3>
+                <canvas class="chart-container" data-chart-type="filename_language_analysis"></canvas>
+            </div>
+            {% endif %}
+
             <!-- File Analysis Details -->
             {% if channel_data.filename_metrics %}
             <div class="metrics-section">
@@ -112,6 +119,55 @@
                     </div>
                 </div>
                 {% endif %}
+            </div>
+            {% endif %}
+
+            {% if channel_data.filename_language_metrics %}
+            <div class="metrics-section">
+                <h3>File Language Analysis Details</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">{{ "{:,}".format(channel_data.filename_language_metrics.total_languages_detected) if channel_data.filename_language_metrics and channel_data.filename_language_metrics.total_languages_detected is defined else 0 }}</div>
+                        <div class="metric-label">Languages Detected</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">{{ channel_data.filename_language_metrics.primary_language if channel_data.filename_language_metrics and channel_data.filename_language_metrics.primary_language is defined else "Unknown" }}</div>
+                        <div class="metric-label">Primary Language</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">{{ "{:.1f}%".format(channel_data.filename_language_metrics.language_confidence * 100) if channel_data.filename_language_metrics and channel_data.filename_language_metrics.language_confidence is defined else 0 }}</div>
+                        <div class="metric-label">Language Confidence</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">{{ "{:.1f}%".format(channel_data.filename_language_metrics.language_coverage) if channel_data.filename_language_metrics and channel_data.filename_language_metrics.language_coverage is defined else 0 }}</div>
+                        <div class="metric-label">Language Coverage</div>
+                    </div>
+                </div>
+                
+                {% if channel_data.filename_language_metrics.language_confidence_stats %}
+                <div class="details-section">
+                    <h4>Language Detection Statistics</h4>
+                    <div class="details-list">
+                        <div class="detail-item">
+                            <span class="detail-label">Average Confidence</span>
+                            <span class="detail-value">{{ "{:.1f}%".format(channel_data.filename_language_metrics.language_confidence_stats.average_confidence * 100) if channel_data.filename_language_metrics.language_confidence_stats.average_confidence is defined else "N/A" }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Min Confidence</span>
+                            <span class="detail-value">{{ "{:.1f}%".format(channel_data.filename_language_metrics.language_confidence_stats.min_confidence * 100) if channel_data.filename_language_metrics.language_confidence_stats.min_confidence is defined else "N/A" }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Max Confidence</span>
+                            <span class="detail-value">{{ "{:.1f}%".format(channel_data.filename_language_metrics.language_confidence_stats.max_confidence * 100) if channel_data.filename_language_metrics.language_confidence_stats.max_confidence is defined else "N/A" }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Low Confidence Files</span>
+                            <span class="detail-value">{{ "{:,}".format(channel_data.filename_language_metrics.language_confidence_stats.low_confidence_files) if channel_data.filename_language_metrics.language_confidence_stats.low_confidence_files is defined else 0 }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
             </div>
             {% endif %}
 
@@ -237,6 +293,13 @@
             </div>
             {% endif %}
 
+            {% if channel_data.emoji_analysis %}
+            <div class="chart-section">
+                <h3>Top Emojis</h3>
+                <canvas class="chart-container" data-chart-type="emoji_analysis"></canvas>
+            </div>
+            {% endif %}
+
             {% if channel_data.mentions_analysis %}
             <div class="chart-section">
                 <h3>Top Mentions</h3>
@@ -307,6 +370,7 @@
         <script type="application/json" id="chart-data">
         {
             "filename_analysis": {{ channel_data.filename_analysis|tojson|safe if channel_data.filename_analysis else 'null' }},
+            "filename_language_analysis": {{ channel_data.filename_language_analysis|tojson|safe if channel_data.filename_language_analysis else 'null' }},
             "filesize_analysis": {{ channel_data.filesize_analysis|tojson|safe if channel_data.filesize_analysis else 'null' }},
             "file_types_analysis": {{ channel_data.file_types_analysis|tojson|safe if channel_data.file_types_analysis else 'null' }},
             "timeline_chart": {{ channel_data.timeline_chart|tojson|safe if channel_data.timeline_chart else 'null' }},
@@ -315,6 +379,7 @@
             "mentions_analysis": {{ channel_data.mentions_analysis|tojson|safe if channel_data.mentions_analysis else 'null' }},
             "urls_analysis": {{ channel_data.urls_analysis|tojson|safe if channel_data.urls_analysis else 'null' }},
             "language_analysis": {{ channel_data.language_analysis|tojson|safe if channel_data.language_analysis else 'null' }},
+            "emoji_analysis": {{ channel_data.emoji_analysis|tojson|safe if channel_data.emoji_analysis else 'null' }},
             "creator_analysis": {{ channel_data.creator_analysis|tojson|safe if channel_data.creator_analysis else 'null' }}
         }
         </script>

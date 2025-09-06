@@ -75,6 +75,133 @@ All analysis functionality is consolidated into `modules/analysis_processor.py` 
 
 ## Analysis Requirements
 
+### Dashboard Data Requirements
+
+Based on the generated HTML dashboard pages, the following data elements are required for each channel:
+
+#### REQ-006: Channel Summary Metrics
+**Required Data:**
+- `total_messages`: Total number of messages in the channel
+- `total_files`: Total number of files shared in the channel  
+- `total_data_size_bytes`: Total size of all files in bytes
+- `total_data_size_formatted`: Human-readable size format (e.g., "89.3 GB")
+- `forwarded_messages`: Number of forwarded messages
+
+**Data Sources:**
+- Message count from collection files
+- File count and size aggregation from `file_size` fields
+- Forwarded message detection from `is_forwarded` field
+
+#### REQ-007: File Analysis Section
+
+**File Uniqueness Chart (Pie Chart):**
+- `unique_files`: Count of files with unique names
+- `duplicate_files`: Count of files with duplicate names
+- `duplicate_ratio`: Percentage of duplicate files
+
+**File Size Distribution Chart (Bar Chart):**
+- Size bins: `["0-1MB", "1-10MB", "10-100MB", "100MB-1GB", "1GB+"]`
+- File counts for each size bin
+- Background colors for visual distinction
+
+**File Types Distribution Chart (Bar Chart):**
+- File extensions: `["pdf", "epub", "zip", "mp4", "tar", "rar", "png", ...]`
+- File counts per extension
+- Top 10 most common extensions
+
+**File Analysis Details Metrics:**
+- `duplicate_ratio`: Percentage of duplicate files
+- `files_with_special_chars`: Count of files with special characters in names
+- `files_with_spaces`: Count of files with spaces in names
+
+**File Size Analysis Details:**
+- `size_duplicate_ratio`: Percentage of files with duplicate sizes
+- `files_with_duplicate_sizes`: Count of files sharing the same size
+
+**File Language Detection:**
+- `detected_languages`: List of detected languages in file names and content
+- `primary_language`: Most common language detected
+- `language_confidence`: Confidence score for language detection
+- `language_distribution`: Count of files per detected language
+
+#### REQ-008: Message Activity Section
+
+**Message Activity Timeline Chart (Line Chart):**
+- Daily message counts over time
+- Date labels in "YYYY-MM-DD" format
+- Message count data points for each day
+- Line styling with fill and tension
+
+**Monthly Message Distribution Chart (Bar Chart):**
+- Monthly message counts: `["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]`
+- Message counts per month
+- Bar styling with consistent colors
+
+**Message Analysis Details:**
+- `unique_hashtags`: Count of unique hashtags used
+- `unique_mentions`: Count of unique user mentions
+- `unique_urls`: Count of unique URLs shared
+- `unique_emojis`: Count of unique emojis used
+- `text_length_stats`: Statistical analysis of message text length
+  - `average_length`: Mean character count
+  - `median_length`: Median character count
+  - `shortest_message`: Minimum character count
+  - `longest_message`: Maximum character count
+
+#### REQ-009: Content Analysis Section
+
+**Top Hashtags Chart (Bar Chart):**
+- Hashtag labels: `["#1", "#reading", "#esl", "#english", ...]`
+- Usage counts for each hashtag
+- Top 10 most used hashtags
+
+**Top Mentions Chart (Bar Chart):**
+- Mention labels: `["@eng_maura", "@english_books_maura", ...]`
+- Mention counts for each user
+- Top 10 most mentioned users
+
+#### REQ-010: Contributors Section
+
+**Top Contributors Chart (Bar Chart):**
+- Contributor usernames: `["books_magazine", "user1", "user2", ...]`
+- Message counts per contributor
+- Bar styling with distinct colors
+
+**Contributor Analysis Details:**
+- `total_contributors`: Total number of unique contributors
+- `avg_messages_per_contributor`: Average messages per contributor
+- `top_contributors`: List of contributors with message counts and percentages
+  - `username`: Contributor username
+  - `message_count`: Number of messages posted
+  - `percentage`: Percentage of total messages
+
+#### REQ-014: File Language Detection Section
+
+**File Language Distribution Chart (Bar Chart):**
+- Language labels: `["English", "Spanish", "French", "German", "Chinese", ...]`
+- File counts per detected language
+- Top 10 most common languages
+- Bar styling with distinct colors
+
+**File Language Analysis Details:**
+- `total_languages_detected`: Number of unique languages found
+- `primary_language`: Most common language with confidence score
+- `language_coverage`: Percentage of files with detected language
+- `multilingual_files`: Count of files with mixed languages
+- `language_confidence_stats`: Statistical analysis of detection confidence
+  - `average_confidence`: Mean confidence score across all detections
+  - `min_confidence`: Minimum confidence score
+  - `max_confidence`: Maximum confidence score
+  - `low_confidence_files`: Count of files with confidence < 0.5
+
+**Language Detection Requirements:**
+- Analyze both `file_name` and `caption` fields for language detection
+- Use language detection libraries (e.g., `langdetect`, `polyglot`)
+- Handle mixed-language content appropriately
+- Provide confidence scores for each detection
+- Support detection of at least 20 major languages
+- Handle cases where language cannot be determined
+
 ### Analysis Types
 
 #### Filename Analysis
@@ -84,7 +211,7 @@ All analysis functionality is consolidated into `modules/analysis_processor.py` 
 
 #### Filesize Analysis
 - Duplicate filesize detection
-- Size distribution analysis with meaningful bins (0-1MB, 1-5MB, 5-10MB, 10MB+)
+- Size distribution analysis with meaningful bins (0-1MB, 1-10MB, 10-100MB, 100MB-1GB, 1GB+)
 - Storage optimization recommendations
 
 #### Message Content Analysis
@@ -98,7 +225,109 @@ All analysis functionality is consolidated into `modules/analysis_processor.py` 
 - Content categorization and themes
 - Time-based trend analysis
 
+### Data Processing Requirements
 
+#### REQ-011: Collection Data Processing
+**Required Fields from Collection Files:**
+- `message_id`: Unique message identifier
+- `channel_username`: Channel identifier (remove '@' prefix for analysis)
+- `date`: Message timestamp for temporal analysis
+- `text`: Message content for text analysis
+- `creator_username`: Message author for contributor analysis
+- `creator_first_name`: Author's first name
+- `creator_last_name`: Author's last name
+- `media_type`: Type of media (if any)
+- `file_name`: Filename for file analysis
+- `file_size`: File size in bytes for size analysis
+- `mime_type`: MIME type for file type classification
+- `caption`: Media caption text
+- `views`: View count for engagement analysis
+- `forwards`: Forward count for engagement analysis
+- `replies`: Reply count for engagement analysis
+- `is_forwarded`: Boolean flag for forwarded message detection
+- `forwarded_from`: Source of forwarded message
+
+#### REQ-012: Data Aggregation Requirements
+**File Analysis Data:**
+- Group files by `file_name` for duplicate detection
+- Group files by `file_size` for size-based duplicate detection
+- Extract file extensions from `file_name` for type distribution
+- Calculate size bins for distribution charts
+- Detect languages in `file_name` and `caption` fields
+- Group files by detected language for language distribution
+- Calculate language confidence scores and statistics
+
+**Message Analysis Data:**
+- Group messages by `date` for temporal analysis
+- Extract hashtags from `text` using regex pattern `#\w+`
+- Extract mentions from `text` using regex pattern `@\w+`
+- Extract URLs from `text` using URL detection patterns
+- Extract emojis from `text` using emoji detection libraries
+- Calculate text length statistics for message content analysis
+
+**Contributor Analysis Data:**
+- Group messages by `creator_username` for contributor analysis
+- Calculate message counts and percentages per contributor
+- Handle missing or null usernames gracefully
+
+#### REQ-013: Chart Data Format Requirements
+**Chart.js Compatible Format:**
+- All chart data must be in Chart.js compatible JSON format
+- Include `type`, `data`, and `options` properties for each chart
+- Use consistent color schemes across charts
+- Include responsive design options
+- Provide proper labels and legends
+
+**Data Validation:**
+- Ensure all numeric values are properly formatted
+- Handle null/undefined values gracefully
+- Provide fallback values for missing data
+- Validate data types before chart generation
+
+#### REQ-015: File Language Detection Implementation
+**Language Detection Algorithm:**
+1. **Primary Detection**: Use `polyglot` library for high-confidence language detection
+2. **Fallback Detection**: Use `pycld2` for additional language support
+3. **Text Sources**: Analyze both `file_name` and `caption` fields
+4. **Confidence Threshold**: Minimum confidence score of 0.3 for valid detection
+5. **Mixed Language Handling**: Detect primary language and flag mixed-language files
+
+**Supported Languages:**
+- English, Spanish, French, German, Italian, Portuguese, Russian
+- Chinese (Simplified/Traditional), Japanese, Korean, Arabic, Hindi
+- Dutch, Swedish, Norwegian, Danish, Finnish, Polish, Czech
+- Turkish, Greek, Hebrew, Thai, Vietnamese, Indonesian
+
+**Output Format:**
+```json
+{
+  "file_language_analysis": {
+    "detected_languages": ["English", "Spanish", "French"],
+    "primary_language": "English",
+    "language_confidence": 0.95,
+    "language_distribution": [
+      {"language": "English", "count": 1200, "percentage": 75.0},
+      {"language": "Spanish", "count": 300, "percentage": 18.8},
+      {"language": "French", "count": 100, "percentage": 6.2}
+    ],
+    "total_languages_detected": 3,
+    "language_coverage": 95.5,
+    "multilingual_files": 25,
+    "language_confidence_stats": {
+      "average_confidence": 0.87,
+      "min_confidence": 0.45,
+      "max_confidence": 0.99,
+      "low_confidence_files": 12
+    }
+  }
+}
+```
+
+**Error Handling:**
+- Handle cases where language cannot be detected
+- Provide fallback to "Unknown" language category
+- Log low-confidence detections for manual review
+- Handle encoding issues in file names and captions
 
 ## Design Constraints
 
@@ -118,7 +347,9 @@ All analysis functionality is consolidated into `modules/analysis_processor.py` 
 - **pandas**: >=1.5.0 (data manipulation and analysis)
 - **numpy**: >=1.21.0 (numerical operations)
 - **requests**: >=2.28.0 (HTTP client for API calls)
-- **langdetect**: >=1.0.9 (language detection)
+- **langdetect**: >=1.0.9 (language detection for messages)
+- **polyglot**: >=16.7.4 (advanced language detection with confidence scores)
+- **pycld2**: >=0.41 (Compact Language Detector 2 for file language detection)
 - **emoji**: >=2.0.0 (emoji analysis)
 
 ### Built-in Modules

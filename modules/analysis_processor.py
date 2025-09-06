@@ -36,6 +36,23 @@ import langdetect
 from langdetect import LangDetectException
 import emoji
 
+# Language detection for filenames
+try:
+    from polyglot.detect import Detector
+    from polyglot.detect.base import UnknownLanguage
+    POLYGLOT_AVAILABLE = True
+except ImportError:
+    POLYGLOT_AVAILABLE = False
+    Detector = None
+    UnknownLanguage = Exception
+
+try:
+    import pycld2 as cld2
+    CLD2_AVAILABLE = True
+except ImportError:
+    CLD2_AVAILABLE = False
+    cld2 = None
+
 from pydantic import BaseModel, Field, field_validator, ValidationError
 from config import (
     API_ENDPOINTS, 
@@ -322,6 +339,9 @@ class FilenameAnalysisResult(BaseModel):
     filename_pattern_analysis: Dict[str, Any] = Field(
         ..., description="Filename pattern analysis results"
     )
+    filename_language_analysis: Dict[str, Any] = Field(
+        default_factory=dict, description="Filename language detection results"
+    )
     
     @field_validator('duplicate_filename_detection')
     @classmethod
@@ -604,7 +624,8 @@ class FilenameAnalyzer:
         
         return FilenameAnalysisResult(
             duplicate_filename_detection=self._analyze_duplicate_filenames(media_df),
-            filename_pattern_analysis=self._analyze_filename_patterns(media_df)
+            filename_pattern_analysis=self._analyze_filename_patterns(media_df),
+            filename_language_analysis=self._analyze_filename_languages(media_df)
         )
     
     def _analyze_duplicate_filenames(self, df: pd.DataFrame) -> Dict[str, Any]:
@@ -667,6 +688,166 @@ class FilenameAnalyzer:
             "common_extensions": common_extensions,
             "files_with_special_chars": int(files_with_special_chars),
             "files_with_spaces": int(files_with_spaces)
+        }
+    
+    def _analyze_filename_languages(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """Analyze language distribution in filenames."""
+        if df.empty:
+            return {
+                "detected_languages": [],
+                "primary_language": "Unknown",
+                "language_confidence": 0.0,
+                "language_distribution": [],
+                "total_languages_detected": 0,
+                "language_coverage": 0.0,
+                "multilingual_files": 0,
+                "language_confidence_stats": {
+                    "average_confidence": 0.0,
+                    "min_confidence": 0.0,
+                    "max_confidence": 0.0,
+                    "low_confidence_files": 0
+                }
+            }
+        
+        # Get filenames and captions for language detection
+        filenames = df['file_name'].dropna().astype(str)
+        captions = df.get('caption', pd.Series()).dropna().astype(str)
+        
+        # Combine filenames and captions for analysis
+        texts_to_analyze = []
+        for idx, filename in filenames.items():
+            caption = captions.get(idx, "")
+            # Combine filename and caption, prioritizing filename
+            combined_text = f"{filename} {caption}".strip()
+            texts_to_analyze.append(combined_text)
+        
+        if not texts_to_analyze:
+            return self._get_empty_language_analysis()
+        
+        # Detect languages
+        language_results = []
+        confidence_scores = []
+        
+        for text in texts_to_analyze:
+            if len(text.strip()) < 3:  # Skip very short texts
+                continue
+                
+            detected_lang, confidence = self._detect_language(text)
+            if detected_lang != "Unknown":
+                language_results.append(detected_lang)
+                confidence_scores.append(confidence)
+        
+        if not language_results:
+            return self._get_empty_language_analysis()
+        
+        # Calculate language distribution
+        from collections import Counter
+        lang_counts = Counter(language_results)
+        total_detected = len(language_results)
+        
+        # Get primary language
+        primary_language = lang_counts.most_common(1)[0][0]
+        primary_confidence = sum(conf for lang, conf in zip(language_results, confidence_scores) 
+                               if lang == primary_language) / lang_counts[primary_language]
+        
+        # Create language distribution
+        language_distribution = [
+            {
+                "language": lang,
+                "count": count,
+                "percentage": round((count / total_detected) * 100, 2)
+            }
+            for lang, count in lang_counts.most_common(10)
+        ]
+        
+        # Calculate confidence statistics
+        avg_confidence = sum(confidence_scores) / len(confidence_scores)
+        min_confidence = min(confidence_scores)
+        max_confidence = max(confidence_scores)
+        low_confidence_files = sum(1 for conf in confidence_scores if conf < 0.5)
+        
+        # Calculate coverage (percentage of files with detected language)
+        total_files = len(df)
+        language_coverage = (total_detected / total_files) * 100 if total_files > 0 else 0
+        
+        return {
+            "detected_languages": list(lang_counts.keys()),
+            "primary_language": primary_language,
+            "language_confidence": round(primary_confidence, 3),
+            "language_distribution": language_distribution,
+            "total_languages_detected": len(lang_counts),
+            "language_coverage": round(language_coverage, 2),
+            "multilingual_files": 0,  # TODO: Implement mixed language detection
+            "language_confidence_stats": {
+                "average_confidence": round(avg_confidence, 3),
+                "min_confidence": round(min_confidence, 3),
+                "max_confidence": round(max_confidence, 3),
+                "low_confidence_files": low_confidence_files
+            }
+        }
+    
+    def _detect_language(self, text: str) -> Tuple[str, float]:
+        """Detect language of text using multiple methods."""
+        if not text or len(text.strip()) < 3:
+            return "Unknown", 0.0
+        
+        # Try polyglot first (more accurate)
+        if POLYGLOT_AVAILABLE:
+            try:
+                detector = Detector(text)
+                if detector.language.code != 'un':
+                    confidence = detector.confidence / 100.0  # Convert to 0-1 scale
+                    return detector.language.name, confidence
+            except (UnknownLanguage, Exception) as e:
+                self.logger.debug(f"Polyglot detection failed: {e}")
+        
+        # Try pycld2 as fallback
+        if CLD2_AVAILABLE:
+            try:
+                is_reliable, text_bytes_found, details = cld2.detect(text)
+                if is_reliable and details:
+                    lang_name = details[0][1]  # Language name
+                    confidence = details[0][2] / 100.0  # Convert to 0-1 scale
+                    return lang_name, confidence
+            except Exception as e:
+                self.logger.debug(f"CLD2 detection failed: {e}")
+        
+        # Try langdetect as last resort
+        try:
+            detected_lang = langdetect.detect(text)
+            # Convert language codes to names
+            lang_names = {
+                'en': 'English', 'es': 'Spanish', 'fr': 'French', 'de': 'German',
+                'it': 'Italian', 'pt': 'Portuguese', 'ru': 'Russian', 'zh': 'Chinese',
+                'ja': 'Japanese', 'ko': 'Korean', 'ar': 'Arabic', 'hi': 'Hindi',
+                'nl': 'Dutch', 'sv': 'Swedish', 'no': 'Norwegian', 'da': 'Danish',
+                'fi': 'Finnish', 'pl': 'Polish', 'cs': 'Czech', 'tr': 'Turkish',
+                'el': 'Greek', 'he': 'Hebrew', 'th': 'Thai', 'vi': 'Vietnamese',
+                'id': 'Indonesian'
+            }
+            lang_name = lang_names.get(detected_lang, detected_lang.title())
+            return lang_name, 0.7  # Default confidence for langdetect
+        except LangDetectException:
+            pass
+        
+        return "Unknown", 0.0
+    
+    def _get_empty_language_analysis(self) -> Dict[str, Any]:
+        """Return empty language analysis structure."""
+        return {
+            "detected_languages": [],
+            "primary_language": "Unknown",
+            "language_confidence": 0.0,
+            "language_distribution": [],
+            "total_languages_detected": 0,
+            "language_coverage": 0.0,
+            "multilingual_files": 0,
+            "language_confidence_stats": {
+                "average_confidence": 0.0,
+                "min_confidence": 0.0,
+                "max_confidence": 0.0,
+                "low_confidence_files": 0
+            }
         }
 
 class FilesizeAnalyzer:

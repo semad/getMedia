@@ -73,10 +73,14 @@ class DashboardProcessor:
         try:
             if report_type == 'filename_analysis':
                 return self._transform_filename_analysis(data)
+            elif report_type == 'filename_language_analysis':
+                return self._transform_filename_language_analysis(data)
             elif report_type == 'filesize_analysis':
                 return self._transform_filesize_analysis(data)
             elif report_type == 'message_analysis':
                 return self._transform_message_analysis(data)
+            elif report_type == 'emoji_analysis':
+                return self._transform_emoji_analysis(data)
             else:
                 return data
         except Exception as e:
@@ -119,6 +123,175 @@ class DashboardProcessor:
                 }
             }
         }
+    
+    def _transform_filename_language_analysis(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Transform filename language analysis data for charts."""
+        # Extract language distribution data
+        language_distribution = data.get('language_distribution', [])
+        
+        if not language_distribution:
+            return {
+                'type': 'bar',
+                'data': {
+                    'labels': ['No Language Data'],
+                    'datasets': [{
+                        'label': 'File Count',
+                        'data': [0],
+                        'backgroundColor': '#6c757d',
+                        'borderColor': '#495057',
+                        'borderWidth': 1
+                    }]
+                },
+                'options': {
+                    'responsive': True,
+                    'plugins': {
+                        'title': {
+                            'display': True,
+                            'text': 'File Language Distribution'
+                        },
+                        'legend': {
+                            'display': False
+                        }
+                    },
+                    'scales': {
+                        'y': {
+                            'beginAtZero': True
+                        },
+                        'x': {
+                            'ticks': {
+                                'maxRotation': 45
+                            }
+                        }
+                    }
+                }
+            }
+        
+        # Extract language names and counts
+        languages = [item['language'] for item in language_distribution]
+        counts = [item['count'] for item in language_distribution]
+        
+        # Generate colors for different languages
+        colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', 
+                 '#6f42c1', '#e83e8c', '#fd7e14', '#20c997', '#6c757d']
+        
+        return {
+            'type': 'bar',
+            'data': {
+                'labels': languages,
+                'datasets': [{
+                    'label': 'File Count',
+                    'data': counts,
+                    'backgroundColor': colors[:len(languages)],
+                    'borderColor': [color.replace('0.7', '1.0') for color in colors[:len(languages)]],
+                    'borderWidth': 1
+                }]
+            },
+            'options': {
+                'responsive': True,
+                'plugins': {
+                    'title': {
+                        'display': True,
+                        'text': 'File Language Distribution'
+                    },
+                    'legend': {
+                        'display': False
+                    }
+                },
+                'scales': {
+                    'y': {
+                        'beginAtZero': True,
+                        'title': {
+                            'display': True,
+                            'text': 'Number of Files'
+                        }
+                    },
+                    'x': {
+                        'title': {
+                            'display': True,
+                            'text': 'Language'
+                        },
+                        'ticks': {
+                            'maxRotation': 45
+                        }
+                    }
+                }
+                }
+            }
+    
+    def _transform_emoji_analysis(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Transform emoji analysis data for charts."""
+        # Extract pattern recognition data
+        pattern_recognition = data.get('pattern_recognition', {})
+        emojis = pattern_recognition.get('emojis', {})
+        
+        # Create a bar chart for top emojis
+        top_emojis = emojis.get('top_emojis', [])[:10]  # Top 10 emojis
+        
+        if top_emojis:
+            labels = [emoji['emoji'] for emoji in top_emojis]
+            counts = [emoji['count'] for emoji in top_emojis]
+            
+            return {
+                'type': 'bar',
+                'data': {
+                    'labels': labels,
+                    'datasets': [{
+                        'label': 'Emoji Usage',
+                        'data': counts,
+                        'backgroundColor': '#28a745',
+                        'borderColor': '#1e7e34',
+                        'borderWidth': 1
+                    }]
+                },
+                'options': {
+                    'responsive': True,
+                    'plugins': {
+                        'title': {
+                            'display': True,
+                            'text': 'Top Emojis'
+                        },
+                        'legend': {
+                            'display': False
+                        }
+                    },
+                    'scales': {
+                        'y': {
+                            'beginAtZero': True
+                        },
+                        'x': {
+                            'ticks': {
+                                'maxRotation': 45
+                            }
+                        }
+                    }
+                }
+            }
+        else:
+            return {
+                'type': 'bar',
+                'data': {
+                    'labels': ['No Data'],
+                    'datasets': [{
+                        'label': 'No Data',
+                        'data': [0],
+                        'backgroundColor': '#6c757d',
+                        'borderColor': '#495057',
+                        'borderWidth': 1
+                    }]
+                },
+                'options': {
+                    'responsive': True,
+                    'plugins': {
+                        'title': {
+                            'display': True,
+                            'text': 'No Emoji Data Available'
+                        },
+                        'legend': {
+                            'display': False
+                        }
+                    }
+                }
+            }
     
     def _transform_filesize_analysis(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Transform filesize analysis data for charts."""
@@ -773,6 +946,9 @@ class DashboardProcessor:
             # Get top extensions
             top_extensions = sorted(file_extensions.items(), key=lambda x: x[1], reverse=True)[:10]
             
+            # Debug logging
+            self.logger.debug(f"Collection data for {channel_name}: {len(filenames)} filenames, {len(file_sizes)} file sizes")
+            
             # Calculate duplicate files by size (since we don't have filenames)
             size_counts = {}
             for size in file_sizes:
@@ -783,20 +959,38 @@ class DashboardProcessor:
             
             # Calculate duplicate ratio
             total_files = len(file_sizes)
-            duplicate_ratio = duplicate_sizes / total_files if total_files > 0 else 0
+            
+            # Calculate files with duplicate sizes (total files - unique files)
+            files_with_duplicate_sizes = total_files - unique_sizes
+            duplicate_ratio = files_with_duplicate_sizes / total_files if total_files > 0 else 0
+            
+            # Calculate duplicate filenames if we have filenames
+            if filenames:
+                filename_counts = {}
+                for filename in filenames:
+                    filename_counts[filename] = filename_counts.get(filename, 0) + 1
+                
+                duplicate_filenames = sum(1 for count in filename_counts.values() if count > 1)
+                unique_filenames = len(filename_counts) - duplicate_filenames
+                files_with_duplicate_names = total_files - unique_filenames
+                duplicate_ratio = files_with_duplicate_names / total_files if total_files > 0 else 0
+            else:
+                # Fallback to size-based calculation
+                unique_filenames = unique_sizes
+                files_with_duplicate_names = files_with_duplicate_sizes
             
             return {
                 'filename_analysis': {
                     'duplicate_filename_detection': {
                         'total_files': total_files,
-                        'total_unique_filenames': len(set(filenames)) if filenames else unique_sizes,
-                        'files_with_duplicate_names': duplicate_sizes if not filenames else 0,
+                        'total_unique_filenames': unique_filenames,
+                        'files_with_duplicate_names': files_with_duplicate_names,
                         'duplicate_ratio': duplicate_ratio
                     },
                     'filename_pattern_analysis': {
                         'common_extensions': [{'extension': ext, 'count': count} for ext, count in top_extensions],
-                        'files_with_special_chars': 0,  # Not available from collection data
-                        'files_with_spaces': 0  # Not available from collection data
+                        'files_with_special_chars': self._count_files_with_special_chars(filenames),
+                        'files_with_spaces': self._count_files_with_spaces(filenames)
                     }
                 },
                 'filesize_analysis': {
@@ -1202,6 +1396,13 @@ class DashboardProcessor:
                             channel_data[channel_name]['file_types_analysis'] = self._transform_file_types_analysis(filename_data)
                             # Add detailed filename metrics
                             channel_data[channel_name]['filename_metrics'] = self._extract_filename_metrics(filename_data)
+                            
+                            # Process filename language analysis
+                            if 'filename_language_analysis' in filename_data:
+                                language_data = filename_data['filename_language_analysis']
+                                channel_data[channel_name]['filename_language_analysis'] = self._transform_filename_language_analysis(language_data)
+                                # Add detailed language metrics
+                                channel_data[channel_name]['filename_language_metrics'] = self._extract_filename_language_metrics(language_data)
                         
                         # Process filesize analysis
                         if 'filesize_analysis' in analysis_results:
@@ -1240,7 +1441,7 @@ class DashboardProcessor:
                                 
                                 self.logger.debug(f"Successfully populated analysis data from collection for {channel_name}")
                         
-                        # Process message analysis
+                        # Process message analysis (independent of filename/filesize analysis)
                         if 'message_analysis' in analysis_results:
                             message_data = analysis_results['message_analysis']
                             channel_data[channel_name]['message_analysis'] = self._transform_message_analysis(message_data)
@@ -1250,12 +1451,17 @@ class DashboardProcessor:
                             channel_data[channel_name]['mentions_analysis'] = self._transform_mentions_analysis(message_data)
                             channel_data[channel_name]['urls_analysis'] = self._transform_urls_analysis(message_data)
                             channel_data[channel_name]['language_analysis'] = self._transform_language_analysis(message_data)
+                            # Add emoji analysis
+                            channel_data[channel_name]['emoji_analysis'] = self._transform_emoji_analysis(message_data)
                             # Add creator analysis
                             channel_data[channel_name]['creator_analysis'] = self._transform_creator_analysis(message_data)
                             channel_data[channel_name]['creator_metrics'] = self._extract_creator_metrics(message_data)
-                        else:
-                            # Fallback: create basic message metrics from collection data
+                            
+                            self.logger.debug(f"Successfully processed message analysis for {channel_name}")
+                        elif 'message_metrics' not in channel_data[channel_name]:
+                            # Only use fallback if message metrics haven't been set yet
                             channel_data[channel_name]['message_metrics'] = self._get_message_metrics_from_collection(channel_name)
+                            self.logger.debug(f"No message analysis found for {channel_name}, using collection data fallback")
                         
                         # Update summary data only if we have actual records
                         data_summary = data.get('data_summary', {})
@@ -1765,6 +1971,42 @@ function handleChartInteraction(chartType, action, channelName) {{
             'files_with_spaces': pattern_analysis.get('files_with_spaces', 0),
             'filename_length_stats': pattern_analysis.get('filename_length', {})
         }
+    
+    def _extract_filename_language_metrics(self, language_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract filename language metrics for detailed display."""
+        return {
+            'total_languages_detected': language_data.get('total_languages_detected', 0),
+            'primary_language': language_data.get('primary_language', 'Unknown'),
+            'language_confidence': language_data.get('language_confidence', 0.0),
+            'language_coverage': language_data.get('language_coverage', 0.0),
+            'multilingual_files': language_data.get('multilingual_files', 0),
+            'language_confidence_stats': language_data.get('language_confidence_stats', {}),
+            'detected_languages': language_data.get('detected_languages', [])
+        }
+    
+    def _count_files_with_special_chars(self, filenames: List[str]) -> int:
+        """Count files with special characters in their names."""
+        if not filenames:
+            return 0
+        
+        import re
+        special_char_pattern = r'[^\w\s.-]'
+        count = 0
+        for filename in filenames:
+            if re.search(special_char_pattern, filename):
+                count += 1
+        return count
+    
+    def _count_files_with_spaces(self, filenames: List[str]) -> int:
+        """Count files with spaces in their names."""
+        if not filenames:
+            return 0
+        
+        count = 0
+        for filename in filenames:
+            if ' ' in filename:
+                count += 1
+        return count
     
     def _extract_filesize_metrics(self, filesize_data: Dict[str, Any]) -> Dict[str, Any]:
         """Extract detailed filesize metrics for display."""

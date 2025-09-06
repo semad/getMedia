@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Channel Analysis Dashboard</title>
+    <link rel="stylesheet" href="static/css/dashboard.css">
+    
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KH0N6NM83F"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-KH0N6NM83F');
+    </script>
+    
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">📊 Telegram Analysis Dashboard</div>
+                <nav class="nav">
+                    <a href="index.html" class="nav-item active">Overview</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <h1>Channel Analysis Overview</h1>
+        
+        <!-- Summary Metrics -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-value">4</div>
+                <div class="metric-label">Total Channels</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">113,942</div>
+                <div class="metric-label">Total Messages</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">87,588</div>
+                <div class="metric-label">Total Files</div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-value">1.2 TB</div>
+                <div class="metric-label">Total Data Size</div>
+            </div>
+            
+        </div>
+
+        <!-- Channels Grid -->
+        <h2>Channels</h2>
+        <div class="channels-grid">
+            
+            <div class="channel-card">
+                <div class="channel-name">SherwinVakiliLibrary</div>
+                <div class="channel-stats">
+                    <div>
+                        <div class="channel-stat-value">109,518</div>
+                        <div class="channel-stat-label">Messages</div>
+                    </div>
+                    <div>
+                        <div class="channel-stat-value">82,946</div>
+                        <div class="channel-stat-label">Files</div>
+                    </div>
+                    
+                    <div>
+                        <div class="channel-stat-value">1.0 TB</div>
+                        <div class="channel-stat-label">Data Size</div>
+                    </div>
+                    
+                </div>
+                <a href="SherwinVakiliLibrary.html" 
+                   class="btn btn-primary">View Details</a>
+            </div>
+            
+            <div class="channel-card">
+                <div class="channel-name">books</div>
+                <div class="channel-stats">
+                    <div>
+                        <div class="channel-stat-value">195</div>
+                        <div class="channel-stat-label">Messages</div>
+                    </div>
+                    <div>
+                        <div class="channel-stat-value">2,548</div>
+                        <div class="channel-stat-label">Files</div>
+                    </div>
+                    
+                    <div>
+                        <div class="channel-stat-value">89.3 GB</div>
+                        <div class="channel-stat-label">Data Size</div>
+                    </div>
+                    
+                </div>
+                <a href="books.html" 
+                   class="btn btn-primary">View Details</a>
+            </div>
+            
+            <div class="channel-card">
+                <div class="channel-name">books_magazine</div>
+                <div class="channel-stats">
+                    <div>
+                        <div class="channel-stat-value">4,118</div>
+                        <div class="channel-stat-label">Messages</div>
+                    </div>
+                    <div>
+                        <div class="channel-stat-value">1,987</div>
+                        <div class="channel-stat-label">Files</div>
+                    </div>
+                    
+                    <div>
+                        <div class="channel-stat-value">89.3 GB</div>
+                        <div class="channel-stat-label">Data Size</div>
+                    </div>
+                    
+                </div>
+                <a href="books_magazine.html" 
+                   class="btn btn-primary">View Details</a>
+            </div>
+            
+            <div class="channel-card">
+                <div class="channel-name">Free_Books_life</div>
+                <div class="channel-stats">
+                    <div>
+                        <div class="channel-stat-value">111</div>
+                        <div class="channel-stat-label">Messages</div>
+                    </div>
+                    <div>
+                        <div class="channel-stat-value">107</div>
+                        <div class="channel-stat-label">Files</div>
+                    </div>
+                    
+                    <div>
+                        <div class="channel-stat-value">2.1 GB</div>
+                        <div class="channel-stat-label">Data Size</div>
+                    </div>
+                    
+                </div>
+                <a href="Free_Books_life.html" 
+                   class="btn btn-primary">View Details</a>
+            </div>
+            
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="static/js/dashboard_new.js"></script>
+</body>
+</html>

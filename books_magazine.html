@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>books_magazine - Channel Analysis</title>
+    <link rel="stylesheet" href="static/css/dashboard.css">
+    
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KH0N6NM83F"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-KH0N6NM83F');
+    </script>
+    
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">📊 Telegram Analysis Dashboard</div>
+                <nav class="nav">
+                    <a href="index.html" class="nav-item">Overview</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <h1>books_magazine</h1>
+        
+        <!-- Channel Metrics -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-value">4,118</div>
+                <div class="metric-label">Total Messages</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">1,987</div>
+                <div class="metric-label">Total Files</div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-value">89.3 GB</div>
+                <div class="metric-label">Total Data Size</div>
+            </div>
+            
+            
+            <div class="metric-card">
+                <div class="metric-value">5</div>
+                <div class="metric-label">Forwarded Messages</div>
+            </div>
+            
+        </div>
+
+        <!-- File Analysis Section -->
+        <div class="analysis-section">
+            <h2>📁 File Analysis</h2>
+            
+            
+            <div class="chart-section">
+                <h3>File Uniqueness</h3>
+                <canvas class="chart-container" data-chart-type="filename_analysis"></canvas>
+            </div>
+            
+
+            
+            <div class="chart-section">
+                <h3>File Size Distribution</h3>
+                <canvas class="chart-container" data-chart-type="filesize_analysis"></canvas>
+            </div>
+            
+
+            
+            <div class="chart-section">
+                <h3>File Types Distribution</h3>
+                <canvas class="chart-container" data-chart-type="file_types_analysis"></canvas>
+            </div>
+            
+
+            
+            <div class="chart-section">
+                <h3>File Language Distribution</h3>
+                <canvas class="chart-container" data-chart-type="filename_language_analysis"></canvas>
+            </div>
+            
+
+            <!-- File Analysis Details -->
+            
+            <div class="metrics-section">
+                <h3>File Analysis Details</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">49.4%</div>
+                        <div class="metric-label">Duplicate Ratio</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">411</div>
+                        <div class="metric-label">Files with Special Chars</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">1,038</div>
+                        <div class="metric-label">Files with Spaces</div>
+                    </div>
+                </div>
+                
+                
+            </div>
+            
+
+            
+            <div class="metrics-section">
+                <h3>File Language Analysis Details</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">23</div>
+                        <div class="metric-label">Languages Detected</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">English</div>
+                        <div class="metric-label">Primary Language</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">70.0%</div>
+                        <div class="metric-label">Language Confidence</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">99.8%</div>
+                        <div class="metric-label">Language Coverage</div>
+                    </div>
+                </div>
+                
+                
+                <div class="details-section">
+                    <h4>Language Detection Statistics</h4>
+                    <div class="details-list">
+                        <div class="detail-item">
+                            <span class="detail-label">Average Confidence</span>
+                            <span class="detail-value">70.0%</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Min Confidence</span>
+                            <span class="detail-value">70.0%</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Max Confidence</span>
+                            <span class="detail-value">70.0%</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Low Confidence Files</span>
+                            <span class="detail-value">0</span>
+                        </div>
+                    </div>
+                </div>
+                
+                
+            </div>
+            
+
+            
+            <div class="metrics-section">
+                <h3>File Size Analysis Details</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">49.4%</div>
+                        <div class="metric-label">Size Duplicate Ratio</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">555</div>
+                        <div class="metric-label">Files with Duplicate Sizes</div>
+                    </div>
+                </div>
+                
+                
+            </div>
+            
+        </div>
+
+        <!-- Message Activity Section -->
+        <div class="analysis-section">
+            <h2>📈 Message Activity</h2>
+            
+            
+            <div class="chart-section">
+                <h3>Message Activity Timeline</h3>
+                <canvas class="chart-container" data-chart-type="timeline_chart"></canvas>
+            </div>
+            
+
+            
+            <div class="chart-section">
+                <h3>Monthly Message Distribution</h3>
+                <canvas class="chart-container" data-chart-type="monthly_histogram"></canvas>
+            </div>
+            
+
+            <!-- Message Analysis Details -->
+            
+            <div class="metrics-section">
+                <h3>Message Analysis Details</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">21</div>
+                        <div class="metric-label">Unique Hashtags</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">2</div>
+                        <div class="metric-label">Unique Mentions</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">0</div>
+                        <div class="metric-label">Unique URLs</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">30</div>
+                        <div class="metric-label">Unique Emojis</div>
+                    </div>
+                </div>
+                
+                
+                <div class="details-section">
+                    <h4>Text Length Statistics</h4>
+                    <div class="details-list">
+                        <div class="detail-item">
+                            <span class="detail-label">Average Length</span>
+                            <span class="detail-value">108.2 characters</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Median Length</span>
+                            <span class="detail-value">17 characters</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Shortest Message</span>
+                            <span class="detail-value">11 characters</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Longest Message</span>
+                            <span class="detail-value">1,861 characters</span>
+                        </div>
+                    </div>
+                </div>
+                
+                
+                
+            </div>
+            
+        </div>
+
+        <!-- Content Analysis Section -->
+        <div class="analysis-section">
+            <h2>📝 Content Analysis</h2>
+            
+            
+            <div class="chart-section">
+                <h3>Top Hashtags</h3>
+                <canvas class="chart-container" data-chart-type="message_analysis"></canvas>
+            </div>
+            
+
+            
+            <div class="chart-section">
+                <h3>Top Emojis</h3>
+                <canvas class="chart-container" data-chart-type="emoji_analysis"></canvas>
+            </div>
+            
+
+            
+            <div class="chart-section">
+                <h3>Top Mentions</h3>
+                <canvas class="chart-container" data-chart-type="mentions_analysis"></canvas>
+            </div>
+            
+
+            
+
+            
+        </div>
+
+        <!-- Contributors Section -->
+        <div class="analysis-section">
+            <h2>👥 Contributors</h2>
+            
+            
+            <div class="chart-section">
+                <h3>Top Contributors by Message Count</h3>
+                <canvas class="chart-container" data-chart-type="creator_analysis"></canvas>
+            </div>
+            
+
+            <!-- Contributor Analysis Details -->
+            
+            <div class="metrics-section">
+                <h3>Contributor Analysis Details</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">1</div>
+                        <div class="metric-label">Total Contributors</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">4118.0</div>
+                        <div class="metric-label">Avg Messages per Contributor</div>
+                    </div>
+                </div>
+                
+                
+                <div class="details-section">
+                    <h4>Top Contributors</h4>
+                    <div class="details-list">
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">books_magazine</span>
+                            <span class="detail-value">4,118 messages (100.0%)</span>
+                        </div>
+                        
+                    </div>
+                </div>
+                
+            </div>
+            
+        </div>
+
+
+        <!-- Chart Data Script -->
+        <script type="application/json" id="chart-data">
+        {
+            "filename_analysis": {"type": "pie", "data": {"labels": ["Unique Files", "Duplicate Files"], "datasets": [{"label": "File Uniqueness", "data": [1290, 1258], "backgroundColor": ["#28a745", "#dc3545"], "borderWidth": 2}]}, "options": {"responsive": true, "maintainAspectRatio": false, "aspectRatio": 1, "plugins": {"title": {"display": true, "text": "File Uniqueness Distribution"}, "legend": {"position": "bottom"}}}},
+            "filename_language_analysis": {"type": "bar", "data": {"labels": ["English", "German", "French", "Af", "Italian", "Ro", "Norwegian", "Danish", "Indonesian", "Dutch"], "datasets": [{"label": "File Count", "data": [1676, 85, 35, 35, 24, 16, 16, 15, 14, 10], "backgroundColor": ["#007bff", "#28a745", "#dc3545", "#ffc107", "#17a2b8", "#6f42c1", "#e83e8c", "#fd7e14", "#20c997", "#6c757d"], "borderColor": ["#007bff", "#28a745", "#dc3545", "#ffc107", "#17a2b8", "#6f42c1", "#e83e8c", "#fd7e14", "#20c997", "#6c757d"], "borderWidth": 1}]}, "options": {"responsive": true, "plugins": {"title": {"display": true, "text": "File Language Distribution"}, "legend": {"display": false}}, "scales": {"y": {"beginAtZero": true, "title": {"display": true, "text": "Number of Files"}}, "x": {"title": {"display": true, "text": "Language"}, "ticks": {"maxRotation": 45}}}}},
+            "filesize_analysis": {"type": "bar", "data": {"labels": ["0-1MB", "1-10MB", "10-100MB", "100MB-1GB", "1GB+"], "datasets": [{"label": "Number of Files", "data": [237, 840, 1215, 256, 0], "backgroundColor": ["#17a2b8", "#6c757d", "#6c757d", "#6c757d", "#6c757d"], "borderWidth": 1}]}, "options": {"responsive": true, "plugins": {"title": {"display": true, "text": "File Size Distribution"}, "legend": {"display": false}}, "scales": {"y": {"beginAtZero": true}}}},
+            "file_types_analysis": {"type": "bar", "data": {"labels": ["pdf", "epub", "zip", "mp4", "tar", "rar", "png"], "datasets": [{"label": "Number of Files", "data": [1329, 1130, 60, 14, 6, 4, 4], "backgroundColor": ["#6c757d", "#6c757d", "#6c757d", "#6c757d", "#6c757d", "#6c757d", "#6c757d"], "borderColor": ["#6c757d", "#6c757d", "#6c757d", "#6c757d", "#6c757d", "#6c757d", "#6c757d"], "borderWidth": 1}]}, "options": {"responsive": true, "plugins": {"title": {"display": true, "text": "File Types Distribution"}, "legend": {"display": false}}, "scales": {"y": {"beginAtZero": true}, "x": {"ticks": {"maxRotation": 45}}}}},
+            "timeline_chart": {"type": "line", "data": {"labels": ["2025-01-05", "2025-01-07", "2025-01-09", "2025-01-11", "2025-01-14", "2025-01-16", "2025-01-18", "2025-01-20", "2025-01-22", "2025-01-24", "2025-01-26", "2025-01-28", "2025-01-30", "2025-02-01", "2025-02-03", "2025-02-05", "2025-02-07", "2025-02-09", "2025-02-11", "2025-02-13", "2025-02-15", "2025-02-17", "2025-02-19", "2025-02-21", "2025-02-23", "2025-02-25", "2025-02-27", "2025-03-01", "2025-03-03", "2025-03-05", "2025-03-07", "2025-03-09", "2025-03-11", "2025-03-13", "2025-03-15", "2025-03-17", "2025-03-19", "2025-03-21", "2025-03-23", "2025-03-25", "2025-03-27", "2025-03-29", "2025-03-31", "2025-04-02", "2025-04-04", "2025-04-06", "2025-04-08", "2025-04-10", "2025-04-12", "2025-04-14", "2025-04-16", "2025-04-18", "2025-04-20", "2025-04-22", "2025-04-24", "2025-04-26", "2025-04-28", "2025-04-30", "2025-05-02", "2025-05-04", "2025-05-06", "2025-05-08", "2025-05-10", "2025-05-12", "2025-05-14", "2025-05-16", "2025-05-18", "2025-05-20", "2025-05-22", "2025-05-24", "2025-05-26", "2025-05-28", "2025-05-30", "2025-06-01", "2025-06-03", "2025-06-05", "2025-06-07", "2025-06-09", "2025-06-11", "2025-06-13", "2025-06-15", "2025-06-17", "2025-06-19", "2025-06-21", "2025-06-23", "2025-06-25", "2025-06-27", "2025-06-29", "2025-07-01", "2025-07-03", "2025-07-05", "2025-07-07", "2025-07-09", "2025-07-11", "2025-07-13", "2025-07-15", "2025-07-17", "2025-07-19", "2025-07-21", "2025-07-23", "2025-07-25", "2025-07-27", "2025-07-29", "2025-07-31", "2025-08-02", "2025-08-04", "2025-08-06", "2025-08-08", "2025-08-10", "2025-08-12", "2025-08-14", "2025-08-16", "2025-08-18", "2025-08-20", "2025-08-24", "2025-08-26", "2025-08-29", "2025-08-31", "2025-09-02"], "datasets": [{"label": "Messages per Day", "data": [60, 25, 16, 5, 20, 28, 24, 12, 49, 25, 11, 27, 18, 19, 29, 9, 20, 27, 13, 12, 26, 26, 7, 47, 14, 17, 19, 32, 6, 4, 10, 23, 24, 12, 2, 4, 11, 25, 19, 30, 15, 12, 10, 26, 26, 22, 21, 14, 13, 44, 11, 41, 9, 7, 26, 17, 26, 23, 5, 24, 14, 11, 9, 20, 4, 34, 19, 8, 25, 20, 6, 21, 22, 23, 19, 8, 26, 12, 13, 30, 19, 36, 32, 60, 44, 12, 60, 18, 34, 24, 16, 50, 34, 60, 4, 18, 24, 30, 4, 40, 32, 12, 12, 14, 20, 28, 46, 64, 54, 40, 28, 18, 54, 51, 6, 15, 42, 15, 8], "borderColor": "#dc3545", "backgroundColor": "rgba(220, 53, 69, 0.1)", "borderWidth": 2, "fill": true, "tension": 0.1}]}, "options": {"responsive": true, "plugins": {"title": {"display": true, "text": "Message Activity Timeline"}, "legend": {"display": false}}, "scales": {"x": {"title": {"display": true, "text": "Date"}}, "y": {"beginAtZero": true, "title": {"display": true, "text": "Messages"}}}}},
+            "monthly_histogram": {"type": "bar", "data": {"labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], "datasets": [{"label": "Messages per Month", "data": [556, 565, 596, 651, 446, 800, 770, 796, 38, 0, 0, 0], "backgroundColor": "#17a2b8", "borderColor": "#138496", "borderWidth": 1}]}, "options": {"responsive": true, "plugins": {"title": {"display": true, "text": "Monthly Message Distribution"}, "legend": {"display": false}}, "scales": {"y": {"beginAtZero": true}}}},
+            "message_analysis": {"type": "bar", "data": {"labels": ["#1", "#reading", "#esl", "#english", "#languages", "#japan", "#asia", "#article", "#New_scientist", "#magazine"], "datasets": [{"label": "Hashtag Usage", "data": [11, 3, 2, 2, 1, 1, 1, 1, 1, 1], "backgroundColor": "#007bff", "borderColor": "#0056b3", "borderWidth": 1}]}, "options": {"responsive": true, "plugins": {"title": {"display": true, "text": "Top Hashtags"}, "legend": {"display": false}}, "scales": {"y": {"beginAtZero": true}, "x": {"ticks": {"maxRotation": 45}}}}},
+            "mentions_analysis": {"type": "bar", "data": {"labels": ["@eng_maura", "@english_books_maura"], "datasets": [{"label": "Mention Count", "data": [1, 1], "backgroundColor": "#17a2b8", "borderColor": "#138496", "borderWidth": 1}]}, "options": {"responsive": true, "plugins": {"title": {"display": true, "text": "Top Mentions"}, "legend": {"display": false}}, "scales": {"y": {"beginAtZero": true}, "x": {"ticks": {"maxRotation": 45}}}}},
+            "urls_analysis": null,
+            "language_analysis": null,
+            "emoji_analysis": {"type": "bar", "data": {"labels": ["\ud83d\udcda", "\u2665\ufe0f", "\ud83c\udf40", "\u2615", "\ud83d\udcd6", "\u2611\ufe0f", "\u26e9", "\ud83c\udf71", "\ud83c\uddef\ud83c\uddf5", "\u2728"], "datasets": [{"label": "Emoji Usage", "data": [39, 39, 6, 5, 4, 3, 2, 2, 2, 2], "backgroundColor": "#28a745", "borderColor": "#1e7e34", "borderWidth": 1}]}, "options": {"responsive": true, "plugins": {"title": {"display": true, "text": "Top Emojis"}, "legend": {"display": false}}, "scales": {"y": {"beginAtZero": true}, "x": {"ticks": {"maxRotation": 45}}}}},
+            "creator_analysis": {"type": "bar", "data": {"labels": ["books_magazine"], "datasets": [{"label": "Message Count", "data": [4118], "backgroundColor": "#6f42c1", "borderColor": "#5a32a3", "borderWidth": 1}]}, "options": {"responsive": true, "plugins": {"title": {"display": true, "text": "Top Contributors by Message Count"}, "legend": {"display": false}}, "scales": {"y": {"beginAtZero": true}, "x": {"ticks": {"maxRotation": 45}}}}}
+        }
+        </script>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="static/js/dashboard_new.js"></script>
+</body>
+</html>

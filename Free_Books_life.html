@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Free_Books_life - Channel Analysis</title>
+    <link rel="stylesheet" href="static/css/dashboard.css">
+    
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KH0N6NM83F"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-KH0N6NM83F');
+    </script>
+    
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">📊 Telegram Analysis Dashboard</div>
+                <nav class="nav">
+                    <a href="index.html" class="nav-item">Overview</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <h1>Free_Books_life</h1>
+        
+        <!-- Channel Metrics -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-value">111</div>
+                <div class="metric-label">Total Messages</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">107</div>
+                <div class="metric-label">Total Files</div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-value">2.1 GB</div>
+                <div class="metric-label">Total Data Size</div>
+            </div>
+            
+            
+            <div class="metric-card">
+                <div class="metric-value">0</div>
+                <div class="metric-label">Forwarded Messages</div>
+            </div>
+            
+        </div>
+
+        <!-- File Analysis Section -->
+        <div class="analysis-section">
+            <h2>📁 File Analysis</h2>
+            
+            
+            <div class="chart-section">
+                <h3>File Uniqueness</h3>
+                <canvas class="chart-container" data-chart-type="filename_analysis"></canvas>
+            </div>
+            
+
+            
+            <div class="chart-section">
+                <h3>File Size Distribution</h3>
+                <canvas class="chart-container" data-chart-type="filesize_analysis"></canvas>
+            </div>
+            
+
+            
+            <div class="chart-section">
+                <h3>File Types Distribution</h3>
+                <canvas class="chart-container" data-chart-type="file_types_analysis"></canvas>
+            </div>
+            
+
+            
+            <div class="chart-section">
+                <h3>File Language Distribution</h3>
+                <canvas class="chart-container" data-chart-type="filename_language_analysis"></canvas>
+            </div>
+            
+
+            <!-- File Analysis Details -->
+            
+            <div class="metrics-section">
+                <h3>File Analysis Details</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">0.0%</div>
+                        <div class="metric-label">Duplicate Ratio</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">10</div>
+                        <div class="metric-label">Files with Special Chars</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">102</div>
+                        <div class="metric-label">Files with Spaces</div>
+                    </div>
+                </div>
+                
+                
+                <div class="details-section">
+                    <h4>Most Common Filenames</h4>
+                    <div class="details-list">
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">کارنامه مصدق 2.pdf</span>
+                            <span class="detail-value">1 times</span>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">کارنامه مصدق 1.pdf</span>
+                            <span class="detail-value">1 times</span>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">نقاشی نوین (2).pdf</span>
+                            <span class="detail-value">1 times</span>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">نقاشی نوین (1).pdf</span>
+                            <span class="detail-value">1 times</span>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">شاه 3جهان نامه.pdf</span>
+                            <span class="detail-value">1 times</span>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">شاه 2جهان نامه.pdf</span>
+                            <span class="detail-value">1 times</span>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">شاه 1جهان نامه.pdf</span>
+                            <span class="detail-value">1 times</span>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">دانشمندان و سخن سرایان فارس 5.PDF</span>
+                            <span class="detail-value">1 times</span>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">دانشمندان و سخن سرایان فارس 4.PDF</span>
+                            <span class="detail-value">1 times</span>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">دانشمندان و سخن سرایان فارس 3.PDF</span>
+                            <span class="detail-value">1 times</span>
+                        </div>
+                        
+                    </div>
+                </div>
+                
+            </div>
+            
+
+            
+            <div class="metrics-section">
+                <h3>File Language Analysis Details</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">3</div>
+                        <div class="metric-label">Languages Detected</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">Fa</div>
+                        <div class="metric-label">Primary Language</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">70.0%</div>
+                        <div class="metric-label">Language Confidence</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">100.0%</div>
+                        <div class="metric-label">Language Coverage</div>
+                    </div>
+                </div>
+                
+                
+                <div class="details-section">
+                    <h4>Language Detection Statistics</h4>
+                    <div class="details-list">
+                        <div class="detail-item">
+                            <span class="detail-label">Average Confidence</span>
+                            <span class="detail-value">70.0%</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Min Confidence</span>
+                            <span class="detail-value">70.0%</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Max Confidence</span>
+                            <span class="detail-value">70.0%</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Low Confidence Files</span>
+                            <span class="detail-value">0</span>
+                        </div>
+                    </div>
+                </div>
+                
+                
+            </div>
+            
+
+            
+            <div class="metrics-section">
+                <h3>File Size Analysis Details</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">0.0%</div>
+                        <div class="metric-label">Size Duplicate Ratio</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">0</div>
+                        <div class="metric-label">Files with Duplicate Sizes</div>
+                    </div>
+                </div>
+                
+                
+                <div class="details-section">
+                    <h4>Most Common File Sizes</h4>
+                    <div class="details-list">
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">2.6 MB</span>
+                            <span class="detail-value">1 files</span>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">4.5 MB</span>
+                            <span class="detail-value">1 files</span>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">11.0 MB</span>
+                            <span class="detail-value">1 files</span>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">11.6 MB</span>
+                            <span class="detail-value">1 files</span>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">9.6 MB</span>
+                            <span class="detail-value">1 files</span>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">9.3 MB</span>
+                            <span class="detail-value">1 files</span>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">10.3 MB</span>
+                            <span class="detail-value">1 files</span>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">7.0 MB</span>
+                            <span class="detail-value">1 files</span>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">9.4 MB</span>
+                            <span class="detail-value">1 files</span>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">10.9 MB</span>
+                            <span class="detail-value">1 files</span>
+                        </div>
+                        
+                    </div>
+                </div>
+                
+            </div>
+            
+        </div>
+
+        <!-- Message Activity Section -->
+        <div class="analysis-section">
+            <h2>📈 Message Activity</h2>
+            
+            
+            <div class="chart-section">
+                <h3>Message Activity Timeline</h3>
+                <canvas class="chart-container" data-chart-type="timeline_chart"></canvas>
+            </div>
+            
+
+            
+            <div class="chart-section">
+                <h3>Monthly Message Distribution</h3>
+                <canvas class="chart-container" data-chart-type="monthly_histogram"></canvas>
+            </div>
+            
+
+            <!-- Message Analysis Details -->
+            
+            <div class="metrics-section">
+                <h3>Message Analysis Details</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">0</div>
+                        <div class="metric-label">Unique Hashtags</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">0</div>
+                        <div class="metric-label">Unique Mentions</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">0</div>
+                        <div class="metric-label">Unique URLs</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">0</div>
+                        <div class="metric-label">Unique Emojis</div>
+                    </div>
+                </div>
+                
+                
+                <div class="details-section">
+                    <h4>Text Length Statistics</h4>
+                    <div class="details-list">
+                        <div class="detail-item">
+                            <span class="detail-label">Average Length</span>
+                            <span class="detail-value">17.2 characters</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Median Length</span>
+                            <span class="detail-value">17 characters</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Shortest Message</span>
+                            <span class="detail-value">17 characters</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Longest Message</span>
+                            <span class="detail-value">36 characters</span>
+                        </div>
+                    </div>
+                </div>
+                
+                
+                
+            </div>
+            
+        </div>
+
+        <!-- Content Analysis Section -->
+        <div class="analysis-section">
+            <h2>📝 Content Analysis</h2>
+            
+            
+            <div class="chart-section">
+                <h3>Top Hashtags</h3>
+                <canvas class="chart-container" data-chart-type="message_analysis"></canvas>
+            </div>
+            
+
+            
+            <div class="chart-section">
+                <h3>Top Emojis</h3>
+                <canvas class="chart-container" data-chart-type="emoji_analysis"></canvas>
+            </div>
+            
+
+            
+
+            
+
+            
+        </div>
+
+        <!-- Contributors Section -->
+        <div class="analysis-section">
+            <h2>👥 Contributors</h2>
+            
+            
+            <div class="chart-section">
+                <h3>Top Contributors by Message Count</h3>
+                <canvas class="chart-container" data-chart-type="creator_analysis"></canvas>
+            </div>
+            
+
+            <!-- Contributor Analysis Details -->
+            
+            <div class="metrics-section">
+                <h3>Contributor Analysis Details</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">1</div>
+                        <div class="metric-label">Total Contributors</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">111.0</div>
+                        <div class="metric-label">Avg Messages per Contributor</div>
+                    </div>
+                </div>
+                
+                
+                <div class="details-section">
+                    <h4>Top Contributors</h4>
+                    <div class="details-list">
+                        
+                        <div class="detail-item">
+                            <span class="detail-label">Free_Books_life</span>
+                            <span class="detail-value">111 messages (100.0%)</span>
+                        </div>
+                        
+                    </div>
+                </div>
+                
+            </div>
+            
+        </div>
+
+
+        <!-- Chart Data Script -->
+        <script type="application/json" id="chart-data">
+        {
+            "filename_analysis": {"type": "pie", "data": {"labels": ["Unique Files", "Duplicate Files"], "datasets": [{"label": "File Uniqueness", "data": [107, 0], "backgroundColor": ["#28a745", "#dc3545"], "borderWidth": 2}]}, "options": {"responsive": true, "maintainAspectRatio": false, "aspectRatio": 1, "plugins": {"title": {"display": true, "text": "File Uniqueness Distribution"}, "legend": {"position": "bottom"}}}},
+            "filename_language_analysis": {"type": "bar", "data": {"labels": ["Fa", "Arabic", "Ur"], "datasets": [{"label": "File Count", "data": [98, 7, 2], "backgroundColor": ["#007bff", "#28a745", "#dc3545"], "borderColor": ["#007bff", "#28a745", "#dc3545"], "borderWidth": 1}]}, "options": {"responsive": true, "plugins": {"title": {"display": true, "text": "File Language Distribution"}, "legend": {"display": false}}, "scales": {"y": {"beginAtZero": true, "title": {"display": true, "text": "Number of Files"}}, "x": {"title": {"display": true, "text": "Language"}, "ticks": {"maxRotation": 45}}}}},
+            "filesize_analysis": {"type": "bar", "data": {"labels": ["10MB+", "1-5MB", "5-10MB", "0-1MB"], "datasets": [{"label": "Number of Files", "data": [42, 41, 24, 0], "backgroundColor": ["#dc3545", "#28a745", "#ffc107", "#17a2b8"], "borderWidth": 1}]}, "options": {"responsive": true, "plugins": {"title": {"display": true, "text": "File Size Distribution"}, "legend": {"display": false}}, "scales": {"y": {"beginAtZero": true}}}},
+            "file_types_analysis": {"type": "bar", "data": {"labels": [".pdf"], "datasets": [{"label": "Number of Files", "data": [107], "backgroundColor": ["#dc3545"], "borderColor": ["#dc3545"], "borderWidth": 1}]}, "options": {"responsive": true, "plugins": {"title": {"display": true, "text": "File Types Distribution"}, "legend": {"display": false}}, "scales": {"y": {"beginAtZero": true}, "x": {"ticks": {"maxRotation": 45}}}}},
+            "timeline_chart": {"type": "line", "data": {"labels": ["2021-09-10", "2021-09-26", "2021-10-01"], "datasets": [{"label": "Messages per Day", "data": [2, 205, 4], "borderColor": "#dc3545", "backgroundColor": "rgba(220, 53, 69, 0.1)", "borderWidth": 2, "fill": true, "tension": 0.1}]}, "options": {"responsive": true, "plugins": {"title": {"display": true, "text": "Message Activity Timeline"}, "legend": {"display": false}}, "scales": {"x": {"title": {"display": true, "text": "Date"}}, "y": {"beginAtZero": true, "title": {"display": true, "text": "Messages"}}}}},
+            "monthly_histogram": {"type": "bar", "data": {"labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], "datasets": [{"label": "Messages per Month", "data": [0, 0, 0, 0, 0, 0, 0, 0, 207, 4, 0, 0], "backgroundColor": "#17a2b8", "borderColor": "#138496", "borderWidth": 1}]}, "options": {"responsive": true, "plugins": {"title": {"display": true, "text": "Monthly Message Distribution"}, "legend": {"display": false}}, "scales": {"y": {"beginAtZero": true}}}},
+            "message_analysis": {"type": "bar", "data": {"labels": ["No Data"], "datasets": [{"label": "No Data Available", "data": [0], "backgroundColor": "#6c757d"}]}, "options": {"responsive": true, "plugins": {"title": {"display": true, "text": "Message Analysis - No Data Available"}}}},
+            "mentions_analysis": null,
+            "urls_analysis": null,
+            "language_analysis": null,
+            "emoji_analysis": {"type": "bar", "data": {"labels": ["No Data"], "datasets": [{"label": "No Data", "data": [0], "backgroundColor": "#6c757d", "borderColor": "#495057", "borderWidth": 1}]}, "options": {"responsive": true, "plugins": {"title": {"display": true, "text": "No Emoji Data Available"}, "legend": {"display": false}}}},
+            "creator_analysis": {"type": "bar", "data": {"labels": ["Free_Books_life"], "datasets": [{"label": "Message Count", "data": [111], "backgroundColor": "#6f42c1", "borderColor": "#5a32a3", "borderWidth": 1}]}, "options": {"responsive": true, "plugins": {"title": {"display": true, "text": "Top Contributors by Message Count"}, "legend": {"display": false}}, "scales": {"y": {"beginAtZero": true}, "x": {"ticks": {"maxRotation": 45}}}}}
+        }
+        </script>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="static/js/dashboard_new.js"></script>
+</body>
+</html>

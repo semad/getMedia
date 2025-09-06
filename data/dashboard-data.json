@@ -1,0 +1,3580 @@
+{
+  "metadata": {
+    "generated_at": "2025-09-05T20:57:15.649474",
+    "total_channels": 4,
+    "total_files": 0
+  },
+  "summary": {
+    "total_messages": 113942,
+    "total_files": 87588,
+    "channels_count": 4,
+    "total_data_size_bytes": 1311374218282.0,
+    "total_data_size_formatted": "1.2 TB"
+  },
+  "channels": {
+    "SherwinVakiliLibrary": {
+      "messages": 109518,
+      "files": 82946,
+      "filename_analysis": {
+        "type": "pie",
+        "data": {
+          "labels": [
+            "Unique Files",
+            "Duplicate Files"
+          ],
+          "datasets": [
+            {
+              "label": "File Uniqueness",
+              "data": [
+                51366,
+                32639
+              ],
+              "backgroundColor": [
+                "#28a745",
+                "#dc3545"
+              ],
+              "borderWidth": 2
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "maintainAspectRatio": false,
+          "aspectRatio": 1,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "File Uniqueness Distribution"
+            },
+            "legend": {
+              "position": "bottom"
+            }
+          }
+        }
+      },
+      "filesize_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "0-1MB",
+            "1-10MB",
+            "10-100MB",
+            "100MB-1GB",
+            "1GB+"
+          ],
+          "datasets": [
+            {
+              "label": "Number of Files",
+              "data": [
+                15749,
+                46588,
+                20200,
+                1449,
+                19
+              ],
+              "backgroundColor": [
+                "#17a2b8",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d"
+              ],
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "File Size Distribution"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            }
+          }
+        }
+      },
+      "message_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "#\u0645\u0642\u0627\u0644\u0647",
+            "#\u0645\u0639\u0631\u0641\u06cc_\u06a9\u062a\u0627\u0628",
+            "#\u06a9\u062a\u0627\u0628",
+            "#\u062f\u0627\u0646\u0644\u0648\u062f_\u06a9\u062a\u0627\u0628",
+            "#\u062f\u0627\u0633\u062a\u0627\u0646",
+            "#\u062a\u0627\u0631\u06cc\u062e",
+            "#pdf",
+            "#\u06a9\u062a\u0627\u0628_\u0635\u0648\u062a\u06cc",
+            "#\u0631\u0648\u0627\u0646\u0634\u0646\u0627\u0633\u06cc",
+            "#\u0641\u0644\u0633\u0641\u0647"
+          ],
+          "datasets": [
+            {
+              "label": "Hashtag Usage",
+              "data": [
+                662,
+                596,
+                419,
+                355,
+                326,
+                261,
+                260,
+                250,
+                225,
+                223
+              ],
+              "backgroundColor": "#007bff",
+              "borderColor": "#0056b3",
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Top Hashtags"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            },
+            "x": {
+              "ticks": {
+                "maxRotation": 45
+              }
+            }
+          }
+        }
+      },
+      "analysis_summary": {},
+      "source_breakdown": {
+        "file_messages": {
+          "messages": 0,
+          "files": 0
+        },
+        "db_messages": {
+          "messages": 0,
+          "files": 0
+        },
+        "diff_messages": {
+          "messages": 0,
+          "files": 0
+        }
+      },
+      "file_types_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "pdf",
+            "epub",
+            "mp3",
+            "zip",
+            "apk",
+            "rar",
+            "txt",
+            "m4a",
+            "doc",
+            "docx"
+          ],
+          "datasets": [
+            {
+              "label": "Number of Files",
+              "data": [
+                75640,
+                2316,
+                2038,
+                674,
+                500,
+                469,
+                435,
+                232,
+                213,
+                209
+              ],
+              "backgroundColor": [
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d"
+              ],
+              "borderColor": [
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d"
+              ],
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "File Types Distribution"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            },
+            "x": {
+              "ticks": {
+                "maxRotation": 45
+              }
+            }
+          }
+        }
+      },
+      "filename_metrics": {
+        "duplicate_ratio": 0.38853639664305695,
+        "files_with_duplicate_names": 32639,
+        "total_unique_filenames": 51366,
+        "total_files": 84005,
+        "most_common_filenames": [],
+        "files_with_special_chars": 23880,
+        "files_with_spaces": 45548,
+        "filename_length_stats": {}
+      },
+      "filesize_metrics": {
+        "duplicate_ratio": 0.38853639664305695,
+        "files_with_duplicate_sizes": 14457,
+        "total_unique_filesizes": 0,
+        "total_files": 84005,
+        "most_common_filesizes": [],
+        "size_frequency_distribution": {
+          "0-1MB": 15749,
+          "1-10MB": 46588,
+          "10-100MB": 20200,
+          "100MB-1GB": 1449,
+          "1GB+": 19
+        },
+        "potential_duplicates_by_size": []
+      },
+      "message_metrics": {
+        "total_messages": 109518,
+        "messages_with_text": 109518,
+        "media_messages": 109518,
+        "forwarded_messages": 80967,
+        "text_length_stats": {
+          "count": 109518,
+          "min": 1,
+          "max": 6834,
+          "mean": 81.9,
+          "median": 43
+        },
+        "hashtags_count": 9041,
+        "mentions_count": 1319,
+        "urls_count": 0,
+        "emojis_count": 588,
+        "detected_languages": [],
+        "primary_language": "Unknown",
+        "language_confidence": 0
+      },
+      "filename_language_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "Fa",
+            "English",
+            "Arabic",
+            "Cy",
+            "Indonesian",
+            "Ur",
+            "German",
+            "So",
+            "Ca",
+            "Et"
+          ],
+          "datasets": [
+            {
+              "label": "File Count",
+              "data": [
+                38387,
+                16452,
+                5525,
+                3058,
+                2203,
+                1891,
+                1029,
+                770,
+                698,
+                633
+              ],
+              "backgroundColor": [
+                "#007bff",
+                "#28a745",
+                "#dc3545",
+                "#ffc107",
+                "#17a2b8",
+                "#6f42c1",
+                "#e83e8c",
+                "#fd7e14",
+                "#20c997",
+                "#6c757d"
+              ],
+              "borderColor": [
+                "#007bff",
+                "#28a745",
+                "#dc3545",
+                "#ffc107",
+                "#17a2b8",
+                "#6f42c1",
+                "#e83e8c",
+                "#fd7e14",
+                "#20c997",
+                "#6c757d"
+              ],
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "File Language Distribution"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true,
+              "title": {
+                "display": true,
+                "text": "Number of Files"
+              }
+            },
+            "x": {
+              "title": {
+                "display": true,
+                "text": "Language"
+              },
+              "ticks": {
+                "maxRotation": 45
+              }
+            }
+          }
+        }
+      },
+      "filename_language_metrics": {
+        "total_languages_detected": 39,
+        "primary_language": "Fa",
+        "language_confidence": 0.7,
+        "language_coverage": 93.84,
+        "multilingual_files": 0,
+        "language_confidence_stats": {
+          "average_confidence": 0.7,
+          "min_confidence": 0.7,
+          "max_confidence": 0.7,
+          "low_confidence_files": 0
+        },
+        "detected_languages": [
+          "Fa",
+          "French",
+          "So",
+          "Et",
+          "Arabic",
+          "Indonesian",
+          "Cy",
+          "English",
+          "Danish",
+          "Lv",
+          "Portuguese",
+          "Italian",
+          "Sw",
+          "Swedish",
+          "Ca",
+          "Ur",
+          "Sq",
+          "Lt",
+          "German",
+          "Dutch",
+          "Turkish",
+          "Hr",
+          "Sl",
+          "Ro",
+          "Norwegian",
+          "Spanish",
+          "Hu",
+          "Tl",
+          "Polish",
+          "Af",
+          "Finnish",
+          "Vietnamese",
+          "Sk",
+          "Russian",
+          "Czech",
+          "Hebrew",
+          "Bg",
+          "Mk",
+          "Zh-Cn"
+        ]
+      },
+      "mentions_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "@SherwinVakiliLibrary",
+            "@OfficialBook",
+            "@Archpoldeb",
+            "@eat_book",
+            "@litera9",
+            "@PDFsCom",
+            "@irCDS",
+            "@pdf_kotob_e_adabi",
+            "@ReligionsLibrary1",
+            "@Library_Telegram"
+          ],
+          "datasets": [
+            {
+              "label": "Mention Count",
+              "data": [
+                5371,
+                2685,
+                2036,
+                1214,
+                1187,
+                1098,
+                1027,
+                954,
+                925,
+                905
+              ],
+              "backgroundColor": "#17a2b8",
+              "borderColor": "#138496",
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Top Mentions"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            },
+            "x": {
+              "ticks": {
+                "maxRotation": 45
+              }
+            }
+          }
+        }
+      },
+      "urls_analysis": null,
+      "language_analysis": null,
+      "emoji_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "\u2796",
+            "\ud83d\udcda",
+            "\ud83d\udcd5",
+            "\u270d",
+            "\ud83c\udd94",
+            "\ud83d\udcd4",
+            "\ud83c\udf10",
+            "\ud83d\udc47",
+            "\u2705",
+            "\u270d\ud83c\udffb"
+          ],
+          "datasets": [
+            {
+              "label": "Emoji Usage",
+              "data": [
+                9388,
+                7526,
+                5856,
+                4387,
+                4075,
+                3130,
+                2315,
+                2142,
+                2112,
+                2101
+              ],
+              "backgroundColor": "#28a745",
+              "borderColor": "#1e7e34",
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Top Emojis"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            },
+            "x": {
+              "ticks": {
+                "maxRotation": 45
+              }
+            }
+          }
+        }
+      },
+      "creator_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "Conflictresolution1",
+            "Zandii62",
+            "Nima_Mafakheri",
+            "SherwinVakili",
+            "user_145628168",
+            "MahshadMD",
+            "FEderakhshan",
+            "Hasanvahidi",
+            "A_Amin",
+            "user_245333558"
+          ],
+          "datasets": [
+            {
+              "label": "Message Count",
+              "data": [
+                50015,
+                11247,
+                10263,
+                7201,
+                5837,
+                3852,
+                2190,
+                1900,
+                1747,
+                1296
+              ],
+              "backgroundColor": "#6f42c1",
+              "borderColor": "#5a32a3",
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Top Contributors by Message Count"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            },
+            "x": {
+              "ticks": {
+                "maxRotation": 45
+              }
+            }
+          }
+        }
+      },
+      "creator_metrics": {
+        "total_creators": 685,
+        "most_active_creators": [
+          {
+            "username": "Conflictresolution1",
+            "message_count": 50015,
+            "percentage": 45.67
+          },
+          {
+            "username": "Zandii62",
+            "message_count": 11247,
+            "percentage": 10.27
+          },
+          {
+            "username": "Nima_Mafakheri",
+            "message_count": 10263,
+            "percentage": 9.37
+          },
+          {
+            "username": "SherwinVakili",
+            "message_count": 7201,
+            "percentage": 6.58
+          },
+          {
+            "username": "user_145628168",
+            "message_count": 5837,
+            "percentage": 5.33
+          },
+          {
+            "username": "MahshadMD",
+            "message_count": 3852,
+            "percentage": 3.52
+          },
+          {
+            "username": "FEderakhshan",
+            "message_count": 2190,
+            "percentage": 2.0
+          },
+          {
+            "username": "Hasanvahidi",
+            "message_count": 1900,
+            "percentage": 1.73
+          },
+          {
+            "username": "A_Amin",
+            "message_count": 1747,
+            "percentage": 1.6
+          },
+          {
+            "username": "user_245333558",
+            "message_count": 1296,
+            "percentage": 1.18
+          }
+        ],
+        "creator_message_stats": {
+          "total_creators": 685,
+          "total_messages": 109518,
+          "avg_messages_per_creator": 159.88
+        },
+        "total_messages": 109518,
+        "avg_messages_per_creator": 159.88
+      },
+      "source_breakdown_chart": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "File Messages",
+            "Db Messages",
+            "Diff Messages"
+          ],
+          "datasets": [
+            {
+              "label": "Messages",
+              "data": [
+                0,
+                0,
+                0
+              ],
+              "backgroundColor": [
+                "#28a745",
+                "#007bff",
+                "#ffc107"
+              ],
+              "borderColor": [
+                "#28a745",
+                "#007bff",
+                "#ffc107"
+              ],
+              "borderWidth": 1
+            },
+            {
+              "label": "Files",
+              "data": [
+                0,
+                0,
+                0
+              ],
+              "backgroundColor": [
+                "#28a74580",
+                "#007bff80",
+                "#ffc10780"
+              ],
+              "borderColor": [
+                "#28a745",
+                "#007bff",
+                "#ffc107"
+              ],
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Data Source Breakdown"
+            },
+            "legend": {
+              "display": true,
+              "position": "top"
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            }
+          }
+        }
+      },
+      "monthly_histogram": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec"
+          ],
+          "datasets": [
+            {
+              "label": "Messages per Month",
+              "data": [
+                808,
+                886,
+                695,
+                905,
+                707,
+                675,
+                1380,
+                699,
+                770,
+                822,
+                738,
+                738
+              ],
+              "backgroundColor": "#17a2b8",
+              "borderColor": "#138496",
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Monthly Message Distribution"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            }
+          }
+        }
+      },
+      "total_data_size_bytes": 1117339517984.0,
+      "total_data_size_formatted": "1.0 TB",
+      "timeline_chart": {
+        "type": "line",
+        "data": {
+          "labels": [
+            "2016-08-13",
+            "2016-09-06",
+            "2016-09-30",
+            "2016-10-24",
+            "2016-11-17",
+            "2016-12-11",
+            "2017-01-04",
+            "2017-01-28",
+            "2017-02-21",
+            "2017-03-17",
+            "2017-04-10",
+            "2017-05-04",
+            "2017-05-28",
+            "2017-06-21",
+            "2017-07-15",
+            "2017-08-08",
+            "2017-09-01",
+            "2017-09-25",
+            "2017-10-19",
+            "2017-11-12",
+            "2017-12-06",
+            "2017-12-30",
+            "2018-01-23",
+            "2018-02-16",
+            "2018-03-12",
+            "2018-04-05",
+            "2018-04-29",
+            "2018-05-25",
+            "2018-06-22",
+            "2018-07-18",
+            "2018-08-12",
+            "2018-09-07",
+            "2018-10-03",
+            "2018-10-28",
+            "2018-11-21",
+            "2018-12-18",
+            "2019-01-16",
+            "2019-02-10",
+            "2019-03-07",
+            "2019-04-03",
+            "2019-04-27",
+            "2019-05-22",
+            "2019-06-15",
+            "2019-07-09",
+            "2019-08-02",
+            "2019-08-26",
+            "2019-09-19",
+            "2019-10-13",
+            "2019-11-06",
+            "2019-12-05",
+            "2019-12-30",
+            "2020-01-24",
+            "2020-02-17",
+            "2020-03-12",
+            "2020-04-07",
+            "2020-05-01",
+            "2020-05-25",
+            "2020-06-18",
+            "2020-07-12",
+            "2020-08-06",
+            "2020-09-01",
+            "2020-09-26",
+            "2020-10-22",
+            "2020-11-16",
+            "2020-12-11",
+            "2021-01-04",
+            "2021-01-29",
+            "2021-02-22",
+            "2021-03-20",
+            "2021-04-13",
+            "2021-05-09",
+            "2021-06-03",
+            "2021-06-30",
+            "2021-07-25",
+            "2021-08-22",
+            "2021-09-22",
+            "2021-10-20",
+            "2021-11-17",
+            "2021-12-24",
+            "2022-01-25",
+            "2022-02-22",
+            "2022-04-04",
+            "2022-05-02",
+            "2022-06-07",
+            "2022-07-10",
+            "2022-08-13",
+            "2022-09-26",
+            "2022-11-06",
+            "2022-12-11",
+            "2023-01-16",
+            "2023-03-20",
+            "2023-05-29",
+            "2023-07-02",
+            "2023-08-04",
+            "2023-09-26",
+            "2023-12-24",
+            "2024-03-24",
+            "2024-06-12",
+            "2024-10-05",
+            "2025-01-05",
+            "2025-03-30",
+            "2025-07-04"
+          ],
+          "datasets": [
+            {
+              "label": "Messages per Day",
+              "data": [
+                36,
+                65,
+                20,
+                23,
+                12,
+                8,
+                39,
+                15,
+                26,
+                18,
+                17,
+                16,
+                31,
+                21,
+                100,
+                18,
+                45,
+                100,
+                12,
+                14,
+                18,
+                11,
+                7,
+                11,
+                43,
+                9,
+                13,
+                6,
+                19,
+                49,
+                26,
+                333,
+                30,
+                82,
+                12,
+                11,
+                57,
+                50,
+                1,
+                95,
+                13,
+                16,
+                146,
+                12,
+                21,
+                15,
+                21,
+                15,
+                46,
+                10,
+                11,
+                13,
+                13,
+                20,
+                48,
+                19,
+                12,
+                18,
+                31,
+                11,
+                62,
+                21,
+                11,
+                11,
+                138,
+                11,
+                2,
+                14,
+                334,
+                16,
+                11,
+                12,
+                33,
+                15,
+                15,
+                35,
+                20,
+                25,
+                8,
+                12,
+                11,
+                10,
+                10,
+                12,
+                10,
+                14,
+                10,
+                11,
+                11,
+                12,
+                11,
+                14,
+                8,
+                16,
+                26,
+                10,
+                10,
+                12,
+                23,
+                13,
+                13,
+                90
+              ],
+              "borderColor": "#dc3545",
+              "backgroundColor": "rgba(220, 53, 69, 0.1)",
+              "borderWidth": 2,
+              "fill": true,
+              "tension": 0.1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Message Activity Timeline"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "x": {
+              "title": {
+                "display": true,
+                "text": "Date"
+              }
+            },
+            "y": {
+              "beginAtZero": true,
+              "title": {
+                "display": true,
+                "text": "Messages"
+              }
+            }
+          }
+        }
+      }
+    },
+    "books": {
+      "messages": 195,
+      "files": 2548,
+      "filename_analysis": {
+        "type": "pie",
+        "data": {
+          "labels": [
+            "Unique Files",
+            "Duplicate Files"
+          ],
+          "datasets": [
+            {
+              "label": "File Uniqueness",
+              "data": [
+                1290,
+                1258
+              ],
+              "backgroundColor": [
+                "#28a745",
+                "#dc3545"
+              ],
+              "borderWidth": 2
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "maintainAspectRatio": false,
+          "aspectRatio": 1,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "File Uniqueness Distribution"
+            },
+            "legend": {
+              "position": "bottom"
+            }
+          }
+        }
+      },
+      "filesize_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "0-1MB",
+            "1-10MB",
+            "10-100MB",
+            "100MB-1GB",
+            "1GB+"
+          ],
+          "datasets": [
+            {
+              "label": "Number of Files",
+              "data": [
+                237,
+                840,
+                1215,
+                256,
+                0
+              ],
+              "backgroundColor": [
+                "#17a2b8",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d"
+              ],
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "File Size Distribution"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            }
+          }
+        }
+      },
+      "message_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "\ud83d\udcf1",
+            "\ud83e\udef6",
+            "\ud83e\udea7",
+            "\ud83d\udcda",
+            "\u2764\ufe0f",
+            "\ud83d\udc96",
+            "\u2728",
+            "\ud83d\udc49\ud83c\udffb",
+            "\ud83d\ude80",
+            "\u26a1"
+          ],
+          "datasets": [
+            {
+              "label": "Emoji Usage",
+              "data": [
+                15,
+                6,
+                4,
+                3,
+                2,
+                2,
+                2,
+                1,
+                1,
+                1
+              ],
+              "backgroundColor": "#28a745",
+              "borderColor": "#1e7e34",
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Top Emojis"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            }
+          }
+        }
+      },
+      "analysis_summary": {},
+      "source_breakdown": {
+        "file_messages": {
+          "messages": 0,
+          "files": 0
+        },
+        "db_messages": {
+          "messages": 0,
+          "files": 0
+        },
+        "diff_messages": {
+          "messages": 0,
+          "files": 0
+        }
+      },
+      "file_types_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "pdf",
+            "epub",
+            "zip",
+            "mp4",
+            "tar",
+            "rar",
+            "png"
+          ],
+          "datasets": [
+            {
+              "label": "Number of Files",
+              "data": [
+                1329,
+                1130,
+                60,
+                14,
+                6,
+                4,
+                4
+              ],
+              "backgroundColor": [
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d"
+              ],
+              "borderColor": [
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d"
+              ],
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "File Types Distribution"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            },
+            "x": {
+              "ticks": {
+                "maxRotation": 45
+              }
+            }
+          }
+        }
+      },
+      "filename_metrics": {
+        "duplicate_ratio": 0.4937205651491366,
+        "files_with_duplicate_names": 1258,
+        "total_unique_filenames": 1290,
+        "total_files": 2548,
+        "most_common_filenames": [],
+        "files_with_special_chars": 411,
+        "files_with_spaces": 1038,
+        "filename_length_stats": {}
+      },
+      "filesize_metrics": {
+        "duplicate_ratio": 0.4937205651491366,
+        "files_with_duplicate_sizes": 555,
+        "total_unique_filesizes": 0,
+        "total_files": 2548,
+        "most_common_filesizes": [],
+        "size_frequency_distribution": {
+          "0-1MB": 237,
+          "1-10MB": 840,
+          "10-100MB": 1215,
+          "100MB-1GB": 256,
+          "1GB+": 0
+        },
+        "potential_duplicates_by_size": []
+      },
+      "message_metrics": {
+        "total_messages": 195,
+        "messages_with_text": 195,
+        "media_messages": 195,
+        "forwarded_messages": 0,
+        "text_length_stats": {
+          "count": 195,
+          "min": 17,
+          "max": 4554,
+          "mean": 580.22,
+          "median": 220
+        },
+        "hashtags_count": 0,
+        "mentions_count": 4,
+        "urls_count": 0,
+        "emojis_count": 37,
+        "detected_languages": [],
+        "primary_language": "Unknown",
+        "language_confidence": 0
+      },
+      "filename_language_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "No Language Data"
+          ],
+          "datasets": [
+            {
+              "label": "File Count",
+              "data": [
+                0
+              ],
+              "backgroundColor": "#6c757d",
+              "borderColor": "#495057",
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "File Language Distribution"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            },
+            "x": {
+              "ticks": {
+                "maxRotation": 45
+              }
+            }
+          }
+        }
+      },
+      "filename_language_metrics": {
+        "total_languages_detected": 0,
+        "primary_language": "Unknown",
+        "language_confidence": 0.0,
+        "language_coverage": 0.0,
+        "multilingual_files": 0,
+        "language_confidence_stats": {},
+        "detected_languages": []
+      },
+      "mentions_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "@ChristinaTsvetkova",
+            "@stateco_in",
+            "@major",
+            "@offtopicclub"
+          ],
+          "datasets": [
+            {
+              "label": "Mention Count",
+              "data": [
+                1,
+                1,
+                1,
+                1
+              ],
+              "backgroundColor": "#17a2b8",
+              "borderColor": "#138496",
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Top Mentions"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            },
+            "x": {
+              "ticks": {
+                "maxRotation": 45
+              }
+            }
+          }
+        }
+      },
+      "urls_analysis": null,
+      "language_analysis": null,
+      "emoji_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "\ud83d\udcf1",
+            "\ud83e\udef6",
+            "\ud83e\udea7",
+            "\ud83d\udcda",
+            "\u2764\ufe0f",
+            "\ud83d\udc96",
+            "\u2728",
+            "\ud83d\udc49\ud83c\udffb",
+            "\ud83d\ude80",
+            "\u26a1"
+          ],
+          "datasets": [
+            {
+              "label": "Emoji Usage",
+              "data": [
+                15,
+                6,
+                4,
+                3,
+                2,
+                2,
+                2,
+                1,
+                1,
+                1
+              ],
+              "backgroundColor": "#28a745",
+              "borderColor": "#1e7e34",
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Top Emojis"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            },
+            "x": {
+              "ticks": {
+                "maxRotation": 45
+              }
+            }
+          }
+        }
+      },
+      "creator_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "user_-1001616159980"
+          ],
+          "datasets": [
+            {
+              "label": "Message Count",
+              "data": [
+                195
+              ],
+              "backgroundColor": "#6f42c1",
+              "borderColor": "#5a32a3",
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Top Contributors by Message Count"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            },
+            "x": {
+              "ticks": {
+                "maxRotation": 45
+              }
+            }
+          }
+        }
+      },
+      "creator_metrics": {
+        "total_creators": 1,
+        "most_active_creators": [
+          {
+            "username": "user_-1001616159980",
+            "message_count": 195,
+            "percentage": 100.0
+          }
+        ],
+        "creator_message_stats": {
+          "total_creators": 1,
+          "total_messages": 195,
+          "avg_messages_per_creator": 195.0
+        },
+        "total_messages": 195,
+        "avg_messages_per_creator": 195.0
+      },
+      "source_breakdown_chart": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "File Messages",
+            "Db Messages",
+            "Diff Messages"
+          ],
+          "datasets": [
+            {
+              "label": "Messages",
+              "data": [
+                0,
+                0,
+                0
+              ],
+              "backgroundColor": [
+                "#28a745",
+                "#007bff",
+                "#ffc107"
+              ],
+              "borderColor": [
+                "#28a745",
+                "#007bff",
+                "#ffc107"
+              ],
+              "borderWidth": 1
+            },
+            {
+              "label": "Files",
+              "data": [
+                0,
+                0,
+                0
+              ],
+              "backgroundColor": [
+                "#28a74580",
+                "#007bff80",
+                "#ffc10780"
+              ],
+              "borderColor": [
+                "#28a745",
+                "#007bff",
+                "#ffc107"
+              ],
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Data Source Breakdown"
+            },
+            "legend": {
+              "display": true,
+              "position": "top"
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            }
+          }
+        }
+      },
+      "monthly_histogram": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec"
+          ],
+          "datasets": [
+            {
+              "label": "Messages per Month",
+              "data": [
+                556,
+                565,
+                3,
+                5,
+                13,
+                800,
+                8,
+                10,
+                8,
+                12,
+                16,
+                29
+              ],
+              "backgroundColor": "#17a2b8",
+              "borderColor": "#138496",
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Monthly Message Distribution"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            }
+          }
+        }
+      },
+      "total_data_size_bytes": 95884332505.0,
+      "total_data_size_formatted": "89.3 GB",
+      "timeline_chart": {
+        "type": "line",
+        "data": {
+          "labels": [
+            "2022-11-01",
+            "2022-11-22",
+            "2022-11-26",
+            "2022-11-30",
+            "2022-12-04",
+            "2022-12-08",
+            "2022-12-12",
+            "2022-12-16",
+            "2022-12-20",
+            "2022-12-24",
+            "2022-12-29",
+            "2023-01-05",
+            "2023-01-10",
+            "2023-01-17",
+            "2023-01-24",
+            "2023-02-05",
+            "2023-02-25",
+            "2023-04-02",
+            "2023-04-23",
+            "2023-05-07",
+            "2023-05-14",
+            "2023-05-21",
+            "2023-06-08",
+            "2023-06-30",
+            "2023-07-27",
+            "2023-08-20",
+            "2023-09-17",
+            "2023-10-12",
+            "2023-11-02",
+            "2023-11-09",
+            "2023-12-05",
+            "2023-12-26",
+            "2024-01-01",
+            "2024-01-11",
+            "2024-01-24",
+            "2024-02-12",
+            "2024-03-09",
+            "2024-04-11",
+            "2024-05-21",
+            "2024-07-05",
+            "2024-08-09",
+            "2024-11-23",
+            "2025-01-05",
+            "2025-01-09",
+            "2025-01-14",
+            "2025-01-18",
+            "2025-01-22",
+            "2025-01-26",
+            "2025-01-30",
+            "2025-02-03",
+            "2025-02-07",
+            "2025-02-11",
+            "2025-02-15",
+            "2025-02-19",
+            "2025-02-23",
+            "2025-02-27",
+            "2025-03-03",
+            "2025-03-07",
+            "2025-03-11",
+            "2025-03-15",
+            "2025-03-19",
+            "2025-03-23",
+            "2025-03-27",
+            "2025-03-31",
+            "2025-04-04",
+            "2025-04-08",
+            "2025-04-12",
+            "2025-04-16",
+            "2025-04-20",
+            "2025-04-24",
+            "2025-04-28",
+            "2025-05-02",
+            "2025-05-06",
+            "2025-05-10",
+            "2025-05-14",
+            "2025-05-18",
+            "2025-05-22",
+            "2025-05-26",
+            "2025-05-30",
+            "2025-06-03",
+            "2025-06-07",
+            "2025-06-11",
+            "2025-06-15",
+            "2025-06-19",
+            "2025-06-23",
+            "2025-06-27",
+            "2025-07-01",
+            "2025-07-05",
+            "2025-07-09",
+            "2025-07-13",
+            "2025-07-17",
+            "2025-07-21",
+            "2025-07-25",
+            "2025-07-29",
+            "2025-08-02",
+            "2025-08-06",
+            "2025-08-10",
+            "2025-08-14",
+            "2025-08-18",
+            "2025-08-24",
+            "2025-08-28",
+            "2025-09-01"
+          ],
+          "datasets": [
+            {
+              "label": "Messages per Day",
+              "data": [
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+                60,
+                16,
+                20,
+                24,
+                49,
+                11,
+                18,
+                29,
+                20,
+                13,
+                26,
+                7,
+                14,
+                19,
+                8,
+                10,
+                26,
+                2,
+                11,
+                19,
+                15,
+                10,
+                26,
+                21,
+                13,
+                11,
+                9,
+                26,
+                26,
+                5,
+                14,
+                9,
+                4,
+                19,
+                25,
+                6,
+                22,
+                19,
+                26,
+                13,
+                19,
+                32,
+                44,
+                60,
+                34,
+                16,
+                34,
+                4,
+                24,
+                6,
+                32,
+                12,
+                20,
+                48,
+                54,
+                28,
+                54,
+                6,
+                2,
+                20
+              ],
+              "borderColor": "#dc3545",
+              "backgroundColor": "rgba(220, 53, 69, 0.1)",
+              "borderWidth": 2,
+              "fill": true,
+              "tension": 0.1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Message Activity Timeline"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "x": {
+              "title": {
+                "display": true,
+                "text": "Date"
+              }
+            },
+            "y": {
+              "beginAtZero": true,
+              "title": {
+                "display": true,
+                "text": "Messages"
+              }
+            }
+          }
+        }
+      }
+    },
+    "books_magazine": {
+      "messages": 4118,
+      "files": 1987,
+      "filename_analysis": {
+        "type": "pie",
+        "data": {
+          "labels": [
+            "Unique Files",
+            "Duplicate Files"
+          ],
+          "datasets": [
+            {
+              "label": "File Uniqueness",
+              "data": [
+                1290,
+                1258
+              ],
+              "backgroundColor": [
+                "#28a745",
+                "#dc3545"
+              ],
+              "borderWidth": 2
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "maintainAspectRatio": false,
+          "aspectRatio": 1,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "File Uniqueness Distribution"
+            },
+            "legend": {
+              "position": "bottom"
+            }
+          }
+        }
+      },
+      "filesize_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "0-1MB",
+            "1-10MB",
+            "10-100MB",
+            "100MB-1GB",
+            "1GB+"
+          ],
+          "datasets": [
+            {
+              "label": "Number of Files",
+              "data": [
+                237,
+                840,
+                1215,
+                256,
+                0
+              ],
+              "backgroundColor": [
+                "#17a2b8",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d"
+              ],
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "File Size Distribution"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            }
+          }
+        }
+      },
+      "message_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "#1",
+            "#reading",
+            "#esl",
+            "#english",
+            "#languages",
+            "#japan",
+            "#asia",
+            "#article",
+            "#New_scientist",
+            "#magazine"
+          ],
+          "datasets": [
+            {
+              "label": "Hashtag Usage",
+              "data": [
+                11,
+                3,
+                2,
+                2,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "backgroundColor": "#007bff",
+              "borderColor": "#0056b3",
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Top Hashtags"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            },
+            "x": {
+              "ticks": {
+                "maxRotation": 45
+              }
+            }
+          }
+        }
+      },
+      "analysis_summary": {},
+      "source_breakdown": {
+        "file_messages": {
+          "messages": 0,
+          "files": 0
+        },
+        "db_messages": {
+          "messages": 0,
+          "files": 0
+        },
+        "diff_messages": {
+          "messages": 0,
+          "files": 0
+        }
+      },
+      "file_types_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "pdf",
+            "epub",
+            "zip",
+            "mp4",
+            "tar",
+            "rar",
+            "png"
+          ],
+          "datasets": [
+            {
+              "label": "Number of Files",
+              "data": [
+                1329,
+                1130,
+                60,
+                14,
+                6,
+                4,
+                4
+              ],
+              "backgroundColor": [
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d"
+              ],
+              "borderColor": [
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d",
+                "#6c757d"
+              ],
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "File Types Distribution"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            },
+            "x": {
+              "ticks": {
+                "maxRotation": 45
+              }
+            }
+          }
+        }
+      },
+      "filename_metrics": {
+        "duplicate_ratio": 0.4937205651491366,
+        "files_with_duplicate_names": 1258,
+        "total_unique_filenames": 1290,
+        "total_files": 2548,
+        "most_common_filenames": [],
+        "files_with_special_chars": 411,
+        "files_with_spaces": 1038,
+        "filename_length_stats": {}
+      },
+      "filename_language_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "English",
+            "German",
+            "French",
+            "Af",
+            "Italian",
+            "Ro",
+            "Norwegian",
+            "Danish",
+            "Indonesian",
+            "Dutch"
+          ],
+          "datasets": [
+            {
+              "label": "File Count",
+              "data": [
+                1676,
+                85,
+                35,
+                35,
+                24,
+                16,
+                16,
+                15,
+                14,
+                10
+              ],
+              "backgroundColor": [
+                "#007bff",
+                "#28a745",
+                "#dc3545",
+                "#ffc107",
+                "#17a2b8",
+                "#6f42c1",
+                "#e83e8c",
+                "#fd7e14",
+                "#20c997",
+                "#6c757d"
+              ],
+              "borderColor": [
+                "#007bff",
+                "#28a745",
+                "#dc3545",
+                "#ffc107",
+                "#17a2b8",
+                "#6f42c1",
+                "#e83e8c",
+                "#fd7e14",
+                "#20c997",
+                "#6c757d"
+              ],
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "File Language Distribution"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true,
+              "title": {
+                "display": true,
+                "text": "Number of Files"
+              }
+            },
+            "x": {
+              "title": {
+                "display": true,
+                "text": "Language"
+              },
+              "ticks": {
+                "maxRotation": 45
+              }
+            }
+          }
+        }
+      },
+      "filename_language_metrics": {
+        "total_languages_detected": 23,
+        "primary_language": "English",
+        "language_confidence": 0.7,
+        "language_coverage": 99.8,
+        "multilingual_files": 0,
+        "language_confidence_stats": {
+          "average_confidence": 0.7,
+          "min_confidence": 0.7,
+          "max_confidence": 0.7,
+          "low_confidence_files": 0
+        },
+        "detected_languages": [
+          "English",
+          "Indonesian",
+          "Swedish",
+          "Italian",
+          "Dutch",
+          "German",
+          "French",
+          "Danish",
+          "Ro",
+          "Sw",
+          "Tl",
+          "Af",
+          "Norwegian",
+          "Cy",
+          "Sq",
+          "Sl",
+          "Ca",
+          "Spanish",
+          "Portuguese",
+          "Polish",
+          "Lv",
+          "Et",
+          "So"
+        ]
+      },
+      "filesize_metrics": {
+        "duplicate_ratio": 0.4937205651491366,
+        "files_with_duplicate_sizes": 555,
+        "total_unique_filesizes": 0,
+        "total_files": 2548,
+        "most_common_filesizes": [],
+        "size_frequency_distribution": {
+          "0-1MB": 237,
+          "1-10MB": 840,
+          "10-100MB": 1215,
+          "100MB-1GB": 256,
+          "1GB+": 0
+        },
+        "potential_duplicates_by_size": []
+      },
+      "message_metrics": {
+        "total_messages": 4118,
+        "messages_with_text": 4118,
+        "media_messages": 4118,
+        "forwarded_messages": 5,
+        "text_length_stats": {
+          "count": 4118,
+          "min": 11,
+          "max": 1861,
+          "mean": 108.19,
+          "median": 17
+        },
+        "hashtags_count": 21,
+        "mentions_count": 2,
+        "urls_count": 0,
+        "emojis_count": 30,
+        "detected_languages": [],
+        "primary_language": "Unknown",
+        "language_confidence": 0
+      },
+      "mentions_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "@eng_maura",
+            "@english_books_maura"
+          ],
+          "datasets": [
+            {
+              "label": "Mention Count",
+              "data": [
+                1,
+                1
+              ],
+              "backgroundColor": "#17a2b8",
+              "borderColor": "#138496",
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Top Mentions"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            },
+            "x": {
+              "ticks": {
+                "maxRotation": 45
+              }
+            }
+          }
+        }
+      },
+      "urls_analysis": null,
+      "language_analysis": null,
+      "emoji_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "\ud83d\udcda",
+            "\u2665\ufe0f",
+            "\ud83c\udf40",
+            "\u2615",
+            "\ud83d\udcd6",
+            "\u2611\ufe0f",
+            "\u26e9",
+            "\ud83c\udf71",
+            "\ud83c\uddef\ud83c\uddf5",
+            "\u2728"
+          ],
+          "datasets": [
+            {
+              "label": "Emoji Usage",
+              "data": [
+                39,
+                39,
+                6,
+                5,
+                4,
+                3,
+                2,
+                2,
+                2,
+                2
+              ],
+              "backgroundColor": "#28a745",
+              "borderColor": "#1e7e34",
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Top Emojis"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            },
+            "x": {
+              "ticks": {
+                "maxRotation": 45
+              }
+            }
+          }
+        }
+      },
+      "creator_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "books_magazine"
+          ],
+          "datasets": [
+            {
+              "label": "Message Count",
+              "data": [
+                4118
+              ],
+              "backgroundColor": "#6f42c1",
+              "borderColor": "#5a32a3",
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Top Contributors by Message Count"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            },
+            "x": {
+              "ticks": {
+                "maxRotation": 45
+              }
+            }
+          }
+        }
+      },
+      "creator_metrics": {
+        "total_creators": 1,
+        "most_active_creators": [
+          {
+            "username": "books_magazine",
+            "message_count": 4118,
+            "percentage": 100.0
+          }
+        ],
+        "creator_message_stats": {
+          "total_creators": 1,
+          "total_messages": 4118,
+          "avg_messages_per_creator": 4118.0
+        },
+        "total_messages": 4118,
+        "avg_messages_per_creator": 4118.0
+      },
+      "source_breakdown_chart": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "File Messages",
+            "Db Messages",
+            "Diff Messages"
+          ],
+          "datasets": [
+            {
+              "label": "Messages",
+              "data": [
+                0,
+                0,
+                0
+              ],
+              "backgroundColor": [
+                "#28a745",
+                "#007bff",
+                "#ffc107"
+              ],
+              "borderColor": [
+                "#28a745",
+                "#007bff",
+                "#ffc107"
+              ],
+              "borderWidth": 1
+            },
+            {
+              "label": "Files",
+              "data": [
+                0,
+                0,
+                0
+              ],
+              "backgroundColor": [
+                "#28a74580",
+                "#007bff80",
+                "#ffc10780"
+              ],
+              "borderColor": [
+                "#28a745",
+                "#007bff",
+                "#ffc107"
+              ],
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Data Source Breakdown"
+            },
+            "legend": {
+              "display": true,
+              "position": "top"
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            }
+          }
+        }
+      },
+      "monthly_histogram": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec"
+          ],
+          "datasets": [
+            {
+              "label": "Messages per Month",
+              "data": [
+                556,
+                565,
+                596,
+                651,
+                446,
+                800,
+                770,
+                796,
+                38,
+                0,
+                0,
+                0
+              ],
+              "backgroundColor": "#17a2b8",
+              "borderColor": "#138496",
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Monthly Message Distribution"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            }
+          }
+        }
+      },
+      "total_data_size_bytes": 95884332505.0,
+      "total_data_size_formatted": "89.3 GB",
+      "timeline_chart": {
+        "type": "line",
+        "data": {
+          "labels": [
+            "2025-01-05",
+            "2025-01-07",
+            "2025-01-09",
+            "2025-01-11",
+            "2025-01-14",
+            "2025-01-16",
+            "2025-01-18",
+            "2025-01-20",
+            "2025-01-22",
+            "2025-01-24",
+            "2025-01-26",
+            "2025-01-28",
+            "2025-01-30",
+            "2025-02-01",
+            "2025-02-03",
+            "2025-02-05",
+            "2025-02-07",
+            "2025-02-09",
+            "2025-02-11",
+            "2025-02-13",
+            "2025-02-15",
+            "2025-02-17",
+            "2025-02-19",
+            "2025-02-21",
+            "2025-02-23",
+            "2025-02-25",
+            "2025-02-27",
+            "2025-03-01",
+            "2025-03-03",
+            "2025-03-05",
+            "2025-03-07",
+            "2025-03-09",
+            "2025-03-11",
+            "2025-03-13",
+            "2025-03-15",
+            "2025-03-17",
+            "2025-03-19",
+            "2025-03-21",
+            "2025-03-23",
+            "2025-03-25",
+            "2025-03-27",
+            "2025-03-29",
+            "2025-03-31",
+            "2025-04-02",
+            "2025-04-04",
+            "2025-04-06",
+            "2025-04-08",
+            "2025-04-10",
+            "2025-04-12",
+            "2025-04-14",
+            "2025-04-16",
+            "2025-04-18",
+            "2025-04-20",
+            "2025-04-22",
+            "2025-04-24",
+            "2025-04-26",
+            "2025-04-28",
+            "2025-04-30",
+            "2025-05-02",
+            "2025-05-04",
+            "2025-05-06",
+            "2025-05-08",
+            "2025-05-10",
+            "2025-05-12",
+            "2025-05-14",
+            "2025-05-16",
+            "2025-05-18",
+            "2025-05-20",
+            "2025-05-22",
+            "2025-05-24",
+            "2025-05-26",
+            "2025-05-28",
+            "2025-05-30",
+            "2025-06-01",
+            "2025-06-03",
+            "2025-06-05",
+            "2025-06-07",
+            "2025-06-09",
+            "2025-06-11",
+            "2025-06-13",
+            "2025-06-15",
+            "2025-06-17",
+            "2025-06-19",
+            "2025-06-21",
+            "2025-06-23",
+            "2025-06-25",
+            "2025-06-27",
+            "2025-06-29",
+            "2025-07-01",
+            "2025-07-03",
+            "2025-07-05",
+            "2025-07-07",
+            "2025-07-09",
+            "2025-07-11",
+            "2025-07-13",
+            "2025-07-15",
+            "2025-07-17",
+            "2025-07-19",
+            "2025-07-21",
+            "2025-07-23",
+            "2025-07-25",
+            "2025-07-27",
+            "2025-07-29",
+            "2025-07-31",
+            "2025-08-02",
+            "2025-08-04",
+            "2025-08-06",
+            "2025-08-08",
+            "2025-08-10",
+            "2025-08-12",
+            "2025-08-14",
+            "2025-08-16",
+            "2025-08-18",
+            "2025-08-20",
+            "2025-08-24",
+            "2025-08-26",
+            "2025-08-29",
+            "2025-08-31",
+            "2025-09-02"
+          ],
+          "datasets": [
+            {
+              "label": "Messages per Day",
+              "data": [
+                60,
+                25,
+                16,
+                5,
+                20,
+                28,
+                24,
+                12,
+                49,
+                25,
+                11,
+                27,
+                18,
+                19,
+                29,
+                9,
+                20,
+                27,
+                13,
+                12,
+                26,
+                26,
+                7,
+                47,
+                14,
+                17,
+                19,
+                32,
+                6,
+                4,
+                10,
+                23,
+                24,
+                12,
+                2,
+                4,
+                11,
+                25,
+                19,
+                30,
+                15,
+                12,
+                10,
+                26,
+                26,
+                22,
+                21,
+                14,
+                13,
+                44,
+                11,
+                41,
+                9,
+                7,
+                26,
+                17,
+                26,
+                23,
+                5,
+                24,
+                14,
+                11,
+                9,
+                20,
+                4,
+                34,
+                19,
+                8,
+                25,
+                20,
+                6,
+                21,
+                22,
+                23,
+                19,
+                8,
+                26,
+                12,
+                13,
+                30,
+                19,
+                36,
+                32,
+                60,
+                44,
+                12,
+                60,
+                18,
+                34,
+                24,
+                16,
+                50,
+                34,
+                60,
+                4,
+                18,
+                24,
+                30,
+                4,
+                40,
+                32,
+                12,
+                12,
+                14,
+                20,
+                28,
+                46,
+                64,
+                54,
+                40,
+                28,
+                18,
+                54,
+                51,
+                6,
+                15,
+                42,
+                15,
+                8
+              ],
+              "borderColor": "#dc3545",
+              "backgroundColor": "rgba(220, 53, 69, 0.1)",
+              "borderWidth": 2,
+              "fill": true,
+              "tension": 0.1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Message Activity Timeline"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "x": {
+              "title": {
+                "display": true,
+                "text": "Date"
+              }
+            },
+            "y": {
+              "beginAtZero": true,
+              "title": {
+                "display": true,
+                "text": "Messages"
+              }
+            }
+          }
+        }
+      }
+    },
+    "Free_Books_life": {
+      "messages": 111,
+      "files": 107,
+      "filename_analysis": {
+        "type": "pie",
+        "data": {
+          "labels": [
+            "Unique Files",
+            "Duplicate Files"
+          ],
+          "datasets": [
+            {
+              "label": "File Uniqueness",
+              "data": [
+                107,
+                0
+              ],
+              "backgroundColor": [
+                "#28a745",
+                "#dc3545"
+              ],
+              "borderWidth": 2
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "maintainAspectRatio": false,
+          "aspectRatio": 1,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "File Uniqueness Distribution"
+            },
+            "legend": {
+              "position": "bottom"
+            }
+          }
+        }
+      },
+      "filesize_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "10MB+",
+            "1-5MB",
+            "5-10MB",
+            "0-1MB"
+          ],
+          "datasets": [
+            {
+              "label": "Number of Files",
+              "data": [
+                42,
+                41,
+                24,
+                0
+              ],
+              "backgroundColor": [
+                "#dc3545",
+                "#28a745",
+                "#ffc107",
+                "#17a2b8"
+              ],
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "File Size Distribution"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            }
+          }
+        }
+      },
+      "message_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "No Data"
+          ],
+          "datasets": [
+            {
+              "label": "No Data Available",
+              "data": [
+                0
+              ],
+              "backgroundColor": "#6c757d"
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Message Analysis - No Data Available"
+            }
+          }
+        }
+      },
+      "analysis_summary": {},
+      "source_breakdown": {
+        "file_messages": {
+          "messages": 0,
+          "files": 0
+        },
+        "db_messages": {
+          "messages": 0,
+          "files": 0
+        },
+        "diff_messages": {
+          "messages": 0,
+          "files": 0
+        }
+      },
+      "file_types_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            ".pdf"
+          ],
+          "datasets": [
+            {
+              "label": "Number of Files",
+              "data": [
+                107
+              ],
+              "backgroundColor": [
+                "#dc3545"
+              ],
+              "borderColor": [
+                "#dc3545"
+              ],
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "File Types Distribution"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            },
+            "x": {
+              "ticks": {
+                "maxRotation": 45
+              }
+            }
+          }
+        }
+      },
+      "filename_metrics": {
+        "duplicate_ratio": 0.0,
+        "files_with_duplicate_names": 0,
+        "total_unique_filenames": 107,
+        "total_files": 107,
+        "most_common_filenames": [
+          {
+            "filename": "\u06a9\u0627\u0631\u0646\u0627\u0645\u0647 \u0645\u0635\u062f\u0642 2.pdf",
+            "count": 1
+          },
+          {
+            "filename": "\u06a9\u0627\u0631\u0646\u0627\u0645\u0647 \u0645\u0635\u062f\u0642 1.pdf",
+            "count": 1
+          },
+          {
+            "filename": "\u0646\u0642\u0627\u0634\u06cc \u0646\u0648\u06cc\u0646 (2).pdf",
+            "count": 1
+          },
+          {
+            "filename": "\u0646\u0642\u0627\u0634\u06cc \u0646\u0648\u06cc\u0646 (1).pdf",
+            "count": 1
+          },
+          {
+            "filename": "\u0634\u0627\u0647 3\u062c\u0647\u0627\u0646 \u0646\u0627\u0645\u0647.pdf",
+            "count": 1
+          },
+          {
+            "filename": "\u0634\u0627\u0647 2\u062c\u0647\u0627\u0646 \u0646\u0627\u0645\u0647.pdf",
+            "count": 1
+          },
+          {
+            "filename": "\u0634\u0627\u0647 1\u062c\u0647\u0627\u0646 \u0646\u0627\u0645\u0647.pdf",
+            "count": 1
+          },
+          {
+            "filename": "\u062f\u0627\u0646\u0634\u0645\u0646\u062f\u0627\u0646 \u0648 \u0633\u062e\u0646 \u0633\u0631\u0627\u06cc\u0627\u0646 \u0641\u0627\u0631\u0633 5.PDF",
+            "count": 1
+          },
+          {
+            "filename": "\u062f\u0627\u0646\u0634\u0645\u0646\u062f\u0627\u0646 \u0648 \u0633\u062e\u0646 \u0633\u0631\u0627\u06cc\u0627\u0646 \u0641\u0627\u0631\u0633 4.PDF",
+            "count": 1
+          },
+          {
+            "filename": "\u062f\u0627\u0646\u0634\u0645\u0646\u062f\u0627\u0646 \u0648 \u0633\u062e\u0646 \u0633\u0631\u0627\u06cc\u0627\u0646 \u0641\u0627\u0631\u0633 3.PDF",
+            "count": 1
+          }
+        ],
+        "files_with_special_chars": 10,
+        "files_with_spaces": 102,
+        "filename_length_stats": {
+          "count": 107,
+          "min": 9,
+          "max": 43,
+          "mean": 21.65,
+          "median": 20
+        }
+      },
+      "filesize_metrics": {
+        "duplicate_ratio": 0.0,
+        "files_with_duplicate_sizes": 0,
+        "total_unique_filesizes": 107,
+        "total_files": 107,
+        "most_common_filesizes": [
+          {
+            "size_bytes": 2755762,
+            "count": 1,
+            "size_mb": 2.63
+          },
+          {
+            "size_bytes": 4693703,
+            "count": 1,
+            "size_mb": 4.48
+          },
+          {
+            "size_bytes": 11572708,
+            "count": 1,
+            "size_mb": 11.04
+          },
+          {
+            "size_bytes": 12179377,
+            "count": 1,
+            "size_mb": 11.62
+          },
+          {
+            "size_bytes": 10108191,
+            "count": 1,
+            "size_mb": 9.64
+          },
+          {
+            "size_bytes": 9715212,
+            "count": 1,
+            "size_mb": 9.27
+          },
+          {
+            "size_bytes": 10827011,
+            "count": 1,
+            "size_mb": 10.33
+          },
+          {
+            "size_bytes": 7321637,
+            "count": 1,
+            "size_mb": 6.98
+          },
+          {
+            "size_bytes": 9840396,
+            "count": 1,
+            "size_mb": 9.38
+          },
+          {
+            "size_bytes": 11416988,
+            "count": 1,
+            "size_mb": 10.89
+          }
+        ],
+        "size_frequency_distribution": {
+          "10MB+": 42,
+          "1-5MB": 41,
+          "5-10MB": 24,
+          "0-1MB": 0
+        },
+        "potential_duplicates_by_size": []
+      },
+      "message_metrics": {
+        "total_messages": 111,
+        "messages_with_text": 111,
+        "media_messages": 111,
+        "forwarded_messages": 0,
+        "text_length_stats": {
+          "count": 111,
+          "min": 17,
+          "max": 36,
+          "mean": 17.17,
+          "median": 17
+        },
+        "hashtags_count": 0,
+        "mentions_count": 0,
+        "urls_count": 0,
+        "emojis_count": 0,
+        "detected_languages": [],
+        "primary_language": "Unknown",
+        "language_confidence": 0
+      },
+      "filename_language_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "Fa",
+            "Arabic",
+            "Ur"
+          ],
+          "datasets": [
+            {
+              "label": "File Count",
+              "data": [
+                98,
+                7,
+                2
+              ],
+              "backgroundColor": [
+                "#007bff",
+                "#28a745",
+                "#dc3545"
+              ],
+              "borderColor": [
+                "#007bff",
+                "#28a745",
+                "#dc3545"
+              ],
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "File Language Distribution"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true,
+              "title": {
+                "display": true,
+                "text": "Number of Files"
+              }
+            },
+            "x": {
+              "title": {
+                "display": true,
+                "text": "Language"
+              },
+              "ticks": {
+                "maxRotation": 45
+              }
+            }
+          }
+        }
+      },
+      "filename_language_metrics": {
+        "total_languages_detected": 3,
+        "primary_language": "Fa",
+        "language_confidence": 0.7,
+        "language_coverage": 100.0,
+        "multilingual_files": 0,
+        "language_confidence_stats": {
+          "average_confidence": 0.7,
+          "min_confidence": 0.7,
+          "max_confidence": 0.7,
+          "low_confidence_files": 0
+        },
+        "detected_languages": [
+          "Fa",
+          "Ur",
+          "Arabic"
+        ]
+      },
+      "mentions_analysis": null,
+      "urls_analysis": null,
+      "language_analysis": null,
+      "emoji_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "No Data"
+          ],
+          "datasets": [
+            {
+              "label": "No Data",
+              "data": [
+                0
+              ],
+              "backgroundColor": "#6c757d",
+              "borderColor": "#495057",
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "No Emoji Data Available"
+            },
+            "legend": {
+              "display": false
+            }
+          }
+        }
+      },
+      "creator_analysis": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "Free_Books_life"
+          ],
+          "datasets": [
+            {
+              "label": "Message Count",
+              "data": [
+                111
+              ],
+              "backgroundColor": "#6f42c1",
+              "borderColor": "#5a32a3",
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Top Contributors by Message Count"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            },
+            "x": {
+              "ticks": {
+                "maxRotation": 45
+              }
+            }
+          }
+        }
+      },
+      "creator_metrics": {
+        "total_creators": 1,
+        "most_active_creators": [
+          {
+            "username": "Free_Books_life",
+            "message_count": 111,
+            "percentage": 100.0
+          }
+        ],
+        "creator_message_stats": {
+          "total_creators": 1,
+          "total_messages": 111,
+          "avg_messages_per_creator": 111.0
+        },
+        "total_messages": 111,
+        "avg_messages_per_creator": 111.0
+      },
+      "source_breakdown_chart": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "File Messages",
+            "Db Messages",
+            "Diff Messages"
+          ],
+          "datasets": [
+            {
+              "label": "Messages",
+              "data": [
+                0,
+                0,
+                0
+              ],
+              "backgroundColor": [
+                "#28a745",
+                "#007bff",
+                "#ffc107"
+              ],
+              "borderColor": [
+                "#28a745",
+                "#007bff",
+                "#ffc107"
+              ],
+              "borderWidth": 1
+            },
+            {
+              "label": "Files",
+              "data": [
+                0,
+                0,
+                0
+              ],
+              "backgroundColor": [
+                "#28a74580",
+                "#007bff80",
+                "#ffc10780"
+              ],
+              "borderColor": [
+                "#28a745",
+                "#007bff",
+                "#ffc107"
+              ],
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Data Source Breakdown"
+            },
+            "legend": {
+              "display": true,
+              "position": "top"
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            }
+          }
+        }
+      },
+      "monthly_histogram": {
+        "type": "bar",
+        "data": {
+          "labels": [
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec"
+          ],
+          "datasets": [
+            {
+              "label": "Messages per Month",
+              "data": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                207,
+                4,
+                0,
+                0
+              ],
+              "backgroundColor": "#17a2b8",
+              "borderColor": "#138496",
+              "borderWidth": 1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Monthly Message Distribution"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            }
+          }
+        }
+      },
+      "total_data_size_bytes": 2266035288.0,
+      "total_data_size_formatted": "2.1 GB",
+      "timeline_chart": {
+        "type": "line",
+        "data": {
+          "labels": [
+            "2021-09-10",
+            "2021-09-26",
+            "2021-10-01"
+          ],
+          "datasets": [
+            {
+              "label": "Messages per Day",
+              "data": [
+                2,
+                205,
+                4
+              ],
+              "borderColor": "#dc3545",
+              "backgroundColor": "rgba(220, 53, 69, 0.1)",
+              "borderWidth": 2,
+              "fill": true,
+              "tension": 0.1
+            }
+          ]
+        },
+        "options": {
+          "responsive": true,
+          "plugins": {
+            "title": {
+              "display": true,
+              "text": "Message Activity Timeline"
+            },
+            "legend": {
+              "display": false
+            }
+          },
+          "scales": {
+            "x": {
+              "title": {
+                "display": true,
+                "text": "Date"
+              }
+            },
+            "y": {
+              "beginAtZero": true,
+              "title": {
+                "display": true,
+                "text": "Messages"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

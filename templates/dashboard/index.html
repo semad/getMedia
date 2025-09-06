@@ -23,7 +23,6 @@
                 <div class="logo">📊 Telegram Analysis Dashboard</div>
                 <nav class="nav">
                     <a href="index.html" class="nav-item active">Overview</a>
-                    <a href="#" class="nav-item">Export</a>
                 </nav>
             </div>
         </div>
@@ -46,6 +45,12 @@
                 <div class="metric-value">{{ "{:,}".format(data.summary.total_files) }}</div>
                 <div class="metric-label">Total Files</div>
             </div>
+            {% if data.summary.total_data_size_formatted %}
+            <div class="metric-card">
+                <div class="metric-value">{{ data.summary.total_data_size_formatted }}</div>
+                <div class="metric-label">Total Data Size</div>
+            </div>
+            {% endif %}
         </div>
 
         <!-- Channels Grid -->
@@ -63,6 +68,12 @@
                         <div class="channel-stat-value">{{ "{:,}".format(channel_data.files) }}</div>
                         <div class="channel-stat-label">Files</div>
                     </div>
+                    {% if channel_data.total_data_size_formatted %}
+                    <div>
+                        <div class="channel-stat-value">{{ channel_data.total_data_size_formatted }}</div>
+                        <div class="channel-stat-label">Data Size</div>
+                    </div>
+                    {% endif %}
                 </div>
                 <a href="{{ channel_name|replace('@', 'at_')|replace(' ', '_') }}.html" 
                    class="btn btn-primary">View Details</a>

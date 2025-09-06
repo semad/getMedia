@@ -179,6 +179,10 @@ class DashboardProcessor:
         filename_pattern_analysis = data.get('filename_pattern_analysis', {})
         common_extensions = filename_pattern_analysis.get('common_extensions', [])
         
+        # Debug logging
+        self.logger.debug(f"File types analysis data: {data}")
+        self.logger.debug(f"Common extensions: {common_extensions}")
+        
         if not common_extensions:
             return {
                 'type': 'bar',
@@ -223,7 +227,8 @@ class DashboardProcessor:
         }
         
         for ext_data in top_extensions:
-            ext = ext_data.get('ext', '')
+            # Handle both 'ext' and 'extension' keys
+            ext = ext_data.get('ext', ext_data.get('extension', ''))
             count = ext_data.get('count', 0)
             
             labels.append(ext)
@@ -610,6 +615,220 @@ class DashboardProcessor:
             self.logger.error(f"Error getting timeline data for {channel_name}: {e}")
             return None
 
+    def _get_total_data_size_and_file_count_for_channel(self, channel_name: str) -> Optional[Dict[str, Any]]:
+        """Get total data size and file count for a specific channel from collection files."""
+        try:
+            # Find all collection files for this channel
+            collections_dir = Path("reports/0_collections")
+            collection_files = list(collections_dir.glob(f"*{channel_name}*.json"))
+            
+            if not collection_files:
+                self.logger.warning(f"Collection file not found for {channel_name}")
+                return None
+            
+            total_size = 0.0
+            total_files = 0
+            
+            # Process all collection files for this channel
+            for file_path in collection_files:
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    
+                    file_count = 0
+                    # Handle the collection file structure
+                    messages = []
+                    if isinstance(data, list):
+                        # If data is a list, it might be a list of collection files
+                        for item in data:
+                            if isinstance(item, dict) and 'messages' in item:
+                                messages.extend(item['messages'])
+                            elif isinstance(item, dict) and 'file_size' in item:
+                                # Direct message format
+                                messages.append(item)
+                    elif isinstance(data, dict) and 'messages' in data:
+                        messages = data['messages']
+                    else:
+                        # Fallback: treat data as messages directly
+                        messages = data if isinstance(data, list) else [data]
+                    
+                    # Sum up file sizes from all messages
+                    self.logger.debug(f"Processing {len(messages)} messages from {file_path}")
+                    for i, message in enumerate(messages):
+                        if i < 5:  # Debug first 5 messages
+                            self.logger.debug(f"Message {i}: type={type(message)}, keys={list(message.keys()) if isinstance(message, dict) else 'not dict'}")
+                        
+                        if isinstance(message, dict) and 'file_size' in message:
+                            file_size = message['file_size']
+                            if file_size is not None and file_size != 'null' and str(file_size).lower() != 'nan':
+                                file_size_float = float(file_size)
+                                if file_size_float > 0:
+                                    total_size += file_size_float
+                                    file_count += 1
+                                elif i < 10:  # Debug first 10 messages
+                                    self.logger.debug(f"Message {i}: file_size={file_size}")
+                    
+                    total_files += file_count
+                    self.logger.debug(f"Processed {file_count} files from {file_path}, total size so far: {total_size}")
+                                
+                except Exception as e:
+                    self.logger.error(f"Error reading collection file {file_path}: {e}")
+                    continue
+            
+            return {
+                'total_size_bytes': total_size,
+                'total_files': total_files
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error getting total data size and file count for {channel_name}: {e}")
+            return None
+
+    def _get_total_data_size_for_channel(self, channel_name: str) -> Optional[float]:
+        """Get total data size for a specific channel from collection files."""
+        result = self._get_total_data_size_and_file_count_for_channel(channel_name)
+        return result['total_size_bytes'] if result else None
+
+    def _get_file_analysis_from_collection(self, channel_name: str) -> Optional[Dict[str, Any]]:
+        """Get file analysis data from collection files when analysis data is missing."""
+        try:
+            # Find all collection files for this channel
+            collections_dir = Path("reports/0_collections")
+            collection_files = list(collections_dir.glob(f"*{channel_name}*.json"))
+            
+            if not collection_files:
+                return None
+            
+            file_extensions = {}
+            file_sizes = []
+            filenames = []
+            
+            # Process all collection files for this channel
+            for file_path in collection_files:
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    
+                    # Handle the collection file structure
+                    messages = []
+                    if isinstance(data, list):
+                        for item in data:
+                            if isinstance(item, dict) and 'messages' in item:
+                                messages.extend(item['messages'])
+                            elif isinstance(item, dict) and 'file_size' in item:
+                                messages.append(item)
+                    elif isinstance(data, dict):
+                        if 'messages' in data:
+                            messages = data['messages']
+                        elif 'file_size' in data:
+                            messages = [data]
+                    
+                    # Extract file information
+                    for message in messages:
+                        if isinstance(message, dict) and 'file_size' in message:
+                            file_size = message['file_size']
+                            if file_size is not None and file_size != 'null' and str(file_size).lower() != 'nan':
+                                file_size_float = float(file_size)
+                                if file_size_float > 0:
+                                    file_sizes.append(file_size_float)
+                                    
+                                    # Extract filename and extension
+                                    if 'file_name' in message and message['file_name']:
+                                        filename = message['file_name']
+                                        filenames.append(filename)
+                                        
+                                        # Get file extension
+                                        if '.' in filename:
+                                            ext = filename.split('.')[-1].lower()
+                                            file_extensions[ext] = file_extensions.get(ext, 0) + 1
+                                    
+                except Exception as e:
+                    self.logger.error(f"Error reading collection file {file_path}: {e}")
+                    continue
+            
+            if not file_sizes:
+                return None
+            
+            # Calculate file size distribution
+            size_ranges = {
+                '0-1MB': 0,
+                '1-10MB': 0,
+                '10-100MB': 0,
+                '100MB-1GB': 0,
+                '1GB+': 0
+            }
+            
+            for size in file_sizes:
+                if size < 1024 * 1024:  # < 1MB
+                    size_ranges['0-1MB'] += 1
+                elif size < 10 * 1024 * 1024:  # < 10MB
+                    size_ranges['1-10MB'] += 1
+                elif size < 100 * 1024 * 1024:  # < 100MB
+                    size_ranges['10-100MB'] += 1
+                elif size < 1024 * 1024 * 1024:  # < 1GB
+                    size_ranges['100MB-1GB'] += 1
+                else:  # >= 1GB
+                    size_ranges['1GB+'] += 1
+            
+            # Get top extensions
+            top_extensions = sorted(file_extensions.items(), key=lambda x: x[1], reverse=True)[:10]
+            
+            # Calculate duplicate files by size (since we don't have filenames)
+            size_counts = {}
+            for size in file_sizes:
+                size_counts[size] = size_counts.get(size, 0) + 1
+            
+            duplicate_sizes = sum(1 for count in size_counts.values() if count > 1)
+            unique_sizes = len(size_counts) - duplicate_sizes
+            
+            # Calculate duplicate ratio
+            total_files = len(file_sizes)
+            duplicate_ratio = duplicate_sizes / total_files if total_files > 0 else 0
+            
+            return {
+                'filename_analysis': {
+                    'duplicate_filename_detection': {
+                        'total_files': total_files,
+                        'total_unique_filenames': len(set(filenames)) if filenames else unique_sizes,
+                        'files_with_duplicate_names': duplicate_sizes if not filenames else 0,
+                        'duplicate_ratio': duplicate_ratio
+                    },
+                    'filename_pattern_analysis': {
+                        'common_extensions': [{'extension': ext, 'count': count} for ext, count in top_extensions],
+                        'files_with_special_chars': 0,  # Not available from collection data
+                        'files_with_spaces': 0  # Not available from collection data
+                    }
+                },
+                'filesize_analysis': {
+                    'duplicate_filesize_detection': {
+                        'total_files': total_files,
+                        'duplicate_ratio': duplicate_ratio,
+                        'files_with_duplicate_sizes': duplicate_sizes
+                    },
+                    'filesize_distribution_analysis': {
+                        'size_frequency_distribution': size_ranges
+                    }
+                }
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating file analysis from collection for {channel_name}: {e}")
+            return None
+
+    def _format_file_size(self, size_bytes: float) -> str:
+        """Format file size in human-readable format."""
+        if size_bytes is None or size_bytes == 0:
+            return "0 B"
+        
+        size_bytes = float(size_bytes)
+        
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if size_bytes < 1024.0:
+                return f"{size_bytes:.1f} {unit}"
+            size_bytes /= 1024.0
+        
+        return f"{size_bytes:.1f} PB"
+
     def _get_monthly_histogram_for_channel(self, channel_name: str) -> Optional[Dict[str, Any]]:
         """Get monthly histogram data for a specific channel from collection files."""
         try:
@@ -660,8 +879,18 @@ class DashboardProcessor:
                 month_key = date.strftime('%Y-%m')
                 monthly_data[month_key] = monthly_data.get(month_key, 0) + 1
             
-            # Transform the monthly data
-            return self._transform_monthly_histogram({'monthly': monthly_data})
+            # Transform the monthly data - convert YYYY-MM format to month numbers
+            monthly_counts = {}
+            for month_key, count in monthly_data.items():
+                # Extract month number from YYYY-MM format
+                month_num = int(month_key.split('-')[1])
+                monthly_counts[str(month_num)] = count
+            
+            return self._transform_monthly_histogram({
+                'temporal_patterns': {
+                    'monthly': monthly_counts
+                }
+            })
             
         except Exception as e:
             self.logger.error(f"Error getting monthly histogram for {channel_name}: {e}")
@@ -981,6 +1210,36 @@ class DashboardProcessor:
                             # Add detailed filesize metrics
                             channel_data[channel_name]['filesize_metrics'] = self._extract_filesize_metrics(filesize_data)
                         
+                        # Check if analysis data is empty and fall back to collection data
+                        filename_analysis = analysis_results.get('filename_analysis', {})
+                        filesize_analysis = analysis_results.get('filesize_analysis', {})
+                        
+                        # Check if filename analysis is empty (no files detected)
+                        filename_duplicate_detection = filename_analysis.get('duplicate_filename_detection', {})
+                        filename_total_files = filename_duplicate_detection.get('total_files', 0)
+                        
+                        # Check if filesize analysis is empty
+                        filesize_duplicate_detection = filesize_analysis.get('duplicate_filesize_detection', {})
+                        filesize_total_files = filesize_duplicate_detection.get('total_files', 0)
+                        
+                        # If both analyses show 0 files, try to get data from collection files
+                        if filename_total_files == 0 and filesize_total_files == 0:
+                            self.logger.debug(f"Analysis data empty for {channel_name}, trying collection data")
+                            collection_analysis = self._get_file_analysis_from_collection(channel_name)
+                            if collection_analysis:
+                                # Use collection data for filename analysis
+                                collection_filename_data = collection_analysis['filename_analysis']
+                                channel_data[channel_name]['filename_analysis'] = self._transform_filename_analysis(collection_filename_data)
+                                channel_data[channel_name]['file_types_analysis'] = self._transform_file_types_analysis(collection_filename_data)
+                                channel_data[channel_name]['filename_metrics'] = self._extract_filename_metrics(collection_filename_data)
+                                
+                                # Use collection data for filesize analysis
+                                collection_filesize_data = collection_analysis['filesize_analysis']
+                                channel_data[channel_name]['filesize_analysis'] = self._transform_filesize_analysis(collection_filesize_data)
+                                channel_data[channel_name]['filesize_metrics'] = self._extract_filesize_metrics(collection_filesize_data)
+                                
+                                self.logger.debug(f"Successfully populated analysis data from collection for {channel_name}")
+                        
                         # Process message analysis
                         if 'message_analysis' in analysis_results:
                             message_data = analysis_results['message_analysis']
@@ -994,6 +1253,9 @@ class DashboardProcessor:
                             # Add creator analysis
                             channel_data[channel_name]['creator_analysis'] = self._transform_creator_analysis(message_data)
                             channel_data[channel_name]['creator_metrics'] = self._extract_creator_metrics(message_data)
+                        else:
+                            # Fallback: create basic message metrics from collection data
+                            channel_data[channel_name]['message_metrics'] = self._get_message_metrics_from_collection(channel_name)
                         
                         # Update summary data only if we have actual records
                         data_summary = data.get('data_summary', {})
@@ -1073,15 +1335,41 @@ class DashboardProcessor:
                 if monthly_histogram:
                     data['monthly_histogram'] = monthly_histogram
             
+            # Add total data size and file count for this channel
+            size_and_file_data = self._get_total_data_size_and_file_count_for_channel(channel_name)
+            if size_and_file_data:
+                total_size_bytes = size_and_file_data['total_size_bytes']
+                collection_file_count = size_and_file_data['total_files']
+                
+                self.logger.debug(f"Total data size for {channel_name}: {total_size_bytes} bytes")
+                self.logger.debug(f"Total files from collection for {channel_name}: {collection_file_count}")
+                
+                data['total_data_size_bytes'] = total_size_bytes
+                data['total_data_size_formatted'] = self._format_file_size(total_size_bytes)
+                
+                # Use collection file count if analysis file count is 0 or missing
+                if data.get('files', 0) == 0 and collection_file_count > 0:
+                    data['files'] = collection_file_count
+                    self.logger.debug(f"Updated file count for {channel_name} from collection data: {collection_file_count}")
+                
+                self.logger.debug(f"Formatted data size for {channel_name}: {data['total_data_size_formatted']}")
+            
             # Add timeline chart from collection data
             timeline_chart = self._get_timeline_data_for_channel(channel_name)
             if timeline_chart:
                 data['timeline_chart'] = timeline_chart
         
         # Calculate total summary
+        total_data_size_bytes = 0.0
         for channel_data_item in channel_data.values():
             dashboard_data['summary']['total_messages'] += channel_data_item.get('messages', 0)
             dashboard_data['summary']['total_files'] += channel_data_item.get('files', 0)
+            total_data_size_bytes += channel_data_item.get('total_data_size_bytes', 0.0)
+        
+        # Add total data size to summary
+        if total_data_size_bytes > 0:
+            dashboard_data['summary']['total_data_size_bytes'] = total_data_size_bytes
+            dashboard_data['summary']['total_data_size_formatted'] = self._format_file_size(total_data_size_bytes)
         
         return dashboard_data
 
@@ -1270,12 +1558,40 @@ body {
     font-size: 0.9rem;
 }
 
+.analysis-section {
+    background: #f8f9fa;
+    padding: 2rem;
+    border-radius: 12px;
+    margin: 2rem 0;
+    border-left: 4px solid #007bff;
+}
+
+.analysis-section h2 {
+    color: #007bff;
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 0.5rem;
+}
+
+.analysis-section h3 {
+    color: #495057;
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+}
+
+.analysis-section h4 {
+    color: #6c757d;
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+}
+
 .chart-section {
     background: white;
     padding: 1.5rem;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    margin: 2rem 0;
+    margin: 1rem 0;
 }
 
 .chart-container {
@@ -1371,19 +1687,6 @@ function initializeAnalytics() {{
     ''' if DASHBOARD_GA_ENABLED else ''}
 }}
 
-function handleExport(type) {{
-    {f'''
-    if (typeof gtag !== 'undefined') {{
-        gtag('event', 'export_action', {{
-            'event_category': 'dashboard',
-            'event_label': type
-        }});
-    }}
-    ''' if DASHBOARD_GA_ENABLED else ''}
-    
-    // Export functionality
-    console.log('Export requested:', type);
-}}
 
 function handleChartInteraction(chartType, action, channelName) {{
     {f'''
@@ -1498,6 +1801,119 @@ function handleChartInteraction(chartType, action, channelName) {{
             'primary_language': language_detection.get('primary_language', 'Unknown'),
             'language_confidence': language_detection.get('confidence', 0)
         }
+    
+    def _get_message_metrics_from_collection(self, channel_name: str) -> Dict[str, Any]:
+        """Get basic message metrics from collection files when analysis data is missing."""
+        try:
+            # Find all collection files for this channel
+            collections_dir = Path("reports/0_collections")
+            collection_files = list(collections_dir.glob(f"*{channel_name}*.json"))
+            
+            if not collection_files:
+                return {
+                    'total_messages': 0,
+                    'messages_with_text': 0,
+                    'media_messages': 0,
+                    'forwarded_messages': 0,
+                    'text_length_stats': {},
+                    'hashtags_count': 0,
+                    'mentions_count': 0,
+                    'urls_count': 0,
+                    'emojis_count': 0,
+                    'detected_languages': [],
+                    'primary_language': 'Unknown',
+                    'language_confidence': 0
+                }
+            
+            total_messages = 0
+            messages_with_text = 0
+            media_messages = 0
+            forwarded_messages = 0
+            text_lengths = []
+            
+            # Process all collection files for this channel
+            for file_path in collection_files:
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    
+                    # Extract messages from the nested structure
+                    messages = []
+                    if isinstance(data, list):
+                        for item in data:
+                            if isinstance(item, dict) and 'messages' in item:
+                                messages.extend(item['messages'])
+                            elif isinstance(item, dict) and 'message_id' in item:
+                                messages.append(item)
+                    elif isinstance(data, dict) and 'messages' in data:
+                        messages = data['messages']
+                    else:
+                        messages = data if isinstance(data, list) else [data]
+                    
+                    for message in messages:
+                        if isinstance(message, dict):
+                            total_messages += 1
+                            
+                            # Check for text content
+                            text = message.get('text', '')
+                            if text and text.strip():
+                                messages_with_text += 1
+                                text_lengths.append(len(text))
+                            
+                            # Check for media content
+                            file_size = message.get('file_size', 0)
+                            if message.get('file_name') or (file_size is not None and file_size > 0):
+                                media_messages += 1
+                            
+                            # Check for forwarded messages
+                            if message.get('is_forwarded', False):
+                                forwarded_messages += 1
+                                
+                except Exception as e:
+                    self.logger.warning(f"Error processing collection file {file_path}: {e}")
+                    continue
+            
+            # Calculate text length statistics
+            text_length_stats = {}
+            if text_lengths:
+                text_length_stats = {
+                    'count': len(text_lengths),
+                    'mean': sum(text_lengths) / len(text_lengths),
+                    'min': min(text_lengths),
+                    'max': max(text_lengths)
+                }
+            
+            return {
+                'total_messages': total_messages,
+                'messages_with_text': messages_with_text,
+                'media_messages': media_messages,
+                'forwarded_messages': forwarded_messages,
+                'text_length_stats': text_length_stats,
+                'hashtags_count': 0,  # Not available from collection data
+                'mentions_count': 0,  # Not available from collection data
+                'urls_count': 0,      # Not available from collection data
+                'emojis_count': 0,    # Not available from collection data
+                'detected_languages': [], # Not available from collection data
+                'primary_language': 'Unknown',
+                'language_confidence': 0
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error getting message metrics from collection for {channel_name}: {e}")
+            return {
+                'total_messages': 0,
+                'messages_with_text': 0,
+                'media_messages': 0,
+                'forwarded_messages': 0,
+                'text_length_stats': {},
+                'hashtags_count': 0,
+                'mentions_count': 0,
+                'urls_count': 0,
+                'emojis_count': 0,
+                'detected_languages': [],
+                'primary_language': 'Unknown',
+                'language_confidence': 0
+            }
     
     def _transform_mentions_analysis(self, message_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Transform mentions analysis data for charts."""
